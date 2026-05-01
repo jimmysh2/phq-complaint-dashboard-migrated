@@ -1,0 +1,25 @@
+Fetching deployments in courtdataportal-3064s-projects
+> Deployments for courtdataportal-3064s-projects/backend [390ms]
+
+  Age     Project                                    Deployment                                                              Status      Environment     Duration     Username                 
+  11m     courtdataportal-3064s-projects/backend     https://backend-pz1soqcxs-courtdataportal-3064s-projects.vercel.app     ● Ready     Preview         3s           courtdataportal-3064     
+  9h      courtdataportal-3064s-projects/backend     https://backend-7drk4f82d-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      24s          courtdataportal-3064     
+  16h     courtdataportal-3064s-projects/backend     https://backend-91ell3zfg-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      31s          courtdataportal-3064     
+  16h     courtdataportal-3064s-projects/backend     https://backend-j1lc9o8xs-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      23s          courtdataportal-3064     
+  16h     courtdataportal-3064s-projects/backend     https://backend-3u8jgvpty-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      30s          courtdataportal-3064     
+  16h     courtdataportal-3064s-projects/backend     https://backend-rjr1jyevc-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      24s          courtdataportal-3064     
+  17h     courtdataportal-3064s-projects/backend     https://backend-enggbxmvg-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      26s          courtdataportal-3064     
+  17h     courtdataportal-3064s-projects/backend     https://backend-d6ybcut6i-courtdataportal-3064s-projects.vercel.app     ● Ready     Preview         24s          courtdataportal-3064     
+  17h     courtdataportal-3064s-projects/backend     https://backend-nmv0j60ja-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      31s          courtdataportal-3064     
+  18h     courtdataportal-3064s-projects/backend     https://backend-q8ebopxo2-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      34s          courtdataportal-3064     
+
+https://backend-pz1soqcxs-courtdataportal-3064s-projects.vercel.app
+https://backend-7drk4f82d-courtdataportal-3064s-projects.vercel.app
+https://backend-91ell3zfg-courtdataportal-3064s-projects.vercel.app
+https://backend-j1lc9o8xs-courtdataportal-3064s-projects.vercel.app
+https://backend-3u8jgvpty-courtdataportal-3064s-projects.vercel.app
+https://backend-rjr1jyevc-courtdataportal-3064s-projects.vercel.app
+https://backend-enggbxmvg-courtdataportal-3064s-projects.vercel.app
+https://backend-d6ybcut6i-courtdataportal-3064s-projects.vercel.app
+https://backend-nmv0j60ja-courtdataportal-3064s-projects.vercel.app
+https://backend-q8ebopxo2-courtdataportal-3064s-projects.vercel.app

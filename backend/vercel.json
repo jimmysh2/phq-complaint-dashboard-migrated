@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "buildCommand": "npm run build",
+  "outputDirectory": ".",
+  "builds": [
+    {
+      "src": "api/serverless.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["dist/**", "prisma/**", "node_modules/.prisma/**", "node_modules/@prisma/**"]
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/serverless.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cctns/cron-sync",
+      "schedule": "0 0 * * *"
+    }
+  ]
+}

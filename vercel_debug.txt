@@ -1,0 +1,63 @@
+> [debug] [2026-04-27T12:18:33.516Z] Vercel CLI 50.38.2
+> [debug] [2026-04-27T12:18:33.519Z] Agent/TTY/nonInteractive: isAgent=true agentName=antigravity stdin.isTTY=undefined --non-interactive=false explicitFalse=false => nonInteractive=true
+> [debug] [2026-04-27T12:18:33.520Z] user supplied known subcommand: "ls"
+> [debug] [2026-04-27T12:18:33.525Z] Valid access token, skipping token refresh.
+> [debug] [2026-04-27T12:18:33.557Z] #1 → GET https://api.vercel.com/v2/user
+> [debug] [2026-04-27T12:18:33.561Z] Arrived at home directory
+> [debug] [2026-04-27T12:18:33.756Z] Found git root via "git rev-parse --show-toplevel" - detected "C:/Users/harsh/PHQ complaint dashboard" as repo root
+> [debug] [2026-04-27T12:18:33.784Z] #2 → GET https://api.vercel.com/v2/user
+> [debug] [2026-04-27T12:18:35.185Z] #2 ← 200 OK: sfo1::vh7s9-1777292314987-4fb449e8906c [1.40s]
+> [debug] [2026-04-27T12:18:35.190Z] #3 → GET https://api.vercel.com/teams/team_LFptVDR1sFKvC4p8MuAfN3CP?teamId=team_LFptVDR1sFKvC4p8MuAfN3CP
+> [debug] [2026-04-27T12:18:35.256Z] #1 ← 200 OK: sfo1::tv9q4-1777292315086-9adac24671d3 [1.70s]
+> [debug] [2026-04-27T12:18:35.939Z] #3 ← 200 OK: sfo1::hzz5w-1777292315692-7ab106d6e851 [749ms]
+> [debug] [2026-04-27T12:18:35.942Z] Spinner invoked (Fetching deployments in courtdataportal-3064s-projects) with a 300ms delay
+> [debug] [2026-04-27T12:18:35.942Z] Fetching deployments
+> [debug] [2026-04-27T12:18:35.943Z] #4 → GET https://api.vercel.com/v6/deployments?limit=20&teamId=team_LFptVDR1sFKvC4p8MuAfN3CP
+> [debug] [2026-04-27T12:18:36.513Z] #4 ← 200 OK: sfo1::g9g8s-1777292316127-8e38a4a855ae [570ms]
+> Deployments under courtdataportal-3064s-projects [576ms]
+
+  Age     Project                                     Deployment                                                               Status      Environment     Duration     Username                 
+  38m     courtdataportal-3064s-projects/frontend     https://frontend-aoxd1n3lx-courtdataportal-3064s-projects.vercel.app     ● Ready     Preview         4s           courtdataportal-3064     
+  38m     courtdataportal-3064s-projects/phq-cd       https://phq-legi1mobq-courtdataportal-3064s-projects.vercel.app          ● Ready     Preview         18s          courtdataportal-3064     
+  38m     courtdataportal-3064s-projects/backend      https://backend-cn8gvlcmi-courtdataportal-3064s-projects.vercel.app      ● Ready     Preview         3s           courtdataportal-3064     
+  42m     courtdataportal-3064s-projects/frontend     https://frontend-atmurpr05-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      4s           courtdataportal-3064     
+  42m     courtdataportal-3064s-projects/backend      https://backend-899byqo5j-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      30s          courtdataportal-3064     
+  43m     courtdataportal-3064s-projects/frontend     https://frontend-jn0a1yrv1-courtdataportal-3064s-projects.vercel.app     ● Ready     Preview         5s           courtdataportal-3064     
+  2h      courtdataportal-3064s-projects/frontend     https://frontend-jqltveywy-courtdataportal-3064s-projects.vercel.app     ● Ready     Preview         4s           courtdataportal-3064     
+  2h      courtdataportal-3064s-projects/phq-cd       https://phq-lcokjpb8z-courtdataportal-3064s-projects.vercel.app          ● Ready     Preview         21s          courtdataportal-3064     
+  2h      courtdataportal-3064s-projects/backend      https://backend-pz1soqcxs-courtdataportal-3064s-projects.vercel.app      ● Ready     Preview         3s           courtdataportal-3064     
+  11h     courtdataportal-3064s-projects/backend      https://backend-7drk4f82d-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      24s          courtdataportal-3064     
+  18h     courtdataportal-3064s-projects/backend      https://backend-91ell3zfg-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      31s          courtdataportal-3064     
+  18h     courtdataportal-3064s-projects/backend      https://backend-j1lc9o8xs-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      23s          courtdataportal-3064     
+  18h     courtdataportal-3064s-projects/backend      https://backend-3u8jgvpty-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      30s          courtdataportal-3064     
+  18h     courtdataportal-3064s-projects/backend      https://backend-rjr1jyevc-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      24s          courtdataportal-3064     
+  19h     courtdataportal-3064s-projects/backend      https://backend-enggbxmvg-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      26s          courtdataportal-3064     
+  19h     courtdataportal-3064s-projects/backend      https://backend-d6ybcut6i-courtdataportal-3064s-projects.vercel.app      ● Ready     Preview         24s          courtdataportal-3064     
+  19h     courtdataportal-3064s-projects/backend      https://backend-nmv0j60ja-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      31s          courtdataportal-3064     
+  19h     courtdataportal-3064s-projects/frontend     https://frontend-b4t16aegr-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      21s          courtdataportal-3064     
+  20h     courtdataportal-3064s-projects/frontend     https://frontend-iq4hr1fw5-courtdataportal-3064s-projects.vercel.app     ● Ready     Production      22s          courtdataportal-3064     
+  20h     courtdataportal-3064s-projects/backend      https://backend-q8ebopxo2-courtdataportal-3064s-projects.vercel.app      ● Ready     Production      34s          courtdataportal-3064     
+
+https://frontend-aoxd1n3lx-courtdataportal-3064s-projects.vercel.app
+https://phq-legi1mobq-courtdataportal-3064s-projects.vercel.app
+https://backend-cn8gvlcmi-courtdataportal-3064s-projects.vercel.app
+https://frontend-atmurpr05-courtdataportal-3064s-projects.vercel.app
+https://backend-899byqo5j-courtdataportal-3064s-projects.vercel.app
+https://frontend-jn0a1yrv1-courtdataportal-3064s-projects.vercel.app
+https://frontend-jqltveywy-courtdataportal-3064s-projects.vercel.app
+https://phq-lcokjpb8z-courtdataportal-3064s-projects.vercel.app
+https://backend-pz1soqcxs-courtdataportal-3064s-projects.vercel.app
+https://backend-7drk4f82d-courtdataportal-3064s-projects.vercel.app
+https://backend-91ell3zfg-courtdataportal-3064s-projects.vercel.app
+https://backend-j1lc9o8xs-courtdataportal-3064s-projects.vercel.app
+https://backend-3u8jgvpty-courtdataportal-3064s-projects.vercel.app
+https://backend-rjr1jyevc-courtdataportal-3064s-projects.vercel.app
+https://backend-enggbxmvg-courtdataportal-3064s-projects.vercel.app
+https://backend-d6ybcut6i-courtdataportal-3064s-projects.vercel.app
+https://backend-nmv0j60ja-courtdataportal-3064s-projects.vercel.app
+https://frontend-b4t16aegr-courtdataportal-3064s-projects.vercel.app
+https://frontend-iq4hr1fw5-courtdataportal-3064s-projects.vercel.app
+https://backend-q8ebopxo2-courtdataportal-3064s-projects.vercel.app
+> To display the next page, run `vercel ls --debug --next 1777220211033`
+> [debug] [2026-04-27T12:18:38.569Z] Telemetry subprocess killed due to timeout
+> [debug] [2026-04-27T12:18:38.588Z] Telemetry subprocess exited with code null

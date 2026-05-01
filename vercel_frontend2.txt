@@ -1,0 +1,17 @@
+Fetching deployments in courtdataportal-3064s-projects
+> Deployments for courtdataportal-3064s-projects/frontend [1s]
+
+  Age     Project                                     Deployment                                                               Status       Environment     Duration     Username                 
+  21s     courtdataportal-3064s-projects/frontend     https://frontend-aoxd1n3lx-courtdataportal-3064s-projects.vercel.app     ● Queued     Preview         ?            courtdataportal-3064     
+  4m      courtdataportal-3064s-projects/frontend     https://frontend-atmurpr05-courtdataportal-3064s-projects.vercel.app     ● Ready      Production      4s           courtdataportal-3064     
+  5m      courtdataportal-3064s-projects/frontend     https://frontend-jn0a1yrv1-courtdataportal-3064s-projects.vercel.app     ● Ready      Preview         5s           courtdataportal-3064     
+  2h      courtdataportal-3064s-projects/frontend     https://frontend-jqltveywy-courtdataportal-3064s-projects.vercel.app     ● Ready      Preview         4s           courtdataportal-3064     
+  19h     courtdataportal-3064s-projects/frontend     https://frontend-b4t16aegr-courtdataportal-3064s-projects.vercel.app     ● Ready      Production      21s          courtdataportal-3064     
+  19h     courtdataportal-3064s-projects/frontend     https://frontend-iq4hr1fw5-courtdataportal-3064s-projects.vercel.app     ● Ready      Production      22s          courtdataportal-3064     
+
+https://frontend-aoxd1n3lx-courtdataportal-3064s-projects.vercel.app
+https://frontend-atmurpr05-courtdataportal-3064s-projects.vercel.app
+https://frontend-jn0a1yrv1-courtdataportal-3064s-projects.vercel.app
+https://frontend-jqltveywy-courtdataportal-3064s-projects.vercel.app
+https://frontend-b4t16aegr-courtdataportal-3064s-projects.vercel.app
+https://frontend-iq4hr1fw5-courtdataportal-3064s-projects.vercel.app
