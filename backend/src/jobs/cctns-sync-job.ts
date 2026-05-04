@@ -121,8 +121,8 @@ export const startCctnsBackgroundSync = () => {
   if (intervalHandle) return;
 
   runCctnsSync().catch((error) => console.error('[SYNC] Initial sync failed:', error));
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
   intervalHandle = setInterval(() => {
     runCctnsSync().catch((error) => console.error('[SYNC] Scheduled sync failed:', error));
-  }, ONE_DAY_MS);
+  }, FOUR_HOURS_MS);
 };

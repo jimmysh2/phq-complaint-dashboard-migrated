@@ -32,6 +32,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     const totalReceived = await prisma.complaint.count({ where: baseWhere });
     const totalDisposed = await prisma.complaint.count({ where: withAnd(baseWhere, { statusGroup: 'disposed' }) });
     const totalPending = await prisma.complaint.count({ where: withAnd(baseWhere, { statusGroup: 'pending' }) });
+    // Complaints where CCTNS API provided no recognizable status value
+    const totalUnknown = await prisma.complaint.count({ where: withAnd(baseWhere, { statusGroup: 'unknown' }) });
     const disposedMissingDateCount = await prisma.complaint.count({
       where: withAnd(baseWhere, { statusGroup: 'disposed', isDisposedMissingDate: true }),
     });
@@ -76,10 +78,11 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       totalReceived,
       totalDisposed,
       totalPending,
+      totalUnknown,          // Status not provided by CCTNS API
+      disposedMissingDateCount, // Disposed but no disposal date from API
       pendingOverFifteenDays: pending15,
       pendingOverOneMonth: pendingOver1,
       pendingOverTwoMonths: pendingOver2,
-      disposedMissingDateCount,
       avgDisposalTime,
     });
   });
@@ -95,13 +98,14 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       }),
     ]);
 
-    const districtMap = new Map<string, { total: number; pending: number; disposed: number; missingDates: number }>();
+    const districtMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
     for (const comp of complaints) {
       const district = getDistrictLabel(comp.districtMasterId, districtMapById);
-      const stats = districtMap.get(district) || { total: 0, pending: 0, disposed: 0, missingDates: 0 };
+      const stats = districtMap.get(district) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
       stats.total++;
       if (comp.statusGroup === 'pending') stats.pending++;
-      if (comp.statusGroup === 'disposed') stats.disposed++;
+      else if (comp.statusGroup === 'disposed') stats.disposed++;
+      else stats.unknown++;
       if (comp.isDisposedMissingDate) stats.missingDates++;
       districtMap.set(district, stats);
     }
@@ -117,15 +121,16 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       select: { complRegDt: true, statusGroup: true },
     });
 
-    const durationMap = new Map<string, { total: number; pending: number; disposed: number; sortKey: number }>();
+    const durationMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; sortKey: number }>();
     for (const comp of complaints) {
       if (!comp.complRegDt) continue;
       const d = new Date(comp.complRegDt);
       const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
-      const stats = durationMap.get(key) || { total: 0, pending: 0, disposed: 0, sortKey: d.getTime() };
+      const stats = durationMap.get(key) || { total: 0, pending: 0, disposed: 0, unknown: 0, sortKey: d.getTime() };
       stats.total++;
       if (comp.statusGroup === 'pending') stats.pending++;
-      if (comp.statusGroup === 'disposed') stats.disposed++;
+      else if (comp.statusGroup === 'disposed') stats.disposed++;
+      else stats.unknown++;
       durationMap.set(key, stats);
     }
 
@@ -133,7 +138,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       reply,
       Array.from(durationMap.entries())
         .sort((a, b) => a[1].sortKey - b[1].sortKey)
-        .map(([duration, stats]) => ({ duration, total: stats.total, pending: stats.pending, disposed: stats.disposed }))
+        .map(([duration, stats]) => ({ duration, total: stats.total, pending: stats.pending, disposed: stats.disposed, unknown: stats.unknown }))
     );
   });
 
@@ -306,22 +311,22 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
 
     const now = Date.now();
     const psMap = new Map<string, {
-      total: number; pending: number; disposed: number; missingDates: number;
+      total: number; pending: number; disposed: number; unknown: number; missingDates: number;
       u7: number; u15: number; u30: number; o30: number;
       du7: number; du15: number; du30: number; do30: number; totalDisposalDays: number;
     }>();
-    const categoryMap = new Map<string, { total: number; pending: number; disposed: number; missingDates: number }>();
+    const categoryMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
 
     for (const comp of complaints) {
       const ps = getPoliceStationLabel(comp.policeStationMasterId, stationMapById);
       const category = comp.classOfIncident || UNMAPPED;
       const stats = psMap.get(ps) || {
-        total: 0, pending: 0, disposed: 0, missingDates: 0,
+        total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0,
         u7: 0, u15: 0, u30: 0, o30: 0,
         du7: 0, du15: 0, du30: 0, do30: 0,
         totalDisposalDays: 0,
       };
-      const catStats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, missingDates: 0 };
+      const catStats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
 
       stats.total++;
       catStats.total++;
@@ -350,6 +355,10 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
           else if (days < 30) stats.du30++;
           else stats.do30++;
         }
+      } else {
+        // status not found in this record
+        stats.unknown++;
+        catStats.unknown++;
       }
 
       psMap.set(ps, stats);
@@ -361,6 +370,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       total: stats.total,
       pending: stats.pending,
       disposed: stats.disposed,
+      unknown: stats.unknown,      // status not found in record
       missingDates: stats.missingDates,
       u7: stats.u7,
       u15: stats.u15,
@@ -392,13 +402,14 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
     });
 
-    const categoryMap = new Map<string, { total: number; pending: number; disposed: number; missingDates: number }>();
+    const categoryMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
     for (const comp of complaints) {
       const category = comp.classOfIncident || UNMAPPED;
-      const stats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, missingDates: 0 };
+      const stats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
       stats.total++;
       if (comp.statusGroup === 'pending') stats.pending++;
-      if (comp.statusGroup === 'disposed') stats.disposed++;
+      else if (comp.statusGroup === 'disposed') stats.disposed++;
+      else stats.unknown++;
       if (comp.isDisposedMissingDate) stats.missingDates++;
       categoryMap.set(category, stats);
     }

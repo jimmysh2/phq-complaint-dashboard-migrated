@@ -155,7 +155,8 @@ export const CCTNSPage = () => {
         sortOrder: 'desc',
       }),
     enabled: activeTab === 'live',
-    refetchInterval: activeTab === 'live' ? 30000 : false,
+    refetchInterval: false,  // No auto-refresh — background sync runs every 4h
+    staleTime: 5 * 60 * 1000, // Cache for 5 min
   });
 
   // —— Sync run history ——
@@ -601,7 +602,7 @@ export const CCTNSPage = () => {
                   No records yet. Click <strong>Fetch & Sync to DB</strong> to pull data from CCTNS.
                 </p>
                 <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  This tab auto-refreshes every 30 seconds to show the latest synced records.
+                  This tab shows the latest synced records. Background sync runs every 4 hours.
                 </p>
               </div>
             ) : (
@@ -619,8 +620,8 @@ export const CCTNSPage = () => {
                   <span>
                     Showing <strong>{liveData.length}</strong> most recently synced records
                   </span>
-                  <span>
-                    Auto-refresh: <strong>30s</strong> | Last updated:{' '}
+                  <span style={{ color: 'var(--text-muted)' }}>
+                    Sync interval: <strong>4h</strong> | Last updated:{' '}
                     {new Date().toLocaleTimeString('en-IN')}
                   </span>
                 </div>
