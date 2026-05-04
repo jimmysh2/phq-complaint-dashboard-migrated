@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "https://phq-complaint-dashboard-migrated-ba.vercel.app/api/:path*"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
