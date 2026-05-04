@@ -130,7 +130,7 @@ export const DashboardPage = () => {
   const categories = categoryData?.data || [];
   const disposalMatrix = disposalMatrixData?.data?.rows || disposalMatrixData?.data || [];
 
-  const [districtSort, setDistrictSort] = useState<string>('pending_pct');
+  const [districtSort, setDistrictSort] = useState<string>('total');
   const [categorySort, setCategorySort] = useState<string>('total');
 
   const stateTotal = s?.totalReceived || 1;

@@ -79,34 +79,251 @@ const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[]) => {
   let updated = 0;
   let errors = 0;
 
-  await processInBatches(rows, 100, async (data) => {
+  // Pre-filter invalid records
+  const validRows = rows.filter((row, index) => {
+    if (!row.complRegNum) {
+      console.warn(`⚠️ Skipping record ${index}: missing complRegNum`);
+      return false;
+    }
+    return true;
+  });
+
+  if (validRows.length < rows.length) {
+    console.log(`ℹ️ Filtered out ${rows.length - validRows.length} invalid records`);
+  }
+
+  await processInBatches(validRows, 50, async (data) => {
     try {
       const mapped = await enrichWithMasterIds(data);
+      
+      // Validate required fields before DB operation
+      if (!mapped.complRegNum) {
+        throw new Error('Missing complRegNum after enrichment');
+      }
+
       await prisma.complaint.upsert({
         where: { complRegNum: data.complRegNum },
         update: mapped,
         create: mapped,
       });
       updated++;
-    } catch {
-      errors++;
+    } catch (error: any) {
+      // Distinguish between different error types
+      if (error.code === 'P2002') { // Unique constraint violation
+        console.warn(`⚠️ Duplicate complaint: ${data.complRegNum}`);
+        updated++; // Treat as update
+      } else if (error.code === 'P2010') { // Invalid value
+        console.error(`❌ Invalid data for ${data.complRegNum}:`, error.message);
+        errors++;
+      } else {
+        console.error(`❌ Database error for ${data.complRegNum}:`, error.message);
+        errors++;
+      }
     }
   });
 
-  created = Math.max(rows.length - updated - errors, 0);
+  created = Math.max(validRows.length - updated - errors, 0);
   return { created, updated, errors };
 };
 
+// In-memory job tracking for async fetch operations
+interface FetchJob {
+  id: string;
+  status: 'pending' | 'running' | 'success' | 'error';
+  timeFrom: string;
+  timeTo: string;
+  progress?: string;
+  result?: {
+    fetched: number;
+    uniqueComplaints: number;
+    created: number;
+    updated: number;
+    errors: number;
+  };
+  error?: string;
+  startedAt: Date;
+  completedAt?: Date;
+}
+
+const fetchJobs = new Map<string, FetchJob>();
+
+const runFetchJob = async (jobId: string, timeFrom: string, timeTo: string) => {
+  const job = fetchJobs.get(jobId);
+  if (!job) return;
+
+  job.status = 'running';
+  console.log(`[FETCH-JOB ${jobId}] Starting fetch job: ${timeFrom} to ${timeTo}`);
+
+  try {
+    // Validate date range early
+    const startDate = parseDdMmYyyy(timeFrom);
+    const endDate = parseDdMmYyyy(timeTo);
+    
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) {
+      throw new Error(`Invalid date range: ${timeFrom} to ${timeTo}`);
+    }
+
+    job.progress = 'Fetching from CCTNS API...';
+    console.log(`[FETCH-JOB ${jobId}] Fetching from CCTNS API...`);
+    
+    let complaints: CctnsComplaintRow[] = [];
+    try {
+      complaints = await collectComplaintsByRange(timeFrom, timeTo);
+    } catch (fetchError: any) {
+      console.error(`[FETCH-JOB ${jobId}] CCTNS API fetch failed:`, fetchError.message);
+      throw new Error(`CCTNS API failed: ${fetchError.message}`);
+    }
+    
+    job.progress = `Normalizing ${complaints.length} records...`;
+    console.log(`[FETCH-JOB ${jobId}] Normalizing ${complaints.length} records...`);
+    
+    const normalized = toNormalizedUnique(complaints);
+    
+    job.progress = `Saving ${normalized.length} records to database...`;
+    console.log(`[FETCH-JOB ${jobId}] Saving ${normalized.length} records to database...`);
+    
+    const { created, updated, errors } = await saveNormalizedComplaints(normalized);
+    
+    job.status = 'success';
+    job.result = {
+      fetched: complaints.length,
+      uniqueComplaints: normalized.length,
+      created,
+      updated,
+      errors,
+    };
+    job.completedAt = new Date();
+    
+    console.log(`[FETCH-JOB ${jobId}] Completed successfully:`, job.result);
+
+    // Also create a SyncRun record for audit trail
+    try {
+      await prisma.syncRun.create({
+        data: {
+          kind: 'cctns-manual',
+          status: errors > 0 ? 'partial' : 'success',
+          startedAt: job.startedAt,
+          endedAt: job.completedAt,
+          fetchedCount: complaints.length,
+          upsertedCount: created + updated,
+          errorCount: errors,
+          message: `Manual fetch: ${timeFrom} to ${timeTo}`,
+        },
+      });
+    } catch (syncRunError: any) {
+      console.error(`[FETCH-JOB ${jobId}] Failed to create sync run record:`, syncRunError.message);
+      // Don't fail the job just because we couldn't create the audit record
+    }
+  } catch (error: any) {
+    const errorMsg = error instanceof Error ? error.message : String(error);
+    job.status = 'error';
+    job.error = errorMsg;
+    job.completedAt = new Date();
+    
+    console.error(`[FETCH-JOB ${jobId}] Job failed:`, errorMsg);
+
+    // Always try to create error sync run for audit
+    try {
+      await prisma.syncRun.create({
+        data: {
+          kind: 'cctns-manual',
+          status: 'error',
+          startedAt: job.startedAt,
+          endedAt: job.completedAt,
+          errorCount: 1,
+          message: `Manual fetch failed: ${timeFrom} to ${timeTo} — ${errorMsg}`,
+        },
+      });
+    } catch (syncRunError: any) {
+      console.error(`[FETCH-JOB ${jobId}] Failed to create error sync run record:`, syncRunError.message);
+    }
+  }
+};
+
 export const cctnsRoutes = async (fastify: FastifyInstance) => {
+  // —— List complaints with pagination, search, filter ——
   fastify.get('/cctns', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
-    const records = await prisma.complaint.findMany({
-      orderBy: { id: 'desc' },
-      take: 500,
-    });
+  }, async (request, reply) => {
+    const {
+      page = '1',
+      limit = '50',
+      search = '',
+      district = '',
+      statusGroup = '',
+      dateFrom = '',
+      dateTo = '',
+      sortBy = 'id',
+      sortOrder = 'desc',
+    } = request.query as Record<string, string>;
 
-    return sendSuccess(reply, records);
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.min(500, Math.max(1, parseInt(limit, 10)));
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+
+    if (search) {
+      where.OR = [
+        { complRegNum: { contains: search, mode: 'insensitive' } },
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
+        { mobile: { contains: search, mode: 'insensitive' } },
+        { complDesc: { contains: search, mode: 'insensitive' } },
+        { districtName: { contains: search, mode: 'insensitive' } },
+        { addressPs: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (district) {
+      where.OR = [
+        { districtName: { contains: district, mode: 'insensitive' } },
+        { addressDistrict: { contains: district, mode: 'insensitive' } },
+      ];
+    }
+
+    if (statusGroup) {
+      where.statusGroup = statusGroup.toLowerCase();
+    }
+
+    if (dateFrom || dateTo) {
+      where.complRegDt = {};
+      if (dateFrom) {
+        where.complRegDt.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        where.complRegDt.lte = new Date(dateTo);
+      }
+    }
+
+    // Validate sortBy to prevent injection
+    const allowedSortFields = [
+      'id', 'complRegNum', 'complRegDt', 'districtName', 'addressPs',
+      'statusOfComplaint', 'disposalDate', 'createdAt', 'updatedAt',
+    ];
+    const orderByField = allowedSortFields.includes(sortBy) ? sortBy : 'id';
+    const orderByDirection = sortOrder === 'asc' ? 'asc' : 'desc';
+
+    const [records, total] = await Promise.all([
+      prisma.complaint.findMany({
+        where,
+        skip,
+        take: limitNum,
+        orderBy: { [orderByField]: orderByDirection },
+      }),
+      prisma.complaint.count({ where }),
+    ]);
+
+    return sendSuccess(reply, {
+      data: records,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
   });
 
   fastify.get('/cctns/district', {
@@ -173,6 +390,8 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
+  // —— Deprecated: direct live fetch without persistence ——
+  // Kept for backward compatibility but marked as deprecated
   fastify.get('/cctns/complaints-live', {
     preHandler: [authenticate],
   }, async (request, reply) => {
@@ -188,6 +407,8 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
         timeFrom,
         timeTo,
         records: complaints,
+        deprecated: true,
+        note: 'This endpoint does not persist data. Use POST /cctns/fetch-and-sync instead.',
       });
     } catch (error) {
       return sendError(
@@ -197,6 +418,78 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     }
   });
 
+  // —— Unified: Fetch from CCTNS API and persist directly to DB ——
+  fastify.post('/cctns/fetch-and-sync', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const { timeFrom, timeTo } = request.body as Record<string, string>;
+      if (!timeFrom || !timeTo) {
+        return sendError(reply, 'timeFrom and timeTo are required');
+      }
+
+      // Validate date format
+      const dateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+      if (!dateRegex.test(timeFrom) || !dateRegex.test(timeTo)) {
+        return sendError(reply, 'Invalid date format. Expected DD/MM/YYYY');
+      }
+
+      const jobId = `fetch-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const job: FetchJob = {
+        id: jobId,
+        status: 'pending',
+        timeFrom,
+        timeTo,
+        startedAt: new Date(),
+      };
+      fetchJobs.set(jobId, job);
+
+      // Start the job asynchronously — do not await
+      runFetchJob(jobId, timeFrom, timeTo).catch((error) => {
+        console.error(`[FETCH-JOB ${jobId}] Unhandled error:`, error);
+        const j = fetchJobs.get(jobId);
+        if (j) {
+          j.status = 'error';
+          j.error = error instanceof Error ? error.message : 'Unknown error';
+          j.completedAt = new Date();
+        }
+      });
+
+      // Return immediately with job ID for polling
+      return sendSuccess(reply, {
+        jobId,
+        status: 'pending',
+        message: 'Fetch and sync job started. Poll GET /cctns/fetch-status/:jobId for progress.',
+      }, 'Fetch job started', 202);
+    } catch (error) {
+      console.error('[FETCH-AND-SYNC] Failed to start job:', error);
+      return sendError(reply, `Failed to start fetch job: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  });
+
+  // —— Poll fetch job status ——
+  fastify.get('/cctns/fetch-status/:jobId', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const { jobId } = request.params as Record<string, string>;
+    const job = fetchJobs.get(jobId);
+
+    if (!job) {
+      return sendNotFound(reply, 'Fetch job not found');
+    }
+
+    return sendSuccess(reply, {
+      id: job.id,
+      status: job.status,
+      progress: job.progress,
+      result: job.result,
+      error: job.error,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+    });
+  });
+
+  // —— Deprecated: manual sync endpoint (redundant after fetch-and-sync) ——
   fastify.post('/cctns/sync-complaints', {
     preHandler: [authenticate],
   }, async (request, reply) => {
@@ -211,16 +504,46 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
       const { created, updated, errors } = await saveNormalizedComplaints(normalized);
 
       return sendSuccess(reply, {
-        message: 'Sync completed',
+        message: 'Sync completed (deprecated: use POST /cctns/fetch-and-sync)',
         fetched: complaints.length,
         uniqueComplaints: normalized.length,
         created,
         updated,
         errors,
+        deprecated: true,
       });
     } catch (error) {
       return sendError(reply, `Sync failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  });
+
+  // —— Sync run history ——
+  fastify.get('/cctns/sync-runs', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const { page = '1', limit = '20' } = request.query as Record<string, string>;
+    const pageNum = Math.max(1, parseInt(page, 10));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
+    const skip = (pageNum - 1) * limitNum;
+
+    const [runs, total] = await Promise.all([
+      prisma.syncRun.findMany({
+        orderBy: { startedAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.syncRun.count(),
+    ]);
+
+    return sendSuccess(reply, {
+      data: runs,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+    });
   });
 
   fastify.post('/cctns/remap-masters', {

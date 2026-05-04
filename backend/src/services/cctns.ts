@@ -92,6 +92,8 @@ export async function getCctnsToken(): Promise<string> {
 }
 
 export async function fetchCctnsComplaints(timeFrom: string, timeTo: string): Promise<Record<string, unknown>[]> {
+  console.log(`[CCTNS] Fetching complaints: ${timeFrom} to ${timeTo}`);
+  
   const token = await getCctnsToken();
   const apiUrl = process.env.CCTNS_COMPLAINT_API;
   const decryptKey = process.env.CCTNS_DECRYPT_KEY;
@@ -101,6 +103,8 @@ export async function fetchCctnsComplaints(timeFrom: string, timeTo: string): Pr
   }
 
   const url = `${apiUrl}?TimeFrom=${encodeURIComponent(timeFrom)}&TimeTo=${encodeURIComponent(timeTo)}`;
+  console.log(`[CCTNS] Request URL: ${url}`);
+  
   const res = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -114,18 +118,26 @@ export async function fetchCctnsComplaints(timeFrom: string, timeTo: string): Pr
   }
 
   const responseData = await res.text();
+  console.log(`[CCTNS] Response length: ${responseData.length} chars`);
 
   // Try plain JSON first
   try {
     const parsed = JSON.parse(responseData);
-    return Array.isArray(parsed) ? parsed : parsed.data || parsed.complaints || [];
+    const records = Array.isArray(parsed) ? parsed : parsed.data || parsed.complaints || [];
+    console.log(`[CCTNS] Parsed ${records.length} records from JSON`);
+    return records;
   } catch {
     // Fallback: try AES decrypt in case response format changes
+    console.log('[CCTNS] JSON parse failed, trying AES decrypt...');
     const decrypted = decrypt(responseData, decryptKey);
     try {
       const parsed = JSON.parse(decrypted);
-      return Array.isArray(parsed) ? parsed : parsed.data || parsed.complaints || [];
+      const records = Array.isArray(parsed) ? parsed : parsed.data || parsed.complaints || [];
+      console.log(`[CCTNS] Parsed ${records.length} records from decrypted JSON`);
+      return records;
     } catch {
+      console.error('[CCTNS] Failed to parse response as JSON or decrypted JSON');
+      console.error('[CCTNS] Raw response preview:', responseData.substring(0, 200));
       return [];
     }
   }

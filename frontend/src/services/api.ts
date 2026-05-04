@@ -19,12 +19,30 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // Add debug logging in development
+  if ((import.meta as any).env?.DEV) {
+    console.log(`🌐 API Request: ${config.method?.toUpperCase()} ${config.url}`, {
+      params: config.params,
+      data: config.data,
+    });
+  }
   return config;
 });
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if ((import.meta as any).env?.DEV) {
+      console.log(`✅ API Response: ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`);
+    }
+    return response;
+  },
   async (error: AxiosError) => {
+    if ((import.meta as any).env?.DEV) {
+      console.error(`❌ API Error: ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status}`, {
+        message: error.message,
+        response: error.response?.data,
+      });
+    }
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
       window.location.href = '/login';
@@ -255,6 +273,42 @@ export const cctnsApi = {
   },
   syncComplaints: async (timeFrom: string, timeTo: string) => {
     const response = await api.post('/api/cctns/sync-complaints', { timeFrom, timeTo });
+    return response.data;
+  },
+  fetchAndSync: async (timeFrom: string, timeTo: string) => {
+    try {
+      const response = await api.post('/api/cctns/fetch-and-sync', { timeFrom, timeTo });
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Fetch and sync failed:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  fetchStatus: async (jobId: string) => {
+    try {
+      const response = await api.get(`/api/cctns/fetch-status/${jobId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Fetch status failed:', error.response?.data || error.message);
+      throw error;
+    }
+  },
+  listPaginated: async (params: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    district?: string;
+    statusGroup?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) => {
+    const response = await api.get('/api/cctns', { params });
+    return response.data;
+  },
+  syncRuns: async (page = 1, limit = 20) => {
+    const response = await api.get('/api/cctns/sync-runs', { params: { page, limit } });
     return response.data;
   },
 };
