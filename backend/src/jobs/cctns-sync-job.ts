@@ -86,7 +86,7 @@ export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
   };
 
   // Create sync run record — retry if DB is still waking up from idle
-  let syncRun: { id: string };
+  let syncRun: { id: number };
   try {
     syncRun = await withRetry(() => prisma.syncRun.create({
       data: {
