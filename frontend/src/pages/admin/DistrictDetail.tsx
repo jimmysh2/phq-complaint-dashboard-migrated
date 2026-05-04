@@ -34,32 +34,37 @@ export const DistrictDetail = () => {
   
   // Aggregates
   const totalReceived = policeStations.reduce((sum: number, ps: any) => sum + ps.total, 0);
-  const totalPending = policeStations.reduce((sum: number, ps: any) => sum + ps.pending, 0);
+  const totalPending  = policeStations.reduce((sum: number, ps: any) => sum + ps.pending, 0);
   const totalDisposed = policeStations.reduce((sum: number, ps: any) => sum + ps.disposed, 0);
+  const totalUnknown  = policeStations.reduce((sum: number, ps: any) => sum + (ps.unknown || 0), 0);
   const totalDisposedDays = policeStations.reduce((sum: number, ps: any) => sum + (ps.avgDisposalDays * ps.disposed), 0);
   const avgDisposalTime = totalDisposed > 0 ? Math.round(totalDisposedDays / totalDisposed) : 0;
 
   // ── Police Station Summary Table ──────────────────────────────────────────
   const psCols: Column<any>[] = [
-    { key: 'ps', label: 'Police Station', sortable: true },
-    { key: 'total', label: 'Total', sortable: true, align: 'center' },
-    { key: 'disposed', label: 'Disposed', sortable: true, align: 'center' },
-    { key: 'u7', label: '< 7 Days', sortable: true, align: 'center' },
-    { key: 'u15', label: '7 - 15 Days', sortable: true, align: 'center' },
-    { key: 'u30', label: '15 - 30 Days', sortable: true, align: 'center' },
-    { key: 'o30', label: '> 30 Days', sortable: true, align: 'center' },
-    { key: 'avgDisposalDays', label: 'Avg Disposal', sortable: true, align: 'center' },
+    { key: 'ps',             label: 'Police Station',      sortable: true },
+    { key: 'total',          label: 'Total',               sortable: true, align: 'center' },
+    { key: 'disposed',       label: 'Disposed',            sortable: true, align: 'center' },
+    { key: 'pending',        label: 'Pending',             sortable: true, align: 'center' },
+    { key: 'unknown',        label: 'Status Not Found',    sortable: true, align: 'center' },
+    { key: 'u7',             label: '< 7 Days',            sortable: true, align: 'center' },
+    { key: 'u15',            label: '7 - 15 Days',         sortable: true, align: 'center' },
+    { key: 'u30',            label: '15 - 30 Days',        sortable: true, align: 'center' },
+    { key: 'o30',            label: '> 30 Days',           sortable: true, align: 'center' },
+    { key: 'avgDisposalDays',label: 'Avg. Disposal (Days)',sortable: true, align: 'center' },
   ];
 
   const renderPsCell = (col: Column<any>, row: any) => {
-    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'total') return <span style={{ color: '#60a5fa' }}>{row.total}</span>;
-    if (col.key === 'disposed') return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
-    if (col.key === 'u7') return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
-    if (col.key === 'u15') return <span style={{ color: '#eab308' }}>{row.u15}</span>;
-    if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
-    if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
-    if (col.key === 'avgDisposalDays') return <span style={{ color: '#c084fc' }}>{row.avgDisposalDays}d</span>;
+    if (col.key === 'ps')             return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'total')          return <span style={{ color: '#60a5fa' }}>{row.total}</span>;
+    if (col.key === 'disposed')       return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
+    if (col.key === 'pending')        return <span style={{ color: '#fbbf24' }}>{row.pending}</span>;
+    if (col.key === 'unknown')        return <span style={{ color: '#94a3b8' }}>{row.unknown ?? 0}</span>;
+    if (col.key === 'u7')             return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
+    if (col.key === 'u15')            return <span style={{ color: '#eab308' }}>{row.u15}</span>;
+    if (col.key === 'u30')            return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
+    if (col.key === 'o30')            return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'avgDisposalDays')return <span style={{ color: '#c084fc' }}>{row.avgDisposalDays}d</span>;
     return row[col.key];
   };
 
@@ -201,7 +206,11 @@ export const DistrictDetail = () => {
                 }, {
                   'Metric': 'Total Pending', 'Value': totalPending
                 }, {
-                  'Metric': 'Clearance Rate', 'Value': `${Math.round((totalDisposed / (totalReceived || 1)) * 100)}%`
+                  'Metric': 'Status Not Found', 'Value': totalUnknown
+                }, {
+                  'Metric': 'Disposed (% of Total)', 'Value': `${Math.round((totalDisposed / (totalReceived || 1)) * 100)}%`
+                }, {
+                  'Metric': 'Pending (% of Total)',  'Value': `${Math.round((totalPending  / (totalReceived || 1)) * 100)}%`
                 }, {
                   'Metric': 'Avg. Disposal Time (Days)', 'Value': avgDisposalTime
                 }];
@@ -209,24 +218,31 @@ export const DistrictDetail = () => {
 
                 // Sheet 2: Police Station Summary
                 const psSummary = policeStations.map((ps: any) => ({
-                  'Police Station': ps.ps,
-                  'Total': ps.total,
-                  'Disposed': ps.disposed,
-                  'Pending': ps.pending,
-                  '< 7 Days (Pending)': ps.u7,
-                  '7 - 15 Days (Pending)': ps.u15,
-                  '15 - 30 Days (Pending)': ps.u30,
-                  '> 30 Days (Pending)': ps.o30,
-                  'Avg Disposal (Days)': ps.avgDisposalDays
+                  'Police Station':          ps.ps,
+                  'Total':                   ps.total,
+                  'Disposed':                ps.disposed,
+                  'Pending':                 ps.pending,
+                  'Status Not Found':        ps.unknown ?? 0,
+                  'Disposed %':              `${Math.round((ps.disposed / (ps.total || 1)) * 100)}%`,
+                  'Pending %':               `${Math.round((ps.pending  / (ps.total || 1)) * 100)}%`,
+                  'Status Not Found %':      `${Math.round(((ps.unknown || 0) / (ps.total || 1)) * 100)}%`,
+                  '< 7 Days (Pending)':      ps.u7,
+                  '7 - 15 Days (Pending)':   ps.u15,
+                  '15 - 30 Days (Pending)':  ps.u30,
+                  '> 30 Days (Pending)':     ps.o30,
+                  'Avg Disposal (Days)':     ps.avgDisposalDays
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(psSummary), 'PS Summary');
 
                 // Sheet 3: Category Breakdown
                 const catSummary = categories.map((cat: any) => ({
-                  'Category': cat.category,
-                  'Total': cat.total,
-                  'Disposed': cat.disposed,
-                  'Pending': cat.pending
+                  'Category':          cat.category,
+                  'Total':             cat.total,
+                  'Disposed':          cat.disposed,
+                  'Pending':           cat.pending,
+                  'Status Not Found':  cat.unknown ?? 0,
+                  'Disposed %':        `${Math.round((cat.disposed / (cat.total || 1)) * 100)}%`,
+                  'Pending %':         `${Math.round((cat.pending  / (cat.total || 1)) * 100)}%`,
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(catSummary), 'Category Breakdown');
 
@@ -284,9 +300,30 @@ export const DistrictDetail = () => {
           <>
             <div className="stats-grid">
               <StatCard label="Total Received" value={totalReceived.toLocaleString()} colorClass="blue" />
-              <StatCard label="Total Disposed" value={totalDisposed.toLocaleString()} subValue={`${Math.round((totalDisposed / (totalReceived || 1)) * 100)}% Clearance`} colorClass="green" />
-              <StatCard label="Total Pending" value={totalPending.toLocaleString()} colorClass="red" />
-              <StatCard label="Avg. Disposal Time" value={`${avgDisposalTime} Days`} colorClass="purple" />
+              <StatCard
+                label="Total Disposed"
+                value={totalDisposed.toLocaleString()}
+                subValue={`${Math.round((totalDisposed / (totalReceived || 1)) * 100)}% of Total Received`}
+                colorClass="green"
+              />
+              <StatCard
+                label="Total Pending"
+                value={totalPending.toLocaleString()}
+                subValue={`${Math.round((totalPending / (totalReceived || 1)) * 100)}% of Total Received`}
+                colorClass="red"
+              />
+              <StatCard
+                label="Status Not Found"
+                value={totalUnknown.toLocaleString()}
+                subValue="Status was not found in the record"
+                colorClass="yellow"
+              />
+              <StatCard
+                label="Avg. Disposal Time"
+                value={`${avgDisposalTime} Days`}
+                subValue="Only for records where date was found"
+                colorClass="purple"
+              />
             </div>
 
             {/* PS Summary + Category Chart */}

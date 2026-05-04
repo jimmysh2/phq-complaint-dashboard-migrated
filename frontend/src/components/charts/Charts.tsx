@@ -5,7 +5,7 @@ export const BaseChart = ({ option, height = '400px', width = '100%' }: { option
   return <ReactECharts option={option} notMerge={true} style={{ height, width }} opts={{ renderer: 'canvas' }} />;
 };
 
-export const getDistrictBarOptions = (data: { district: string; total: number; pending: number; disposed: number }[]): any => {
+export const getDistrictBarOptions = (data: { district: string; total: number; pending: number; disposed: number; unknown?: number }[]): any => {
   return {
     tooltip: {
       trigger: 'item',
@@ -19,7 +19,7 @@ export const getDistrictBarOptions = (data: { district: string; total: number; p
       },
     },
     legend: {
-      data: ['Pending', 'Disposed'],
+      data: ['Pending', 'Disposed', 'Status Not Found'],
       bottom: 0,
       textStyle: { color: '#94a3b8', fontSize: 11 },
       itemWidth: 12,
@@ -45,7 +45,7 @@ export const getDistrictBarOptions = (data: { district: string; total: number; p
         type: 'bar',
         stack: 'total',
         data: data.map(d => d.pending),
-        itemStyle: { color: '#fbbf24', borderRadius: [0, 3, 3, 0] },
+        itemStyle: { color: '#fbbf24' },
         barMaxWidth: 20,
       },
       {
@@ -53,14 +53,22 @@ export const getDistrictBarOptions = (data: { district: string; total: number; p
         type: 'bar',
         stack: 'total',
         data: data.map(d => d.disposed),
-        itemStyle: { color: '#34d399', borderRadius: [0, 3, 3, 0] },
+        itemStyle: { color: '#34d399' },
+        barMaxWidth: 20,
+      },
+      {
+        name: 'Status Not Found',
+        type: 'bar',
+        stack: 'total',
+        data: data.map(d => d.unknown ?? 0),
+        itemStyle: { color: '#64748b', borderRadius: [0, 3, 3, 0] },
         barMaxWidth: 20,
       },
     ],
   };
 };
 
-export const getDurationLineOptions = (data: { duration?: string; month?: string; total: number; pending: number; disposed: number }[]): any => {
+export const getDurationLineOptions = (data: { duration?: string; month?: string; total: number; pending: number; disposed: number; unknown?: number }[]): any => {
   return {
     tooltip: {
       trigger: 'axis',
@@ -78,7 +86,7 @@ export const getDurationLineOptions = (data: { duration?: string; month?: string
       }
     },
     legend: {
-      data: ['Pending', 'Disposed'],
+      data: ['Pending', 'Disposed', 'Status Not Found'],
       bottom: 0,
       textStyle: { color: '#94a3b8', fontSize: 11 },
       itemWidth: 12,
@@ -122,6 +130,16 @@ export const getDurationLineOptions = (data: { duration?: string; month?: string
         itemStyle: { color: '#34d399' },
         areaStyle: { color: { type: 'linear', x: 0, y: 0, x2: 0, y2: 1, colorStops: [{ offset: 0, color: 'rgba(52,211,153,0.3)' }, { offset: 1, color: 'rgba(52,211,153,0)' }] } },
       },
+      {
+        name: 'Status Not Found',
+        type: 'line',
+        data: data.map(d => d.unknown ?? 0),
+        smooth: 0.4,
+        symbol: 'circle',
+        symbolSize: 4,
+        lineStyle: { color: '#64748b', width: 1.5, type: 'dashed' },
+        itemStyle: { color: '#64748b' },
+      },
     ],
   };
 };
@@ -160,7 +178,7 @@ export const getPieOptions = (data: { name: string; value: number }[]): any => {
   };
 };
 
-export const getStackedBarOptions = (data: { category: string; total: number; pending: number; disposed: number }[]): any => {
+export const getStackedBarOptions = (data: { category: string; total: number; pending: number; disposed: number; unknown?: number }[]): any => {
   return {
     tooltip: {
       trigger: 'item',
@@ -174,7 +192,7 @@ export const getStackedBarOptions = (data: { category: string; total: number; pe
       },
     },
     legend: {
-      data: ['Pending', 'Disposed'],
+      data: ['Pending', 'Disposed', 'Status Not Found'],
       bottom: 0,
       textStyle: { color: '#94a3b8', fontSize: 11 },
       itemWidth: 12,
@@ -209,6 +227,14 @@ export const getStackedBarOptions = (data: { category: string; total: number; pe
         stack: 'total',
         data: data.map(d => d.disposed),
         itemStyle: { color: '#34d399', borderRadius: [3, 3, 0, 0] },
+        barMaxWidth: 20,
+      },
+      {
+        name: 'Unknown Status',
+        type: 'bar',
+        stack: 'total',
+        data: data.map(d => d.unknown ?? 0),
+        itemStyle: { color: '#64748b', borderRadius: [3, 3, 0, 0] },
         barMaxWidth: 20,
       },
     ],
