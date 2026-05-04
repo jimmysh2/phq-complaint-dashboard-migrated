@@ -1,4 +1,3 @@
-import type { EChartsOption } from 'echarts';
 
 export const getDistrictBarOptions = (data: { district: string; total: number; pending: number; disposed: number; unknown?: number }[]): any => {
   return {
