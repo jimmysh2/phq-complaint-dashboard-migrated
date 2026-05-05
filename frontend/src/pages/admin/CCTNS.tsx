@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
 import { DataTable, Column } from '@/components/data/DataTable';
@@ -38,7 +39,25 @@ function formatDateTime(d: string | Date | null): string {
 
 export const CCTNSPage = () => {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<Tab>('live');
+  const [searchParams] = useSearchParams();
+
+  // Read ?statusGroup and global filters from URL (set by dashboard card clicks)
+  const urlStatusGroup    = searchParams.get('statusGroup')      || '';
+  const urlDistrictIds    = searchParams.get('districtIds')      || '';
+  const urlPsIds          = searchParams.get('policeStationIds') || '';
+  const urlOfficeIds      = searchParams.get('officeIds')        || '';
+  const urlClassOfInc     = searchParams.get('classOfIncident')  || '';
+  const urlFromDate       = searchParams.get('fromDate')         || '';
+  const urlToDate         = searchParams.get('toDate')           || '';
+
+  // Derived: any global filter is active
+  const hasGlobalFilters = !!(urlDistrictIds || urlPsIds || urlOfficeIds || urlClassOfInc || urlFromDate || urlToDate);
+
+  // Map special values: 'all' -> no status filter, 'disposed_missing_date' -> handled separately
+  const resolvedInitialStatus = urlStatusGroup === 'all' ? '' :
+    urlStatusGroup === 'disposed_missing_date' ? 'disposed' : urlStatusGroup;
+
+  const [activeTab, setActiveTab] = useState<Tab>(() => urlStatusGroup ? 'synced' : 'live');
 
   // Date range state in ISO format for native browser date picker
   const [timeFrom, setTimeFrom] = useState(thirtyDaysAgoIsoStr());
@@ -52,7 +71,8 @@ export const CCTNSPage = () => {
   // Synced records filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDistrict, setFilterDistrict] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const [filterStatus, setFilterStatus] = useState(resolvedInitialStatus);
+  const [filterMissingDateOnly, setFilterMissingDateOnly] = useState(urlStatusGroup === 'disposed_missing_date');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [sortBy, setSortBy] = useState('id');
@@ -112,6 +132,28 @@ export const CCTNSPage = () => {
     }
   }, [jobQuery.data, queryClient]);
 
+  // —— Sync filter state when URL ?statusGroup param changes ——
+  // This handles the case where the component is reused (not remounted) when
+  // navigating from dashboard card clicks multiple times (same route, different query string).
+  useEffect(() => {
+    const sg = searchParams.get('statusGroup') || '';
+    if (!sg) return; // No URL filter — leave manual state alone
+
+    // Map special values
+    const resolved = sg === 'all' ? '' : sg === 'disposed_missing_date' ? 'disposed' : sg;
+    setActiveTab('synced');
+    setFilterStatus(resolved);
+    setFilterMissingDateOnly(sg === 'disposed_missing_date');
+    setSearchQuery('');
+    setFilterDistrict('');
+    setFilterDateFrom('');
+    setFilterDateTo('');
+    setSortBy('id');
+    setSortOrder('desc');
+    setPage(1);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // —— Synced records from DB (paginated gateway) ——
   const syncedQuery = useQuery({
     queryKey: [
@@ -122,10 +164,13 @@ export const CCTNSPage = () => {
       searchQuery,
       filterDistrict,
       filterStatus,
+      filterMissingDateOnly,
       filterDateFrom,
       filterDateTo,
       sortBy,
       sortOrder,
+      // Global filters come from URL directly — include in key so query re-runs on navigation
+      urlDistrictIds, urlPsIds, urlOfficeIds, urlClassOfInc, urlFromDate, urlToDate,
     ],
     queryFn: () =>
       cctnsApi.listPaginated({
@@ -134,10 +179,18 @@ export const CCTNSPage = () => {
         search: searchQuery || undefined,
         district: filterDistrict || undefined,
         statusGroup: filterStatus || undefined,
+        isDisposedMissingDate: filterMissingDateOnly ? 'true' : undefined,
         dateFrom: filterDateFrom || undefined,
         dateTo: filterDateTo || undefined,
         sortBy,
         sortOrder,
+        // Forward global dashboard filters unchanged — backend applies them via buildPrismaWhereClause
+        districtIds:      urlDistrictIds || undefined,
+        policeStationIds: urlPsIds       || undefined,
+        officeIds:        urlOfficeIds   || undefined,
+        classOfIncident:  urlClassOfInc  || undefined,
+        fromDate:         urlFromDate    || undefined,
+        toDate:           urlToDate      || undefined,
       }),
     enabled: activeTab === 'synced',
     staleTime: 0,
@@ -196,8 +249,16 @@ export const CCTNSPage = () => {
 
   const isFetching = fetchMutation.isPending || !!activeJobId;
 
-  // —— Table columns ——
+  // —— Table columns — ALL complaint fields ——
+  const fmtDate = (val: any) => {
+    if (!val) return '—';
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? String(val) : d.toLocaleDateString('en-IN');
+  };
+
   const recordCols: Column<any>[] = [
+    // Identity
+    { key: 'id', label: 'DB ID', sortable: true },
     {
       key: 'complRegNum',
       label: 'Reg. No.',
@@ -208,21 +269,96 @@ export const CCTNSPage = () => {
         </span>
       ),
     },
+    { key: 'complSrno', label: 'Sr. No.', sortable: false },
     {
       key: 'complRegDt',
       label: 'Reg. Date',
       sortable: true,
-      render: (row) => {
-        if (!row.complRegDt) return <span>—</span>;
-        const d = new Date(row.complRegDt);
-        return <span>{isNaN(d.getTime()) ? row.complRegDt : d.toLocaleDateString('en-IN')}</span>;
-      },
+      render: (row) => <span>{fmtDate(row.complRegDt)}</span>,
     },
-    { key: 'districtName', label: 'District', sortable: true },
-    { key: 'addressPs', label: 'PS', sortable: true },
+
+    // Complainant
+    { key: 'firstName', label: 'First Name', sortable: true },
+    { key: 'lastName', label: 'Last Name', sortable: true },
+    { key: 'gender', label: 'Gender', sortable: false },
+    { key: 'age', label: 'Age', sortable: false },
+    { key: 'mobile', label: 'Mobile', sortable: false },
+    { key: 'email', label: 'Email', sortable: false },
+    { key: 'complainantType', label: 'Complainant Type', sortable: false },
+
+    // Address
+    { key: 'addressLine1', label: 'Address Line 1', sortable: false },
+    { key: 'addressLine2', label: 'Address Line 2', sortable: false },
+    { key: 'addressLine3', label: 'Address Line 3', sortable: false },
+    { key: 'village', label: 'Village', sortable: false },
+    { key: 'tehsil', label: 'Tehsil', sortable: false },
+    { key: 'addressDistrict', label: 'Address District', sortable: true },
+    { key: 'addressPs', label: 'Police Station', sortable: true },
+
+    // Location / Registration
+    { key: 'districtName', label: 'District (Master)', sortable: true },
+    {
+      key: 'districtMasterId',
+      label: 'District ID',
+      sortable: false,
+      render: (row) => <span>{row.districtMasterId != null ? String(row.districtMasterId) : '—'}</span>,
+    },
+    {
+      key: 'policeStationMasterId',
+      label: 'PS ID',
+      sortable: false,
+      render: (row) => <span>{row.policeStationMasterId != null ? String(row.policeStationMasterId) : '—'}</span>,
+    },
+    {
+      key: 'officeMasterId',
+      label: 'Office ID',
+      sortable: false,
+      render: (row) => <span>{row.officeMasterId != null ? String(row.officeMasterId) : '—'}</span>,
+    },
+    { key: 'submitPsCd', label: 'Submit PS Code', sortable: false },
+    { key: 'submitOfficeCd', label: 'Submit Office Code', sortable: false },
+    { key: 'receptionMode', label: 'Reception Mode', sortable: false },
+    { key: 'branch', label: 'Branch', sortable: false },
+
+    // Complaint Details
+    {
+      key: 'complDesc',
+      label: 'Description',
+      sortable: false,
+      render: (row) => (
+        <span
+          title={row.complDesc || ''}
+          style={{ maxWidth: 240, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+        >
+          {row.complDesc || '—'}
+        </span>
+      ),
+    },
+    { key: 'complaintSource', label: 'Complaint Source', sortable: false },
+    { key: 'typeOfComplaint', label: 'Type of Complaint', sortable: false },
+    { key: 'complaintPurpose', label: 'Complaint Purpose', sortable: false },
+    { key: 'classOfIncident', label: 'Class of Incident', sortable: false },
+    { key: 'incidentType', label: 'Incident Type', sortable: false },
+    { key: 'incidentPlc', label: 'Incident Place', sortable: false },
+    {
+      key: 'incidentFromDt',
+      label: 'Incident From',
+      sortable: false,
+      render: (row) => <span>{fmtDate(row.incidentFromDt)}</span>,
+    },
+    {
+      key: 'incidentToDt',
+      label: 'Incident To',
+      sortable: false,
+      render: (row) => <span>{fmtDate(row.incidentToDt)}</span>,
+    },
+    { key: 'crimeCategory', label: 'Crime Category', sortable: false },
+    { key: 'respondentCategories', label: 'Respondent Categories', sortable: false },
+
+    // Status
     {
       key: 'statusOfComplaint',
-      label: 'Status',
+      label: 'Status (Raw)',
       sortable: true,
       render: (row) => (
         <span
@@ -231,28 +367,67 @@ export const CCTNSPage = () => {
             borderRadius: '12px',
             fontSize: '12px',
             background:
-              row.statusOfComplaint?.toLowerCase().includes('disposed')
+              row.statusGroup === 'disposed'
                 ? 'rgba(34,197,94,0.15)'
-                : 'rgba(100,116,139,0.15)',
+                : row.statusGroup === 'pending'
+                ? 'rgba(239,68,68,0.15)'
+                : 'rgba(234,179,8,0.15)',
             color:
-              row.statusOfComplaint?.toLowerCase().includes('disposed')
+              row.statusGroup === 'disposed'
                 ? '#22c55e'
-                : '#94a3b8',
+                : row.statusGroup === 'pending'
+                ? '#ef4444'
+                : '#eab308',
           }}
         >
-          {row.statusOfComplaint || 'Pending'}
+          {row.statusOfComplaint || '—'}
         </span>
+      ),
+    },
+    { key: 'statusRaw', label: 'Status (API Raw)', sortable: false },
+    {
+      key: 'statusGroup',
+      label: 'Status Group',
+      sortable: true,
+      render: (row) => (
+        <span style={{
+          padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600, textTransform: 'uppercase',
+          background: row.statusGroup === 'disposed' ? 'rgba(34,197,94,0.2)' : row.statusGroup === 'pending' ? 'rgba(239,68,68,0.2)' : 'rgba(234,179,8,0.2)',
+          color: row.statusGroup === 'disposed' ? '#22c55e' : row.statusGroup === 'pending' ? '#ef4444' : '#eab308',
+        }}>{row.statusGroup}</span>
       ),
     },
     {
       key: 'disposalDate',
       label: 'Disposal Date',
       sortable: true,
-      render: (row) => {
-        if (!row.disposalDate) return <span>—</span>;
-        const d = new Date(row.disposalDate);
-        return <span>{isNaN(d.getTime()) ? row.disposalDate : d.toLocaleDateString('en-IN')}</span>;
-      },
+      render: (row) => <span>{fmtDate(row.disposalDate)}</span>,
+    },
+    {
+      key: 'isDisposedMissingDate',
+      label: 'Missing Disposal Date',
+      sortable: false,
+      render: (row) => (
+        <span style={{ color: row.isDisposedMissingDate ? '#f87171' : 'var(--text-muted)' }}>
+          {row.isDisposedMissingDate ? 'Yes' : 'No'}
+        </span>
+      ),
+    },
+
+    // Transfer / Action
+    { key: 'transferDistrictCd', label: 'Transfer District Code', sortable: false },
+    { key: 'transferOfficeCd', label: 'Transfer Office Code', sortable: false },
+    { key: 'transferPsCd', label: 'Transfer PS Code', sortable: false },
+    { key: 'firNumber', label: 'FIR Number', sortable: false },
+    { key: 'actionTaken', label: 'Action Taken', sortable: false },
+    { key: 'ioDetails', label: 'IO Details', sortable: false },
+
+    // Timestamps
+    {
+      key: 'createdAt',
+      label: 'Created At',
+      sortable: true,
+      render: (row) => <span>{formatDateTime(row.createdAt)}</span>,
     },
     {
       key: 'updatedAt',
@@ -372,6 +547,7 @@ export const CCTNSPage = () => {
     setSearchQuery('');
     setFilterDistrict('');
     setFilterStatus('');
+    setFilterMissingDateOnly(false);
     setFilterDateFrom('');
     setFilterDateTo('');
     setSortBy('id');
@@ -634,6 +810,52 @@ export const CCTNSPage = () => {
         {/* —— Synced Records Tab: Full DB Gateway —— */}
         {isConfigured && activeTab === 'synced' && (
           <>
+            {/* Active filter banner when coming from dashboard */}
+            {urlStatusGroup && (
+              <div style={{
+                marginBottom: 10,
+                padding: '8px 14px',
+                borderRadius: 8,
+                background: 'rgba(59,130,246,0.1)',
+                border: '1px solid rgba(59,130,246,0.3)',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 8,
+              }}>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span>
+                    <strong>📊 Dashboard Filter Active:</strong>{' '}
+                    {urlStatusGroup === 'all'                   && 'Showing all complaints'}
+                    {urlStatusGroup === 'pending'               && 'Showing pending complaints only'}
+                    {urlStatusGroup === 'disposed'              && 'Showing disposed complaints only'}
+                    {urlStatusGroup === 'unknown'               && 'Showing complaints with unknown/missing status'}
+                    {urlStatusGroup === 'disposed_missing_date' && 'Showing disposed complaints with no disposal date'}
+                  </span>
+                  {hasGlobalFilters && (
+                    <span style={{ fontSize: 12, opacity: 0.8 }}>
+                      Global filters applied:{' '}
+                      {[
+                        urlDistrictIds    && `District IDs: ${urlDistrictIds}`,
+                        urlPsIds          && `PS IDs: ${urlPsIds}`,
+                        urlOfficeIds      && `Office IDs: ${urlOfficeIds}`,
+                        urlClassOfInc     && `Class: ${urlClassOfInc}`,
+                        urlFromDate       && `From: ${urlFromDate}`,
+                        urlToDate         && `To: ${urlToDate}`,
+                      ].filter(Boolean).join(' | ')}
+                    </span>
+                  )}
+                </span>
+                <button
+                  onClick={resetFilters}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', fontSize: 12, textDecoration: 'underline', whiteSpace: 'nowrap' }}
+                >
+                  Clear Filter
+                </button>
+              </div>
+            )}
+
             {/* Filters */}
             <div
               style={{
@@ -675,6 +897,15 @@ export const CCTNSPage = () => {
                 <option value="disposed">Disposed</option>
                 <option value="unknown">Unknown</option>
               </select>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={filterMissingDateOnly}
+                  onChange={(e) => { setFilterMissingDateOnly(e.target.checked); setPage(1); }}
+                  style={{ cursor: 'pointer' }}
+                />
+                Missing Disposal Date
+              </label>
               <input
                 type="date"
                 value={filterDateFrom}

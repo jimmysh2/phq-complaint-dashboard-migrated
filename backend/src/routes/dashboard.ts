@@ -66,7 +66,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     let totalDisposalDays = 0;
     for (const c of disposedComplaints) {
       if (c.complRegDt && c.disposalDate) {
-        totalDisposalDays += (c.disposalDate.getTime() - c.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
+        // Guard against data entry errors where disposalDate < complRegDt (gives negative days)
+        totalDisposalDays += Math.max(0, (c.disposalDate.getTime() - c.complRegDt.getTime()) / (1000 * 60 * 60 * 24));
       }
     }
 
@@ -223,15 +224,16 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     ]);
 
     const now = Date.now();
-    const matrixMap = new Map<string, { u7: number; u15: number; u30: number; o30: number }>();
+    const matrixMap = new Map<string, { u7: number; u15: number; u30: number; o30: number; o60: number }>();
     for (const comp of complaints) {
       const district = getDistrictLabel(comp.districtMasterId, districtMapById);
-      const stats = matrixMap.get(district) || { u7: 0, u15: 0, u30: 0, o30: 0 };
+      const stats = matrixMap.get(district) || { u7: 0, u15: 0, u30: 0, o30: 0, o60: 0 };
       const days = (now - comp.complRegDt!.getTime()) / (1000 * 60 * 60 * 24);
       if (days < 7) stats.u7++;
       else if (days < 15) stats.u15++;
       else if (days < 30) stats.u30++;
-      else stats.o30++;
+      else if (days < 60) stats.o30++;  // 1-2 Months
+      else stats.o60++;                 // Over 2 Months
       matrixMap.set(district, stats);
     }
 
@@ -255,15 +257,19 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       }),
     ]);
 
-    const matrixMap = new Map<string, { u7: number; u15: number; u30: number; o30: number }>();
+    const matrixMap = new Map<string, { u7: number; u15: number; u30: number; o30: number; o60: number }>();
     for (const comp of complaints) {
       const district = getDistrictLabel(comp.districtMasterId, districtMapById);
-      const stats = matrixMap.get(district) || { u7: 0, u15: 0, u30: 0, o30: 0 };
-      const days = (comp.disposalDate!.getTime() - comp.complRegDt!.getTime()) / (1000 * 60 * 60 * 24);
+      const stats = matrixMap.get(district) || { u7: 0, u15: 0, u30: 0, o30: 0, o60: 0 };
+      // Guard: negative days (disposal before registration = data entry error) are skipped
+      const rawDays = (comp.disposalDate!.getTime() - comp.complRegDt!.getTime()) / (1000 * 60 * 60 * 24);
+      if (rawDays < 0) { matrixMap.set(district, stats); continue; } // skip corrupt record
+      const days = rawDays;
       if (days < 7) stats.u7++;
       else if (days < 15) stats.u15++;
       else if (days < 30) stats.u30++;
-      else stats.o30++;
+      else if (days < 60) stats.o30++;  // 1-2 Months
+      else stats.o60++;                 // Over 2 Months
       matrixMap.set(district, stats);
     }
 
@@ -312,8 +318,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     const now = Date.now();
     const psMap = new Map<string, {
       total: number; pending: number; disposed: number; unknown: number; missingDates: number;
-      u7: number; u15: number; u30: number; o30: number;
-      du7: number; du15: number; du30: number; do30: number; totalDisposalDays: number;
+      u7: number; u15: number; u30: number; o30: number; o60: number;
+      du7: number; du15: number; du30: number; do30: number; do60: number; totalDisposalDays: number;
     }>();
     const categoryMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
 
@@ -322,8 +328,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       const category = comp.classOfIncident || UNMAPPED;
       const stats = psMap.get(ps) || {
         total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0,
-        u7: 0, u15: 0, u30: 0, o30: 0,
-        du7: 0, du15: 0, du30: 0, do30: 0,
+        u7: 0, u15: 0, u30: 0, o30: 0, o60: 0,
+        du7: 0, du15: 0, du30: 0, do30: 0, do60: 0,
         totalDisposalDays: 0,
       };
       const catStats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
@@ -339,7 +345,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
           if (days < 7) stats.u7++;
           else if (days < 15) stats.u15++;
           else if (days < 30) stats.u30++;
-          else stats.o30++;
+          else if (days < 60) stats.o30++;  // 1-2 Months
+          else stats.o60++;                 // Over 2 Months
         }
       } else if (comp.statusGroup === 'disposed') {
         stats.disposed++;
@@ -348,12 +355,17 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
           stats.missingDates++;
           catStats.missingDates++;
         } else if (comp.complRegDt && comp.disposalDate) {
-          const days = (comp.disposalDate.getTime() - comp.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
-          stats.totalDisposalDays += days;
-          if (days < 7) stats.du7++;
-          else if (days < 15) stats.du15++;
-          else if (days < 30) stats.du30++;
-          else stats.do30++;
+          const rawDays = (comp.disposalDate.getTime() - comp.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
+          // Skip data entry errors (disposal before registration = negative days)
+          if (rawDays >= 0) {
+            const days = rawDays;
+            stats.totalDisposalDays += days;
+            if (days < 7) stats.du7++;
+            else if (days < 15) stats.du15++;
+            else if (days < 30) stats.du30++;
+            else if (days < 60) stats.do30++;  // 1-2 Months
+            else stats.do60++;                 // Over 2 Months
+          }
         }
       } else {
         // status not found in this record
@@ -376,10 +388,12 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       u15: stats.u15,
       u30: stats.u30,
       o30: stats.o30,
+      o60: stats.o60,
       du7: stats.du7,
       du15: stats.du15,
       du30: stats.du30,
       do30: stats.do30,
+      do60: stats.do60,
       avgDisposalDays: stats.disposed - stats.missingDates > 0
         ? Math.round(stats.totalDisposalDays / (stats.disposed - stats.missingDates))
         : 0,

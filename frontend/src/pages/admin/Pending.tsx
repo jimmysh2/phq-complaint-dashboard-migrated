@@ -9,8 +9,8 @@ import { useFilters } from '@/contexts/FilterContext';
 const tabs = [
   { id: 'all',      label: 'All Pending' },
   { id: '15-30',    label: '15-30 Days' },
-  { id: '30-60',    label: '30-60 Days' },
-  { id: 'over-60',  label: 'Over 60 Days' },
+  { id: '30-60',    label: '1-2 Months' },
+  { id: 'over-60',  label: 'Over 2 Months' },
   { id: 'branch',   label: 'By Branch' },
 ];
 

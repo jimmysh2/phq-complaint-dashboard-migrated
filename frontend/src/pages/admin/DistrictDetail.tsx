@@ -42,111 +42,135 @@ export const DistrictDetail = () => {
 
   // ── Police Station Summary Table ──────────────────────────────────────────
   const psCols: Column<any>[] = [
-    { key: 'ps',             label: 'Police Station',      sortable: true },
-    { key: 'total',          label: 'Total',               sortable: true, align: 'center' },
-    { key: 'disposed',       label: 'Disposed',            sortable: true, align: 'center' },
-    { key: 'pending',        label: 'Pending',             sortable: true, align: 'center' },
-    { key: 'unknown',        label: 'Status Not Found',    sortable: true, align: 'center' },
-    { key: 'u7',             label: '< 7 Days',            sortable: true, align: 'center' },
-    { key: 'u15',            label: '7 - 15 Days',         sortable: true, align: 'center' },
-    { key: 'u30',            label: '15 - 30 Days',        sortable: true, align: 'center' },
-    { key: 'o30',            label: '> 30 Days',           sortable: true, align: 'center' },
-    { key: 'avgDisposalDays',label: 'Avg. Disposal (Days)',sortable: true, align: 'center' },
+    { key: 'ps',              label: 'Police Station',       sortable: true },
+    { key: 'total',           label: 'Total',                sortable: true, align: 'center' },
+    { key: 'disposed',        label: 'Disposed',             sortable: true, align: 'center' },
+    { key: 'pending',         label: 'Pending',              sortable: true, align: 'center' },
+    { key: 'unknown',         label: 'Status Not Found',     sortable: true, align: 'center' },
+    { key: 'u7',              label: '< 7 Days',             sortable: true, align: 'center' },
+    { key: 'u15',             label: '7 - 15 Days',          sortable: true, align: 'center' },
+    { key: 'u30',             label: '15 - 30 Days',         sortable: true, align: 'center' },
+    { key: 'o30',             label: '1-2 Months',           sortable: true, align: 'center' },
+    { key: 'o60',             label: 'Over 2 Months',        sortable: true, align: 'center' },
+    { key: 'avgDisposalDays', label: 'Avg. Disposal (Days)', sortable: true, align: 'center' },
   ];
 
   const renderPsCell = (col: Column<any>, row: any) => {
-    if (col.key === 'ps')             return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'total')          return <span style={{ color: '#60a5fa' }}>{row.total}</span>;
-    if (col.key === 'disposed')       return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
-    if (col.key === 'pending')        return <span style={{ color: '#fbbf24' }}>{row.pending}</span>;
-    if (col.key === 'unknown')        return <span style={{ color: '#94a3b8' }}>{row.unknown ?? 0}</span>;
-    if (col.key === 'u7')             return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
-    if (col.key === 'u15')            return <span style={{ color: '#eab308' }}>{row.u15}</span>;
-    if (col.key === 'u30')            return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
-    if (col.key === 'o30')            return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
-    if (col.key === 'avgDisposalDays')return <span style={{ color: '#c084fc' }}>{row.avgDisposalDays}d</span>;
+    if (col.key === 'ps')              return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'total')           return <span style={{ color: '#60a5fa' }}>{row.total}</span>;
+    if (col.key === 'disposed')        return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
+    if (col.key === 'pending')         return <span style={{ color: '#fbbf24' }}>{row.pending}</span>;
+    if (col.key === 'unknown')         return <span style={{ color: '#94a3b8' }}>{row.unknown ?? 0}</span>;
+    if (col.key === 'u7')              return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
+    if (col.key === 'u15')             return <span style={{ color: '#eab308' }}>{row.u15}</span>;
+    if (col.key === 'u30')             return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
+    if (col.key === 'o30')             return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'o60')             return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
+    if (col.key === 'avgDisposalDays') return <span style={{ color: '#c084fc' }}>{row.avgDisposalDays}d</span>;
     return row[col.key];
   };
 
   // ── Pendency Ageing Matrix (Days) ─────────────────────────────────────────
   const pendencyCols: Column<any>[] = [
-    { key: 'ps', label: 'Police Station', sortable: true },
-    { key: 'u7', label: '< 7 Days', sortable: true, align: 'center' },
-    { key: 'u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'o30', label: '> 30 Days', sortable: true, align: 'center' },
+    { key: 'ps',   label: 'Police Station', sortable: true },
+    { key: 'u7',   label: '< 7 Days',       sortable: true, align: 'center' },
+    { key: 'u15',  label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'u30',  label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'o30',  label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderPendencyDays = (col: Column<any>, row: any) => {
-    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'u7') return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
+    if (col.key === 'ps')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
     if (col.key === 'u15') return <span style={{ color: '#eab308' }}>{row.u15}</span>;
     if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
     if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
     return row[col.key];
   };
 
   // ── Pendency Ageing Matrix (%) ────────────────────────────────────────────
   const pendingWithPct = policeStations.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30) || 1;
-    return { ...row, pct_u7: Math.round(row.u7 * 100 / total), pct_u15: Math.round(row.u15 * 100 / total), pct_u30: Math.round(row.u30 * 100 / total), pct_o30: Math.round(row.o30 * 100 / total) };
+    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
+    return {
+      ...row,
+      pct_u7:  Math.round(row.u7  * 100 / total),
+      pct_u15: Math.round(row.u15 * 100 / total),
+      pct_u30: Math.round(row.u30 * 100 / total),
+      pct_o30: Math.round(row.o30 * 100 / total),
+      pct_o60: Math.round((row.o60 || 0) * 100 / total),
+    };
   });
 
   const pendencyPctCols: Column<any>[] = [
-    { key: 'ps', label: 'Police Station', sortable: true },
-    { key: 'pct_u7', label: '< 7 Days', sortable: true, align: 'center' },
-    { key: 'pct_u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'pct_u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'pct_o30', label: '> 30 Days', sortable: true, align: 'center' },
+    { key: 'ps',       label: 'Police Station', sortable: true },
+    { key: 'pct_u7',   label: '< 7 Days',       sortable: true, align: 'center' },
+    { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'pct_o30',  label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'pct_o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderPendencyPct = (col: Column<any>, row: any) => {
-    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'pct_u7') return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
-    if (col.key === 'pct_u15') return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
-    if (col.key === 'pct_u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
-    if (col.key === 'pct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'ps')       return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'pct_u7')   return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
+    if (col.key === 'pct_u15')  return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
+    if (col.key === 'pct_u30')  return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
+    if (col.key === 'pct_o30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'pct_o60')  return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.pct_o60 || 0}%</span>;
     return row[col.key];
   };
 
   // ── Disposal Time Matrix (Days) ───────────────────────────────────────────
   const disposalCols: Column<any>[] = [
-    { key: 'ps', label: 'Police Station', sortable: true },
-    { key: 'du7', label: '< 7 Days', sortable: true, align: 'center' },
-    { key: 'du15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'du30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'do30', label: '> 30 Days', sortable: true, align: 'center' },
+    { key: 'ps',    label: 'Police Station', sortable: true },
+    { key: 'du7',   label: '< 7 Days',       sortable: true, align: 'center' },
+    { key: 'du15',  label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'du30',  label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'do30',  label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'do60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderDisposalDays = (col: Column<any>, row: any) => {
-    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'du7') return <span style={{ color: '#4ade80' }}>{row.du7}</span>;
+    if (col.key === 'ps')   return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'du7')  return <span style={{ color: '#4ade80' }}>{row.du7}</span>;
     if (col.key === 'du15') return <span style={{ color: '#a3e635' }}>{row.du15}</span>;
     if (col.key === 'du30') return <span style={{ color: '#eab308' }}>{row.du30}</span>;
     if (col.key === 'do30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.do30}</span>;
+    if (col.key === 'do60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.do60 || 0}</span>;
     return row[col.key];
   };
 
   // ── Disposal Time Matrix (%) ──────────────────────────────────────────────
   const disposalWithPct = policeStations.map((row: any) => {
-    const total = (row.du7 + row.du15 + row.du30 + row.do30) || 1;
-    return { ...row, dpct_u7: Math.round(row.du7 * 100 / total), dpct_u15: Math.round(row.du15 * 100 / total), dpct_u30: Math.round(row.du30 * 100 / total), dpct_o30: Math.round(row.do30 * 100 / total) };
+    const total = (row.du7 + row.du15 + row.du30 + row.do30 + (row.do60 || 0)) || 1;
+    return {
+      ...row,
+      dpct_u7:  Math.round(row.du7  * 100 / total),
+      dpct_u15: Math.round(row.du15 * 100 / total),
+      dpct_u30: Math.round(row.du30 * 100 / total),
+      dpct_o30: Math.round(row.do30 * 100 / total),
+      dpct_o60: Math.round((row.do60 || 0) * 100 / total),
+    };
   });
 
   const disposalPctCols: Column<any>[] = [
-    { key: 'ps', label: 'Police Station', sortable: true },
-    { key: 'dpct_u7', label: '< 7 Days', sortable: true, align: 'center' },
-    { key: 'dpct_u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'dpct_u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'dpct_o30', label: '> 30 Days', sortable: true, align: 'center' },
+    { key: 'ps',       label: 'Police Station', sortable: true },
+    { key: 'dpct_u7',  label: '< 7 Days',       sortable: true, align: 'center' },
+    { key: 'dpct_u15', label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'dpct_u30', label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'dpct_o30', label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'dpct_o60', label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderDisposalPct = (col: Column<any>, row: any) => {
-    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'dpct_u7') return <span style={{ color: '#4ade80' }}>{row.dpct_u7}%</span>;
+    if (col.key === 'ps')        return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'dpct_u7')  return <span style={{ color: '#4ade80' }}>{row.dpct_u7}%</span>;
     if (col.key === 'dpct_u15') return <span style={{ color: '#a3e635' }}>{row.dpct_u15}%</span>;
     if (col.key === 'dpct_u30') return <span style={{ color: '#eab308' }}>{row.dpct_u30}%</span>;
     if (col.key === 'dpct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.dpct_o30}%</span>;
+    if (col.key === 'dpct_o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.dpct_o60 || 0}%</span>;
     return row[col.key];
   };
 

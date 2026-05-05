@@ -316,10 +316,18 @@ export const cctnsApi = {
     search?: string;
     district?: string;
     statusGroup?: string;
+    isDisposedMissingDate?: string;
     dateFrom?: string;
     dateTo?: string;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    // Global dashboard filters forwarded via URL
+    districtIds?: string;
+    policeStationIds?: string;
+    officeIds?: string;
+    classOfIncident?: string;
+    fromDate?: string;
+    toDate?: string;
   }) => {
     const response = await api.get('/api/cctns', { params });
     return response.data;
