@@ -1,43 +1,54 @@
-#!/usr/bin/env node
 /**
  * seed-master-data.js
  * ────────────────────────────────────────────────────────────────────────────
- * One-time script to populate District, PoliceStation, and Office tables
- * from the Haryana Police Government API.
+ * One-time script to populate District, PoliceStation, and Office tables.
  *
- * Run once on any new database:
- *   node scripts/seed-master-data.js
+ * HOW IT WORKS:
+ *  1. Fetches master data directly from the Haryana Govt API (port 443 ✅)
+ *  2. POSTs fetched data to the LOCAL backend API (localhost:3001) which
+ *     writes to the database (backend has full DB access ✅)
  *
- * Or with custom env:
- *   DATABASE_URL=postgresql://... node scripts/seed-master-data.js
+ * This avoids the need for direct DB access (port 5432) from local machine.
  *
- * Safe to re-run — uses upsert (idempotent).
+ * USAGE:
+ *  1. Make sure backend is running: npm run dev  (in backend/ folder)
+ *  2. Get your JWT from browser → DevTools → Application → localStorage → 'token'
+ *  3. Run:
+ *       JWT_TOKEN=<your-token> node scripts/seed-master-data.js
+ *
+ * Or set in .env.seed file:
+ *       BACKEND_URL=http://localhost:3001
+ *       JWT_TOKEN=eyJhbGci...
  * ────────────────────────────────────────────────────────────────────────────
  */
 
-// Load .env from the backend root
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
+require('dotenv').config({ path: require('path').join(__dirname, '..', '.env.seed'), override: false });
 
-const { PrismaClient } = require('@prisma/client');
+const BACKEND_URL   = (process.env.BACKEND_URL  || 'http://localhost:3001').replace(/\/$/, '');
+const JWT_TOKEN     = process.env.JWT_TOKEN || '';
+const STATE_CODE    = process.env.HARYANA_STATE_CODE || '13';
+const PS_BATCH_SIZE = 3;
 
-const prisma = new PrismaClient();
+const BASE         = process.env.HARYANA_POLICE_API_BASE    || 'https://api.haryanapolice.gov.in/eSaralServices/api/common';
+const DISTRICT_API = process.env.HARYANA_DISTRICT_API       || `${BASE}/district`;
+const PS_API       = process.env.HARYANA_POLICE_STATION_API || `${BASE}/GetPSByDistrict`;
+const OFFICE_API   = process.env.HARYANA_OFFICE_API         || `${BASE}/GetAllOffice`;
 
-// ── API Endpoints ──────────────────────────────────────────────────────────
-const BASE    = process.env.HARYANA_POLICE_API_BASE     || 'https://api.haryanapolice.gov.in/eSaralServices/api/common';
-const DISTRICT_API  = process.env.HARYANA_DISTRICT_API        || `${BASE}/district`;
-const PS_API        = process.env.HARYANA_POLICE_STATION_API  || `${BASE}/GetPSByDistrict`;
-const OFFICE_API    = process.env.HARYANA_OFFICE_API          || `${BASE}/GetAllOffice`;
-const STATE_CODE    = process.env.HARYANA_STATE_CODE          || '13';
-
-const TIMEOUT_MS    = 120_000; // 2 minutes per request
-const PS_BATCH_SIZE = 3;       // concurrent district PS fetches
+if (!JWT_TOKEN) {
+  console.error('\n❌  JWT_TOKEN is required.\n');
+  console.error('   1. Open your dashboard in browser and log in.');
+  console.error('   2. Open DevTools → Application → Local Storage → copy "token" value.');
+  console.error('   3. Run:  JWT_TOKEN=<paste-here> node scripts/seed-master-data.js\n');
+  process.exit(1);
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
 const toId = (value) => {
   const raw = String(value ?? '').trim();
   if (!raw || !/^-?\d+$/.test(raw)) return null;
-  try { return BigInt(raw); } catch { return null; }
+  return raw;           // keep as string — backend parses to BigInt
 };
 
 const parseJsonPayload = (rawText) => {
@@ -58,9 +69,9 @@ const parseJsonPayload = (rawText) => {
 };
 
 const parseXmlPayload = (rawText) => {
-  const xml  = rawText.replace(/<d2p1:/g, '<').replace(/<\/d2p1:/g, '</').replace(/<d3p1:/g, '<').replace(/<\/d3p1:/g, '</');
-  const ids  = Array.from(xml.matchAll(/<ID>(.*?)<\/ID>/g),   (m) => m[1]);
-  const names = Array.from(xml.matchAll(/<Name>(.*?)<\/Name>/g), (m) => m[1]);
+  const xml   = rawText.replace(/<d2p1:/g, '<').replace(/<\/d2p1:/g, '</').replace(/<d3p1:/g, '<').replace(/<\/d3p1:/g, '</');
+  const ids   = Array.from(xml.matchAll(/<ID>(.*?)<\/ID>/g),    (m) => m[1]);
+  const names = Array.from(xml.matchAll(/<Name>(.*?)<\/Name>/g),(m) => m[1]);
   const items = [];
   for (let i = 0; i < ids.length; i++) {
     const id   = toId(ids[i]);
@@ -70,83 +81,71 @@ const parseXmlPayload = (rawText) => {
   return items;
 };
 
-const fetchItems = async (url) => {
+const fetchGovtItems = async (url) => {
   console.log(`  → GET ${url}`);
   const res = await fetch(url, {
     headers: { Accept: 'application/json, text/plain, application/xml;q=0.9, */*;q=0.8' },
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+  if (!res.ok) throw new Error(`Govt API HTTP ${res.status}: ${url}`);
   const rawText = (await res.text()).trim().replace(/^\uFEFF/, '');
   return parseJsonPayload(rawText) ?? parseXmlPayload(rawText) ?? [];
 };
 
-// ── Step 1: Seed Districts ─────────────────────────────────────────────────
+// ── Step 1: Collect all data from Govt API ─────────────────────────────────
 
-const seedDistricts = async () => {
-  console.log('\n[1/3] Seeding Districts...');
-  const items = await fetchItems(DISTRICT_API);
-  if (items.length === 0) throw new Error('No districts returned from API');
+const collectAllData = async () => {
+  // Districts
+  console.log('\n[1/3] Fetching Districts from Govt API...');
+  const districts = await fetchGovtItems(DISTRICT_API);
+  console.log(`      ✅ ${districts.length} districts fetched`);
 
-  let count = 0;
-  for (const d of items) {
-    await prisma.district.upsert({
-      where:  { id: d.id },
-      update: { name: d.name },
-      create: { id: d.id, name: d.name },
-    });
-    count++;
-  }
-  console.log(`  ✅ ${count} districts upserted`);
-  return items;
-};
-
-// ── Step 2: Seed Police Stations (per district) ────────────────────────────
-
-const seedPoliceStations = async (districts) => {
-  console.log('\n[2/3] Seeding Police Stations...');
-  let total = 0;
-
+  // Police Stations (per district, in batches)
+  console.log('\n[2/3] Fetching Police Stations from Govt API...');
+  const policeStations = [];
   for (let i = 0; i < districts.length; i += PS_BATCH_SIZE) {
     const batch = districts.slice(i, i + PS_BATCH_SIZE);
-    await Promise.all(batch.map(async (district) => {
+    const results = await Promise.all(batch.map(async (district) => {
       try {
-        const url   = `${PS_API}?state=${STATE_CODE}&district=${district.id.toString()}`;
-        const items = await fetchItems(url);
-        for (const ps of items) {
-          await prisma.policeStation.upsert({
-            where:  { id: ps.id },
-            update: { name: ps.name, districtId: district.id, districtName: district.name },
-            create: { id: ps.id, name: ps.name, districtId: district.id, districtName: district.name },
-          });
-        }
-        console.log(`     District "${district.name}": ${items.length} PS`);
-        total += items.length;
+        const url   = `${PS_API}?state=${STATE_CODE}&district=${district.id}`;
+        const items = await fetchGovtItems(url);
+        console.log(`      District "${district.name}": ${items.length} PS`);
+        return items.map(ps => ({ ...ps, districtId: district.id, districtName: district.name }));
       } catch (err) {
-        console.warn(`  ⚠️  Failed for district "${district.name}": ${err.message}`);
+        console.warn(`  ⚠️  PS fetch failed for district "${district.name}": ${err.message}`);
+        return [];
       }
     }));
+    policeStations.push(...results.flat());
   }
+  console.log(`      ✅ ${policeStations.length} police stations fetched`);
 
-  console.log(`  ✅ ${total} police stations upserted`);
+  // Offices
+  console.log('\n[3/3] Fetching Offices from Govt API...');
+  const offices = await fetchGovtItems(OFFICE_API);
+  console.log(`      ✅ ${offices.length} offices fetched`);
+
+  return { districts, policeStations, offices };
 };
 
-// ── Step 3: Seed Offices ───────────────────────────────────────────────────
+// ── Step 2: POST to local backend (which writes to DB) ─────────────────────
 
-const seedOffices = async () => {
-  console.log('\n[3/3] Seeding Offices...');
-  const items = await fetchItems(OFFICE_API);
-
-  let count = 0;
-  for (const office of items) {
-    await prisma.office.upsert({
-      where:  { id: office.id },
-      update: { name: office.name },
-      create: { id: office.id, name: office.name },
-    });
-    count++;
+const seedViaBackend = async (data) => {
+  console.log(`\n[SAVING] POSTing to ${BACKEND_URL}/api/gov/bulk-seed ...`);
+  const res = await fetch(`${BACKEND_URL}/api/gov/bulk-seed`, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${JWT_TOKEN}`,
+    },
+    body: JSON.stringify(data),
+    signal: AbortSignal.timeout(120_000),
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) {
+    throw new Error(`Backend bulk-seed failed (${res.status}): ${json.message}`);
   }
-  console.log(`  ✅ ${count} offices upserted`);
+  return json.data;
 };
 
 // ── Main ───────────────────────────────────────────────────────────────────
@@ -155,21 +154,27 @@ async function main() {
   console.log('═══════════════════════════════════════════════════════');
   console.log(' PHQ Dashboard — Master Data Seed Script');
   console.log('═══════════════════════════════════════════════════════');
+  console.log(` Backend URL  : ${BACKEND_URL}`);
   console.log(` District API : ${DISTRICT_API}`);
   console.log(` PS API       : ${PS_API}`);
   console.log(` Office API   : ${OFFICE_API}`);
   console.log(` State code   : ${STATE_CODE}`);
-  console.log('───────────────────────────────────────────────────────\n');
+  console.log('───────────────────────────────────────────────────────');
 
   const t0 = Date.now();
 
-  const districts = await seedDistricts();
-  await seedPoliceStations(districts);
-  await seedOffices();
+  // Fetch all data from govt API
+  const data = await collectAllData();
+
+  // Save via local backend (handles DB write)
+  const result = await seedViaBackend(data);
 
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   console.log('\n═══════════════════════════════════════════════════════');
   console.log(` ✅ Seed complete in ${elapsed}s`);
+  console.log(` Districts:       ${result.districts}`);
+  console.log(` Police Stations: ${result.policeStations}`);
+  console.log(` Offices:         ${result.offices}`);
   console.log('═══════════════════════════════════════════════════════\n');
 }
 
@@ -178,5 +183,4 @@ main()
   .catch((err) => {
     console.error('\n❌ Seed failed:', err.message);
     process.exit(1);
-  })
-  .finally(() => prisma.$disconnect());
+  });

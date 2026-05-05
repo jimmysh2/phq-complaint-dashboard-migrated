@@ -246,8 +246,82 @@ export const governmentRoutes = async (fastify: FastifyInstance) => {
         offices: offices.length,
       });
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       console.error('Sync all error:', error);
-      return sendError(reply, 'Sync failed');
+      return sendError(reply, `Sync failed: ${msg}`);
+    }
+  });
+
+  /**
+   * POST /api/gov/bulk-seed
+   *
+   * Accepts pre-fetched master data (districts, policeStations, offices)
+   * and upserts them to the database. Used by the seed script which can
+   * reach the govt API but not the DB directly (port 5432 blocked locally).
+   *
+   * Body: { districts: [{id, name}], policeStations: [{id, name, districtId, districtName}], offices: [{id, name}] }
+   */
+  fastify.post('/gov/bulk-seed', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    try {
+      const body = request.body as {
+        districts?: Array<{ id: string; name: string }>;
+        policeStations?: Array<{ id: string; name: string; districtId: string; districtName: string }>;
+        offices?: Array<{ id: string; name: string }>;
+      };
+
+      let districtsCount = 0;
+      let psCount = 0;
+      let officesCount = 0;
+
+      // Upsert Districts
+      for (const d of (body.districts ?? [])) {
+        const id = toId(d.id);
+        if (!id || !d.name) continue;
+        await prisma.district.upsert({
+          where:  { id },
+          update: { name: d.name },
+          create: { id, name: d.name },
+        });
+        districtsCount++;
+      }
+
+      // Upsert Police Stations
+      for (const ps of (body.policeStations ?? [])) {
+        const id = toId(ps.id);
+        const districtId = toId(ps.districtId);
+        if (!id || !ps.name) continue;
+        await prisma.policeStation.upsert({
+          where:  { id },
+          update: { name: ps.name, districtId: districtId ?? undefined, districtName: ps.districtName ?? null },
+          create: { id, name: ps.name, districtId: districtId ?? undefined, districtName: ps.districtName ?? null },
+        });
+        psCount++;
+      }
+
+      // Upsert Offices
+      for (const o of (body.offices ?? [])) {
+        const id = toId(o.id);
+        if (!id || !o.name) continue;
+        await prisma.office.upsert({
+          where:  { id },
+          update: { name: o.name },
+          create: { id, name: o.name },
+        });
+        officesCount++;
+      }
+
+      return sendSuccess(reply, {
+        message: 'Bulk seed complete',
+        districts:      districtsCount,
+        policeStations: psCount,
+        offices:        officesCount,
+      });
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.error('Bulk seed error:', error);
+      return sendError(reply, `Bulk seed failed: ${msg}`);
     }
   });
 };
