@@ -147,20 +147,40 @@ export const runCctnsSync = async (
 };
 
 /**
- * Run a full rolling-year sync in monthly chunks.
- * This catches status changes on complaints registered months ago
- * (e.g. a 3-month-old pending complaint that gets disposed today).
- * Runs one month at a time to stay within CCTNS API page limits.
+ * Run a full rolling sync in monthly chunks.
+ * Instead of fetching a hardcoded 365 days, this queries the DB for the
+ * oldest pending complaint and syncs from that date up to today.
+ * This catches status changes on old complaints efficiently.
  */
 export const runCctnsFullRollingSync = async (): Promise<void> => {
-  const ROLLING_DAYS = 365;
-  const CHUNK_DAYS   = 30;
+  const CHUNK_DAYS = 30;
+
+  // Find the oldest pending complaint
+  const oldestPending = await prisma.complaint.findFirst({
+    where: { statusGroup: 'pending', complRegDt: { not: null } },
+    orderBy: { complRegDt: 'asc' },
+    select: { complRegDt: true },
+  });
 
   const end = new Date();
   const start = new Date();
-  start.setDate(end.getDate() - ROLLING_DAYS);
 
-  console.log(`[SYNC] Starting full rolling sync: ${formatDateStr(start)} → ${formatDateStr(end)} in ${CHUNK_DAYS}-day chunks`);
+  if (oldestPending?.complRegDt) {
+    start.setTime(oldestPending.complRegDt.getTime());
+    // Add a 1-day buffer just to be safe
+    start.setDate(start.getDate() - 1);
+  } else {
+    // Fallback to 30 days if no pending complaints exist
+    start.setDate(end.getDate() - 30);
+  }
+
+  // Sanity check
+  if (start > end) {
+    start.setTime(end.getTime());
+    start.setDate(start.getDate() - 1);
+  }
+
+  console.log(`[SYNC] Starting full rolling sync from oldest pending date: ${formatDateStr(start)} → ${formatDateStr(end)} in ${CHUNK_DAYS}-day chunks`);
 
   let chunkStart = new Date(start);
   let chunkIndex = 0;
