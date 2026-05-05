@@ -85,18 +85,55 @@ export const referenceRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/branches', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
     await ensureMasterData();
-    const offices = await prisma.office.findMany({ orderBy: { name: 'asc' } });
+    const { districtIds, policeStationIds } = request.query as {
+      districtIds?: string;
+      policeStationIds?: string;
+    };
 
+    const dIds = parseDistrictIds(districtIds);
+    const psIds = parseDistrictIds(policeStationIds);
+
+    // When district or PS is selected, derive offices from complaint data
+    // (Govt API doesn't provide office→district relationships,
+    // so we infer them from existing complaints that already have master IDs resolved)
+    if (dIds.length > 0 || psIds.length > 0) {
+      const filterWhere: Record<string, unknown> = { officeMasterId: { not: null } };
+      if (dIds.length > 0)  filterWhere.districtMasterId      = { in: dIds };
+      if (psIds.length > 0) filterWhere.policeStationMasterId = { in: psIds };
+
+      const rows = await prisma.complaint.findMany({
+        where:    filterWhere,
+        select:   { officeMasterId: true },
+        distinct: ['officeMasterId'],
+      });
+
+      const officeIds = rows.map((r) => r.officeMasterId!).filter(Boolean) as bigint[];
+
+      if (officeIds.length === 0) {
+        return sendSuccess(reply, []);
+      }
+
+      const offices = await prisma.office.findMany({
+        where:   { id: { in: officeIds } },
+        orderBy: { name: 'asc' },
+      });
+
+      return sendSuccess(
+        reply,
+        offices.map((o) => ({ id: o.id.toString(), name: o.name }))
+      );
+    }
+
+    // No district/PS filter — return all offices
+    const offices = await prisma.office.findMany({ orderBy: { name: 'asc' } });
     return sendSuccess(
       reply,
-      offices.map((o) => ({
-        id: o.id.toString(),
-        name: o.name,
-      }))
+      offices.map((o) => ({ id: o.id.toString(), name: o.name }))
     );
   });
+
 
   fastify.get('/reference/nature-crime', {
     preHandler: [authenticate],

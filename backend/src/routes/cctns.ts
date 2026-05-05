@@ -9,6 +9,7 @@ import {
   normalizeComplaintRow,
 } from '../services/cctns-normalize.js';
 import { enrichWithMasterIds, remapComplaintMasterIds } from '../services/master-mapping.js';
+import { syncDistricts, syncOffices, syncPoliceStationsByDistrict } from './government.js';
 
 const processInBatches = async <T>(
   items: T[],
@@ -195,6 +196,32 @@ const runFetchJob = async (jobId: string, timeFrom: string, timeTo: string) => {
     job.completedAt = new Date();
     
     console.log(`[FETCH-JOB ${jobId}] Completed successfully:`, job.result);
+
+    // ── Post-sync: refresh master tables + remap complaint IDs ──────────────
+    // This ensures District / PoliceStation / Office tables are up to date and
+    // every complaint has accurate districtMasterId / policeStationMasterId /
+    // officeMasterId so the hierarchical filter bar works correctly.
+    try {
+      job.progress = 'Refreshing master reference tables...';
+      // 1. Sync districts from govt API (upsert — safe to call always)
+      const districts = await syncDistricts();
+      // 2. Sync PS for each district in background batches
+      for (let i = 0; i < districts.length; i += 5) {
+        await Promise.all(
+          districts.slice(i, i + 5).map((d) => syncPoliceStationsByDistrict(d.id).catch(() => {}))
+        );
+      }
+      // 3. Sync offices
+      await syncOffices();
+      // 4. Remap all complaint master IDs with the freshest lookup tables
+      job.progress = 'Remapping complaint master IDs...';
+      const remapStats = await remapComplaintMasterIds();
+      console.log(`[FETCH-JOB ${jobId}] Master remap complete:`, remapStats);
+    } catch (remapError: any) {
+      // Non-fatal — log but don't fail the sync job
+      console.error(`[FETCH-JOB ${jobId}] Post-sync master remap failed:`, remapError.message);
+    }
+
 
     // Also create a SyncRun record for audit trail
     try {

@@ -218,14 +218,15 @@ export const referenceApi = {
     });
     return response.data;
   },
-  offices: async () => {
-    const response = await api.get('/api/branches');
+  offices: async (params?: { districtIds?: string; policeStationIds?: string }) => {
+    const response = await api.get('/api/branches', { params });
     return response.data;
   },
   branches: async () => {
     const response = await api.get('/api/branches');
     return response.data;
   },
+
   natureCrime: async () => {
     const response = await api.get('/api/reference/nature-crime');
     return response.data;
