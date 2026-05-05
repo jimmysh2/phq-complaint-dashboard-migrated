@@ -9,11 +9,26 @@ import { DataTable, Column } from '@/components/data/DataTable';
 import { dashboardApi } from '@/services/api';
 import { useFilters } from '@/contexts/FilterContext';
 
-const StatCard = ({ label, value, subValue, colorClass }: { label: string; value: string | number; subValue?: string; colorClass: string }) => (
-  <div className={`stat-card ${colorClass}`}>
+const StatCard = ({ label, value, subValue, colorClass, onClick }: { label: string; value: string | number; subValue?: string; colorClass: string; onClick?: () => void }) => (
+  <div
+    className={`stat-card ${colorClass}`}
+    onClick={onClick}
+    style={{ cursor: onClick ? 'pointer' : undefined, transition: 'transform 0.15s, box-shadow 0.15s' }}
+    onMouseEnter={(e) => { if (onClick) { (e.currentTarget as HTMLElement).style.transform = 'scale(1.025)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)'; } }}
+    onMouseLeave={(e) => { if (onClick) { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; } }}
+    title={onClick ? 'Click to view these complaints' : undefined}
+  >
     <div className="stat-card-label">{label}</div>
     <div className="stat-card-value">{value}</div>
     {subValue && <div className="text-xs mt-1 opacity-80">{subValue}</div>}
+    {onClick && (
+      <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+        Click to view complaints
+      </div>
+    )}
   </div>
 );
 
@@ -89,6 +104,19 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
 export const DashboardPage = () => {
   const navigate = useNavigate();
   const { filters } = useFilters();
+
+  // Build CCTNS navigation URL including all active global filters so the
+  // gateway reproduces the exact same WHERE clause that produced the card count.
+  const buildCctnsUrl = (statusGroup: string) => {
+    const params = new URLSearchParams({ statusGroup });
+    if (filters.districtIds)      params.set('districtIds',      filters.districtIds);
+    if (filters.policeStationIds) params.set('policeStationIds', filters.policeStationIds);
+    if (filters.officeIds)        params.set('officeIds',        filters.officeIds);
+    if (filters.classOfIncident)  params.set('classOfIncident',  filters.classOfIncident);
+    if (filters.fromDate)         params.set('fromDate',         filters.fromDate);
+    if (filters.toDate)           params.set('toDate',           filters.toDate);
+    return `/admin/cctns?${params.toString()}`;
+  };
   
   // Clean empty filters before passing
   const activeFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''));
@@ -371,30 +399,35 @@ export const DashboardPage = () => {
               label="Total Received"
               value={(s?.totalReceived || 0).toLocaleString()}
               colorClass="blue"
+              onClick={() => navigate(buildCctnsUrl('all'))}
             />
             <StatCard
               label="Total Disposed"
               value={(s?.totalDisposed || 0).toLocaleString()}
               subValue={`${Math.round(((s?.totalDisposed || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
               colorClass="green"
+              onClick={() => navigate(buildCctnsUrl('disposed'))}
             />
             <StatCard
               label="Total Pending"
               value={(s?.totalPending || 0).toLocaleString()}
               subValue={`${Math.round(((s?.totalPending || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
               colorClass="red"
+              onClick={() => navigate(buildCctnsUrl('pending'))}
             />
             <StatCard
               label="Status Not Found"
               value={(s?.totalUnknown || 0).toLocaleString()}
               subValue="Status was not found in the record"
               colorClass="yellow"
+              onClick={() => navigate(buildCctnsUrl('unknown'))}
             />
             <StatCard
               label="Disposal Date Not Found"
               value={(s?.disposedMissingDateCount || 0).toLocaleString()}
               subValue="Marked disposed but date not found"
               colorClass="purple"
+              onClick={() => navigate(buildCctnsUrl('disposed_missing_date'))}
             />
           </div>
         )}

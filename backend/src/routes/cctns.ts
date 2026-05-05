@@ -13,7 +13,10 @@ import {
   loadAllLookups,
   resolveMasterIds,
   MasterLookups,
+  remapComplaintMasterIds,
 } from '../services/master-mapping.js';
+import { syncDistricts, syncOffices, syncPoliceStationsByDistrict } from './government.js';
+import { buildPrismaWhereClause } from '../utils/filters.js';
 
 const processInBatches = async <T>(
   items: T[],
@@ -265,6 +268,14 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
       dateTo = '',
       sortBy = 'id',
       sortOrder = 'desc',
+      isDisposedMissingDate = '',
+      // Global dashboard filters forwarded from card navigation
+      districtIds = '',
+      policeStationIds = '',
+      officeIds = '',
+      classOfIncident = '',
+      fromDate = '',
+      toDate = '',
     } = request.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page, 10));
@@ -273,6 +284,22 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
 
     // Build where clause using AND so multiple filters never overwrite each other
     const andConditions: any[] = [];
+
+    // ── Global dashboard filters (district IDs, PS IDs, office IDs, class, date range)
+    // These mirror what buildPrismaWhereClause does in the dashboard summary route,
+    // ensuring the gateway shows exactly the same records the card counted.
+    const globalWhere = buildPrismaWhereClause({
+      districtIds,
+      policeStationIds,
+      officeIds,
+      classOfIncident,
+      fromDate,
+      toDate,
+    });
+    // Spread each top-level key of globalWhere as separate AND conditions
+    for (const [key, val] of Object.entries(globalWhere)) {
+      andConditions.push({ [key]: val });
+    }
 
     if (search) {
       andConditions.push({
@@ -300,6 +327,10 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
 
     if (statusGroup) {
       andConditions.push({ statusGroup: statusGroup.toLowerCase() });
+    }
+
+    if (isDisposedMissingDate === 'true') {
+      andConditions.push({ isDisposedMissingDate: true });
     }
 
     if (dateFrom || dateTo) {
