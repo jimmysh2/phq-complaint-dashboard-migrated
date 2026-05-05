@@ -17,6 +17,7 @@ import {
 } from '../services/master-mapping.js';
 import { syncDistricts, syncOffices, syncPoliceStationsByDistrict } from './government.js';
 import { buildPrismaWhereClause } from '../utils/filters.js';
+import { runCctnsSync, runCctnsFullRollingSync } from '../jobs/cctns-sync-job.js';
 
 const processInBatches = async <T>(
   items: T[],
@@ -671,5 +672,33 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     const { id } = request.params as Record<string, string>;
     await prisma.complaint.delete({ where: { id: parseInt(id, 10) } });
     return sendSuccess(reply, null, 'Record deleted');
+  });
+
+  // ── Vercel Cron endpoint (Issue #1 fix) ──────────────────────────────────
+  // vercel.json points "0 0 * * *" to /api/cctns/cron-sync
+  // Protected by CRON_SECRET env var to prevent unauthorized triggers.
+  fastify.get('/cctns/cron-sync', async (request, reply) => {
+    const secret = process.env.CRON_SECRET;
+    const authHeader = (request.headers['authorization'] || '') as string;
+    if (secret && authHeader !== `Bearer ${secret}`) {
+      return reply.status(401).send({ error: 'Unauthorized' });
+    }
+    // Run 2-day recent sync (fast, catches new records)
+    const result = await runCctnsSync({ label: 'vercel-cron-daily' });
+    return sendSuccess(reply, result ?? { skipped: true }, 'Daily cron sync triggered');
+  });
+
+  // ── Manual rolling sync trigger (authenticated admin route) ──────────────
+  // Use this to immediately re-sync the last 365 days and fix stale pending records.
+  fastify.post('/cctns/trigger-rolling-sync', {
+    preHandler: [authenticate],
+  }, async (_request, reply) => {
+    // Fire and forget — rolling sync can take several minutes
+    runCctnsFullRollingSync().catch((err) =>
+      console.error('[SYNC] Manual rolling sync error:', err)
+    );
+    return sendSuccess(reply, {
+      message: 'Full rolling sync started (last 365 days in 30-day chunks). Check sync history for progress.',
+    });
   });
 };

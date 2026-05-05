@@ -64,33 +64,38 @@ const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 5000):
   throw lastError;
 };
 
-export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
+export const runCctnsSync = async (
+  options: { fromDate?: string; toDate?: string; label?: string } = {}
+): Promise<CctnsSyncResult | null> => {
   if (isSyncing) {
     console.log('[SYNC] Already syncing, skipping...');
     return null;
   }
 
   isSyncing = true;
-  console.log('[SYNC] Starting background CCTNS data sync...');
 
+  // Use provided dates or default to last 2 days (recent registrations)
   const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 2);
+  const defaultStart = new Date();
+  defaultStart.setDate(endDate.getDate() - 2);
 
-  const timeFrom = formatDateStr(startDate);
-  const timeTo = formatDateStr(endDate);
+  const timeFrom = options.fromDate ?? formatDateStr(defaultStart);
+  const timeTo   = options.toDate   ?? formatDateStr(endDate);
+  const label    = options.label    ?? 'background';
+
+  console.log(`[SYNC] Starting ${label} CCTNS sync: ${timeFrom} → ${timeTo}`);
+
   const result: CctnsSyncResult = {
     timeFrom,
     timeTo,
     complaints: { fetched: 0, upserted: 0, errors: 0 },
   };
 
-  // Create sync run record — retry if DB is still waking up from idle
   let syncRun: { id: number };
   try {
     syncRun = await withRetry(() => prisma.syncRun.create({
       data: {
-        kind: 'cctns-background',
+        kind: `cctns-${label}`,
         status: 'running',
         startedAt: new Date(),
       },
@@ -141,9 +146,57 @@ export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
   return result;
 };
 
+/**
+ * Run a full rolling-year sync in monthly chunks.
+ * This catches status changes on complaints registered months ago
+ * (e.g. a 3-month-old pending complaint that gets disposed today).
+ * Runs one month at a time to stay within CCTNS API page limits.
+ */
+export const runCctnsFullRollingSync = async (): Promise<void> => {
+  const ROLLING_DAYS = 365;
+  const CHUNK_DAYS   = 30;
+
+  const end = new Date();
+  const start = new Date();
+  start.setDate(end.getDate() - ROLLING_DAYS);
+
+  console.log(`[SYNC] Starting full rolling sync: ${formatDateStr(start)} → ${formatDateStr(end)} in ${CHUNK_DAYS}-day chunks`);
+
+  let chunkStart = new Date(start);
+  let chunkIndex = 0;
+
+  while (chunkStart < end) {
+    const chunkEnd = new Date(chunkStart);
+    chunkEnd.setDate(chunkStart.getDate() + CHUNK_DAYS);
+    if (chunkEnd > end) chunkEnd.setTime(end.getTime());
+
+    chunkIndex++;
+    // Wait for any in-progress sync to finish before each chunk
+    while (isSyncing) {
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    await runCctnsSync({
+      fromDate: formatDateStr(chunkStart),
+      toDate:   formatDateStr(chunkEnd),
+      label:    `rolling-chunk-${chunkIndex}`,
+    });
+
+    chunkStart.setDate(chunkStart.getDate() + CHUNK_DAYS + 1);
+
+    // Small pause between chunks to avoid hammering the CCTNS API
+    await new Promise(r => setTimeout(r, 3000));
+  }
+
+  console.log(`[SYNC] Full rolling sync complete — ${chunkIndex} chunks processed`);
+};
+
+
+
 
 
 let intervalHandle: NodeJS.Timeout | null = null;
+let rollingIntervalHandle: NodeJS.Timeout | null = null;
 
 export const startCctnsBackgroundSync = () => {
   if (intervalHandle) return;
@@ -153,8 +206,19 @@ export const startCctnsBackgroundSync = () => {
   setTimeout(() => {
     runCctnsSync().catch((error) => console.error('[SYNC] Initial sync failed:', error));
   }, 15_000);
+
+  // Every 4 hours: sync last 2 days (new registrations + recent status changes)
   const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
   intervalHandle = setInterval(() => {
     runCctnsSync().catch((error) => console.error('[SYNC] Scheduled sync failed:', error));
   }, FOUR_HOURS_MS);
+
+  // Every 7 days: full rolling-year sync (catches status updates on OLD complaints)
+  // This is the fix for "permanent pending" — a complaint registered months ago
+  // that gets disposed today will be updated by this job.
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  rollingIntervalHandle = setInterval(() => {
+    console.log('[SYNC] Starting weekly full rolling sync...');
+    runCctnsFullRollingSync().catch((error) => console.error('[SYNC] Rolling sync failed:', error));
+  }, SEVEN_DAYS_MS);
 };

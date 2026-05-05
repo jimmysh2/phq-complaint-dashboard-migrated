@@ -66,7 +66,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     let totalDisposalDays = 0;
     for (const c of disposedComplaints) {
       if (c.complRegDt && c.disposalDate) {
-        totalDisposalDays += (c.disposalDate.getTime() - c.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
+        // Guard against data entry errors where disposalDate < complRegDt (gives negative days)
+        totalDisposalDays += Math.max(0, (c.disposalDate.getTime() - c.complRegDt.getTime()) / (1000 * 60 * 60 * 24));
       }
     }
 
@@ -259,7 +260,10 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     for (const comp of complaints) {
       const district = getDistrictLabel(comp.districtMasterId, districtMapById);
       const stats = matrixMap.get(district) || { u7: 0, u15: 0, u30: 0, o30: 0 };
-      const days = (comp.disposalDate!.getTime() - comp.complRegDt!.getTime()) / (1000 * 60 * 60 * 24);
+      // Guard: negative days (disposal before registration = data entry error) are skipped
+      const rawDays = (comp.disposalDate!.getTime() - comp.complRegDt!.getTime()) / (1000 * 60 * 60 * 24);
+      if (rawDays < 0) { matrixMap.set(district, stats); continue; } // skip corrupt record
+      const days = rawDays;
       if (days < 7) stats.u7++;
       else if (days < 15) stats.u15++;
       else if (days < 30) stats.u30++;
@@ -348,12 +352,16 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
           stats.missingDates++;
           catStats.missingDates++;
         } else if (comp.complRegDt && comp.disposalDate) {
-          const days = (comp.disposalDate.getTime() - comp.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
-          stats.totalDisposalDays += days;
-          if (days < 7) stats.du7++;
-          else if (days < 15) stats.du15++;
-          else if (days < 30) stats.du30++;
-          else stats.do30++;
+          const rawDays = (comp.disposalDate.getTime() - comp.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
+          // Skip data entry errors (disposal before registration = negative days)
+          if (rawDays >= 0) {
+            const days = rawDays;
+            stats.totalDisposalDays += days;
+            if (days < 7) stats.du7++;
+            else if (days < 15) stats.du15++;
+            else if (days < 30) stats.du30++;
+            else stats.do30++;
+          }
         }
       } else {
         // status not found in this record
