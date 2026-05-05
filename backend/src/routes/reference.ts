@@ -133,10 +133,41 @@ export const referenceRoutes = async (fastify: FastifyInstance) => {
     const dIds = parseDistrictIds(districtIds);
     const psIds = parseDistrictIds(policeStationIds);
 
-    // When district or PS is selected, derive offices from complaint data
-    // (Govt API doesn't provide office→district relationships,
-    // so we infer them from existing complaints that already have master IDs resolved)
     if (dIds.length > 0 || psIds.length > 0) {
+      // ── Primary path: filter Office by districtId ─────────────────────────
+      // Accurate because learnOfficeDistricts() populates Office.districtId
+      // by reading actual complaint data (most-votes wins per office code).
+      if (dIds.length > 0) {
+        const offices = await prisma.office.findMany({
+          where: { districtId: { in: dIds } },
+          orderBy: { name: 'asc' },
+        });
+
+        if (offices.length > 0) {
+          // If PS filter also active, narrow down via complaint data
+          if (psIds.length > 0) {
+            const psRows = await prisma.complaint.findMany({
+              where: {
+                policeStationMasterId: { in: psIds },
+                submitOfficeCd:        { not: null },
+              },
+              select:   { submitOfficeCd: true },
+              distinct: ['submitOfficeCd'],
+            });
+            const validCodes = new Set(psRows.map((r) => r.submitOfficeCd!));
+            const filtered = offices.filter((o) => validCodes.has(o.id.toString()));
+            if (filtered.length > 0) {
+              return sendSuccess(reply, filtered.map((o) => ({ id: o.id.toString(), name: o.name })));
+            }
+            // No PS-level match → fall through to complaint-based derivation
+          } else {
+            return sendSuccess(reply, offices.map((o) => ({ id: o.id.toString(), name: o.name })));
+          }
+        }
+      }
+
+      // ── Fallback: derive offices from complaint data ──────────────────────
+      // Used when Office.districtId has not been learned yet (first-run).
       const filterWhere: Record<string, unknown> = { officeMasterId: { not: null } };
       if (dIds.length > 0)  filterWhere.districtMasterId      = { in: dIds };
       if (psIds.length > 0) filterWhere.policeStationMasterId = { in: psIds };
@@ -147,20 +178,16 @@ export const referenceRoutes = async (fastify: FastifyInstance) => {
         distinct: ['officeMasterId'],
       });
 
-      // Also prepare a filter for checking complaint existence (ignoring officeMasterId)
-      const withNullOfficeMasterId: Record<string, unknown> = {};
-      if (dIds.length > 0)  withNullOfficeMasterId.districtMasterId      = { in: dIds };
-      if (psIds.length > 0) withNullOfficeMasterId.policeStationMasterId = { in: psIds };
-
       const officeIds = rows.map((r) => r.officeMasterId!).filter(Boolean) as bigint[];
 
       if (officeIds.length === 0) {
-        // Offices empty — could mean officeMasterId is null on complaints (remap not run yet).
-        // Check if complaints actually exist for this district/PS filter.
-        const complaintsExist = await prisma.complaint.count({ where: withNullOfficeMasterId });
+        // Check if complaints exist but officeMasterId is null — trigger remap
+        const checkWhere: Record<string, unknown> = {};
+        if (dIds.length > 0)  checkWhere.districtMasterId      = { in: dIds };
+        if (psIds.length > 0) checkWhere.policeStationMasterId = { in: psIds };
+        const complaintsExist = await prisma.complaint.count({ where: checkWhere });
         if (complaintsExist > 0) {
-          // Complaints exist but officeMasterId is null → trigger remap in background
-          console.log(`[branches] ${complaintsExist} complaint(s) found but officeMasterId=null — triggering background remap`);
+          console.log(`[branches] ${complaintsExist} complaint(s) found but no office resolved — triggering background remap`);
           runMasterSync('on-demand-office-remap').catch((e: any) =>
             console.error('[branches] Background remap failed:', e.message)
           );
@@ -173,18 +200,12 @@ export const referenceRoutes = async (fastify: FastifyInstance) => {
         orderBy: { name: 'asc' },
       });
 
-      return sendSuccess(
-        reply,
-        offices.map((o) => ({ id: o.id.toString(), name: o.name }))
-      );
+      return sendSuccess(reply, offices.map((o) => ({ id: o.id.toString(), name: o.name })));
     }
 
-    // No district/PS filter — return all offices
+    // No filter — return all offices
     const offices = await prisma.office.findMany({ orderBy: { name: 'asc' } });
-    return sendSuccess(
-      reply,
-      offices.map((o) => ({ id: o.id.toString(), name: o.name }))
-    );
+    return sendSuccess(reply, offices.map((o) => ({ id: o.id.toString(), name: o.name })));
   });
 
 
