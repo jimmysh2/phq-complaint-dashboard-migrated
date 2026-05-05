@@ -189,93 +189,103 @@ export const DashboardPage = () => {
   const sortedCategories = sortData(categories, categorySort);
 
   const matrixWithPct = matrix.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30) || 1;
+    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
     return {
       ...row,
-      pct_u7: Math.round(row.u7 * 100 / total),
+      pct_u7:  Math.round(row.u7  * 100 / total),
       pct_u15: Math.round(row.u15 * 100 / total),
       pct_u30: Math.round(row.u30 * 100 / total),
       pct_o30: Math.round(row.o30 * 100 / total),
+      pct_o60: Math.round((row.o60 || 0) * 100 / total),
     };
   });
 
   const matrixCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'u7',       label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'u15',      label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'u30',      label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'o30',      label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'o60',      label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderMatrixDays = (col: any, row: any) => {
     if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'u7') return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
+    if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
     if (col.key === 'u15') return <span style={{ color: '#eab308' }}>{row.u15}</span>;
     if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
     if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
     return row[col.key];
   };
 
   const matrixPctCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'pct_u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'pct_u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'pct_u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'pct_o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'pct_u7',   label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'pct_o30',  label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'pct_o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderMatrixPct = (col: any, row: any) => {
-    if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'pct_u7') return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
-    if (col.key === 'pct_u15') return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
-    if (col.key === 'pct_u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
-    if (col.key === 'pct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'district')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'pct_u7')   return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
+    if (col.key === 'pct_u15')  return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
+    if (col.key === 'pct_u30')  return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
+    if (col.key === 'pct_o30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'pct_o60')  return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.pct_o60 || 0}%</span>;
     return row[col.key];
   };
 
   // Disposal Time Matrix data
   const disposalMatrixWithPct = disposalMatrix.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30) || 1;
+    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
     return {
       ...row,
-      pct_u7: Math.round(row.u7 * 100 / total),
+      pct_u7:  Math.round(row.u7  * 100 / total),
       pct_u15: Math.round(row.u15 * 100 / total),
       pct_u30: Math.round(row.u30 * 100 / total),
       pct_o30: Math.round(row.o30 * 100 / total),
+      pct_o60: Math.round((row.o60 || 0) * 100 / total),
     };
   });
 
   const disposalCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'u7',       label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'u15',      label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'u30',      label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'o30',      label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'o60',      label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderDisposalDays = (col: any, row: any) => {
     if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'u7') return <span style={{ color: '#4ade80' }}>{row.u7}</span>;
+    if (col.key === 'u7')  return <span style={{ color: '#4ade80' }}>{row.u7}</span>;
     if (col.key === 'u15') return <span style={{ color: '#a3e635' }}>{row.u15}</span>;
     if (col.key === 'u30') return <span style={{ color: '#eab308' }}>{row.u30}</span>;
     if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
     return row[col.key];
   };
 
   const disposalPctCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'pct_u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'pct_u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'pct_u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'pct_o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'pct_u7',   label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'pct_o30',  label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'pct_o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderDisposalPct = (col: any, row: any) => {
-    if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'pct_u7') return <span style={{ color: '#4ade80' }}>{row.pct_u7}%</span>;
-    if (col.key === 'pct_u15') return <span style={{ color: '#a3e635' }}>{row.pct_u15}%</span>;
-    if (col.key === 'pct_u30') return <span style={{ color: '#eab308' }}>{row.pct_u30}%</span>;
-    if (col.key === 'pct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'district')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'pct_u7')   return <span style={{ color: '#4ade80' }}>{row.pct_u7}%</span>;
+    if (col.key === 'pct_u15')  return <span style={{ color: '#a3e635' }}>{row.pct_u15}%</span>;
+    if (col.key === 'pct_u30')  return <span style={{ color: '#eab308' }}>{row.pct_u30}%</span>;
+    if (col.key === 'pct_o30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'pct_o60')  return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.pct_o60 || 0}%</span>;
     return row[col.key];
   };
 
