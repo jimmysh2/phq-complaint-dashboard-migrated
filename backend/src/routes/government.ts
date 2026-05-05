@@ -2,6 +2,8 @@ import { FastifyInstance } from 'fastify';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { prisma } from '../config/database.js';
+import https from 'https';
+import http from 'http';
 
 interface GovernmentDropdownPayload {
   Result?: Array<Record<string, unknown>>;
@@ -79,13 +81,23 @@ const parseXmlPayload = (rawText: string): NormalizedGovItem[] => {
   return normalizeItems(ids.map((id, i) => ({ id, name: names[i] || '' })));
 };
 
-const fetchGovernmentItems = async (url: string): Promise<NormalizedGovItem[]> => {
-  const res = await fetch(url, {
+const httpGet = (url: string): Promise<string> => new Promise((resolve, reject) => {
+  const mod = url.startsWith('https') ? https : http;
+  const req = mod.get(url, {
+    rejectUnauthorized: false,          // Haryana govt API uses self-signed / chain-invalid cert
     headers: { Accept: 'application/json, text/plain, application/xml;q=0.9, */*;q=0.8' },
-    signal: AbortSignal.timeout(120000),
+  }, (res) => {
+    let raw = '';
+    res.setEncoding('utf8');
+    res.on('data', (chunk: string) => { raw += chunk; });
+    res.on('end', () => resolve(raw.trim().replace(/^\uFEFF/, '')));
   });
-  if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`);
-  const rawText = (await res.text()).trim().replace(/^\uFEFF/, '');
+  req.setTimeout(300_000, () => req.destroy(new Error(`Govt API timeout (5 min): ${url}`)));
+  req.on('error', reject);
+});
+
+const fetchGovernmentItems = async (url: string): Promise<NormalizedGovItem[]> => {
+  const rawText = await httpGet(url);
   return parseJsonPayload(rawText) ?? parseXmlPayload(rawText);
 };
 

@@ -81,14 +81,33 @@ const parseXmlPayload = (rawText) => {
   return items;
 };
 
+// ── HTTP helper (uses native https to bypass govt API SSL cert issues) ─────
+
+const https = require('https');
+const http  = require('http');
+
+const httpGet = (url) => new Promise((resolve, reject) => {
+  const mod = url.startsWith('https') ? https : http;
+  const req = mod.get(url, {
+    rejectUnauthorized: false,          // Govt APIs often have self-signed certs
+    headers: {
+      Accept: 'application/json, text/plain, application/xml;q=0.9, */*;q=0.8',
+    },
+  }, (res) => {
+    let raw = '';
+    res.setEncoding('utf8');
+    res.on('data', (chunk) => { raw += chunk; });
+    res.on('end', () => resolve(raw.trim().replace(/^\uFEFF/, '')));
+  });
+  req.setTimeout(300_000, () => {       // 5 minutes — govt servers are very slow
+    req.destroy(new Error(`Timeout after 5 min: ${url}`));
+  });
+  req.on('error', reject);
+});
+
 const fetchGovtItems = async (url) => {
   console.log(`  → GET ${url}`);
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json, text/plain, application/xml;q=0.9, */*;q=0.8' },
-    signal: AbortSignal.timeout(60_000),
-  });
-  if (!res.ok) throw new Error(`Govt API HTTP ${res.status}: ${url}`);
-  const rawText = (await res.text()).trim().replace(/^\uFEFF/, '');
+  const rawText = await httpGet(url);
   return parseJsonPayload(rawText) ?? parseXmlPayload(rawText) ?? [];
 };
 
