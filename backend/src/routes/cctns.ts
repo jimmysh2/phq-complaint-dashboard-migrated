@@ -565,7 +565,8 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
 
       const complaints = await collectComplaintsByRange(timeFrom, timeTo);
       const normalized = toNormalizedUnique(complaints);
-      const { created, updated, errors } = await saveNormalizedComplaints(normalized);
+      const lookups = await loadAllLookups();
+      const { created, updated, errors } = await saveNormalizedComplaints(normalized, lookups);
 
       return sendSuccess(reply, {
         message: 'Sync completed (deprecated: use POST /cctns/fetch-and-sync)',
