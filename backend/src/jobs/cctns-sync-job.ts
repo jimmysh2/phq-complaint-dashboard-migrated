@@ -233,12 +233,12 @@ export const startCctnsBackgroundSync = () => {
     runCctnsSync().catch((error) => console.error('[SYNC] Scheduled sync failed:', error));
   }, FOUR_HOURS_MS);
 
-  // Every 7 days: full rolling-year sync (catches status updates on OLD complaints)
+  // Every 24 hours: full rolling sync from oldest pending complaint to today.
   // This is the fix for "permanent pending" — a complaint registered months ago
-  // that gets disposed today will be updated by this job.
-  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  // that gets disposed today will be caught and updated by this daily job.
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   rollingIntervalHandle = setInterval(() => {
-    console.log('[SYNC] Starting weekly full rolling sync...');
+    console.log('[SYNC] Starting daily full rolling sync...');
     runCctnsFullRollingSync().catch((error) => console.error('[SYNC] Rolling sync failed:', error));
-  }, SEVEN_DAYS_MS);
+  }, ONE_DAY_MS);
 };
