@@ -142,51 +142,67 @@ export const dashboardApi = {
 };
 
 export const reportsApi = {
-  district: async () => {
-    const response = await api.get('/api/reports/district');
+  district: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/district', { params });
     return response.data;
   },
-  modeReceipt: async () => {
-    const response = await api.get('/api/reports/mode-receipt');
+  modeReceipt: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/mode-receipt', { params });
     return response.data;
   },
-  natureIncident: async () => {
-    const response = await api.get('/api/reports/nature-incident');
+  natureIncident: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/nature-incident', { params });
     return response.data;
   },
-  typeAgainst: async () => {
-    const response = await api.get('/api/reports/type-against');
+  typeAgainst: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/type-against', { params });
     return response.data;
   },
-  status: async () => {
-    const response = await api.get('/api/reports/status');
+  status: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/status', { params });
     return response.data;
   },
-  branchWise: async () => {
-    const response = await api.get('/api/reports/branch-wise');
+  branchWise: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/branch-wise', { params });
     return response.data;
   },
-  highlights: async () => {
-    const response = await api.get('/api/reports/highlights');
+  highlights: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/highlights', { params });
+    return response.data;
+  },
+  complaintsSource: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/complaint-source', { params });
+    return response.data;
+  },
+  typeComplaint: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/type-complaint', { params });
+    return response.data;
+  },
+  dateWise: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/date-wise', { params });
+    return response.data;
+  },
+  actionTaken: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/action-taken', { params });
     return response.data;
   },
 };
 
 export const pendingApi = {
-  all: async () => {
-    const response = await api.get('/api/pending/all');
+  all: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/pending/all', { params });
     return response.data;
   },
-  fifteenToThirty: async () => {
-    const response = await api.get('/api/pending/15-30-days');
+  fifteenToThirty: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/pending/15-30-days', { params });
     return response.data;
   },
-  thirtyToSixty: async () => {
-    const response = await api.get('/api/pending/30-60-days');
+  thirtyToSixty: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/pending/30-60-days', { params });
     return response.data;
   },
-  overSixty: async () => {
-    const response = await api.get('/api/pending/over-60-days');
+  overSixty: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/pending/over-60-days', { params });
     return response.data;
   },
 };
