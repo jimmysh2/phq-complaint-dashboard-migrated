@@ -47,6 +47,23 @@ interface CctnsSyncResult {
 
 let isSyncing = false;
 
+// Retry a DB operation up to `attempts` times with `delayMs` gap
+const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 5000): Promise<T> => {
+  let lastError: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (i < attempts - 1) {
+        console.log(`[SYNC] DB not ready, retrying in ${delayMs / 1000}s... (attempt ${i + 1}/${attempts})`);
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  throw lastError;
+};
+
 export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
   if (isSyncing) {
     console.log('[SYNC] Already syncing, skipping...');
@@ -67,13 +84,22 @@ export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
     timeTo,
     complaints: { fetched: 0, upserted: 0, errors: 0 },
   };
-  const syncRun = await prisma.syncRun.create({
-    data: {
-      kind: 'cctns-background',
-      status: 'running',
-      startedAt: new Date(),
-    },
-  });
+
+  // Create sync run record — retry if DB is still waking up from idle
+  let syncRun: { id: number };
+  try {
+    syncRun = await withRetry(() => prisma.syncRun.create({
+      data: {
+        kind: 'cctns-background',
+        status: 'running',
+        startedAt: new Date(),
+      },
+    }));
+  } catch (err) {
+    console.error('[SYNC] Could not connect to database after retries. Skipping sync.', err);
+    isSyncing = false;
+    return null;
+  }
 
   try {
     const complaints = (await fetchCctnsComplaints(timeFrom, timeTo)) as CctnsComplaintRow[];
@@ -115,14 +141,20 @@ export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
   return result;
 };
 
+
+
 let intervalHandle: NodeJS.Timeout | null = null;
 
 export const startCctnsBackgroundSync = () => {
   if (intervalHandle) return;
 
-  runCctnsSync().catch((error) => console.error('[SYNC] Initial sync failed:', error));
-  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+  // Wait 15s before first sync — gives Neon DB time to wake from idle on cold start
+  console.log('[SYNC] Server ready. First sync will begin in 15 seconds...');
+  setTimeout(() => {
+    runCctnsSync().catch((error) => console.error('[SYNC] Initial sync failed:', error));
+  }, 15_000);
+  const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
   intervalHandle = setInterval(() => {
     runCctnsSync().catch((error) => console.error('[SYNC] Scheduled sync failed:', error));
-  }, ONE_DAY_MS);
+  }, FOUR_HOURS_MS);
 };

@@ -8,7 +8,12 @@ import {
   NormalizedCctnsComplaint,
   normalizeComplaintRow,
 } from '../services/cctns-normalize.js';
-import { enrichWithMasterIds, remapComplaintMasterIds } from '../services/master-mapping.js';
+import {
+  enrichWithMasterIds,
+  loadAllLookups,
+  resolveMasterIds,
+  MasterLookups,
+} from '../services/master-mapping.js';
 
 const processInBatches = async <T>(
   items: T[],
@@ -74,7 +79,7 @@ const collectComplaintsByRange = async (timeFrom: string, timeTo: string) => {
   return rows;
 };
 
-const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[]) => {
+const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[], lookups: MasterLookups) => {
   let created = 0;
   let updated = 0;
   let errors = 0;
@@ -92,9 +97,11 @@ const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[]) => {
     console.log(`ℹ️ Filtered out ${rows.length - validRows.length} invalid records`);
   }
 
+  // Use the pre-loaded lookups for every record — avoids N×3 DB queries
   await processInBatches(validRows, 50, async (data) => {
     try {
-      const mapped = await enrichWithMasterIds(data);
+      const resolved = await resolveMasterIds(data, lookups);
+      const mapped = { ...data, ...resolved };
       
       // Validate required fields before DB operation
       if (!mapped.complRegNum) {
@@ -179,10 +186,13 @@ const runFetchJob = async (jobId: string, timeFrom: string, timeTo: string) => {
     
     const normalized = toNormalizedUnique(complaints);
     
+    // Load master lookups ONCE and save all complaints in a single pass
     job.progress = `Saving ${normalized.length} records to database...`;
+    console.log(`[FETCH-JOB ${jobId}] Loading master lookups once for batch save...`);
+    const lookups = await loadAllLookups();
     console.log(`[FETCH-JOB ${jobId}] Saving ${normalized.length} records to database...`);
     
-    const { created, updated, errors } = await saveNormalizedComplaints(normalized);
+    const { created, updated, errors } = await saveNormalizedComplaints(normalized, lookups);
     
     job.status = 'success';
     job.result = {
@@ -261,41 +271,46 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     const limitNum = Math.min(500, Math.max(1, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where clause
-    const where: any = {};
+    // Build where clause using AND so multiple filters never overwrite each other
+    const andConditions: any[] = [];
 
     if (search) {
-      where.OR = [
-        { complRegNum: { contains: search, mode: 'insensitive' } },
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { mobile: { contains: search, mode: 'insensitive' } },
-        { complDesc: { contains: search, mode: 'insensitive' } },
-        { districtName: { contains: search, mode: 'insensitive' } },
-        { addressPs: { contains: search, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { complRegNum:   { contains: search, mode: 'insensitive' } },
+          { firstName:     { contains: search, mode: 'insensitive' } },
+          { lastName:      { contains: search, mode: 'insensitive' } },
+          { mobile:        { contains: search, mode: 'insensitive' } },
+          { complDesc:     { contains: search, mode: 'insensitive' } },
+          { districtName:  { contains: search, mode: 'insensitive' } },
+          { addressPs:     { contains: search, mode: 'insensitive' } },
+        ],
+      });
     }
 
     if (district) {
-      where.OR = [
-        { districtName: { contains: district, mode: 'insensitive' } },
-        { addressDistrict: { contains: district, mode: 'insensitive' } },
-      ];
+      // Separate AND block — never overwrites the search OR block
+      andConditions.push({
+        OR: [
+          { districtName:    { contains: district, mode: 'insensitive' } },
+          { addressDistrict: { contains: district, mode: 'insensitive' } },
+        ],
+      });
     }
 
     if (statusGroup) {
-      where.statusGroup = statusGroup.toLowerCase();
+      andConditions.push({ statusGroup: statusGroup.toLowerCase() });
     }
 
     if (dateFrom || dateTo) {
-      where.complRegDt = {};
-      if (dateFrom) {
-        where.complRegDt.gte = new Date(dateFrom);
-      }
-      if (dateTo) {
-        where.complRegDt.lte = new Date(dateTo);
-      }
+      const dateFilter: any = {};
+      if (dateFrom) dateFilter.gte = new Date(dateFrom);
+      if (dateTo)   dateFilter.lte = new Date(dateTo);
+      andConditions.push({ complRegDt: dateFilter });
     }
+
+    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
+
 
     // Validate sortBy to prevent injection
     const allowedSortFields = [
@@ -501,7 +516,8 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
 
       const complaints = await collectComplaintsByRange(timeFrom, timeTo);
       const normalized = toNormalizedUnique(complaints);
-      const { created, updated, errors } = await saveNormalizedComplaints(normalized);
+      const lookups = await loadAllLookups();
+      const { created, updated, errors } = await saveNormalizedComplaints(normalized, lookups);
 
       return sendSuccess(reply, {
         message: 'Sync completed (deprecated: use POST /cctns/fetch-and-sync)',
@@ -550,12 +566,41 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (_request, reply) => {
     try {
+      // Step 1: ensure master tables are populated from govt API
+      await syncDistricts();
+
+      const allDistricts = await prisma.district.findMany({ select: { id: true, name: true } });
+      const districtIdsWithPS = (
+        await prisma.policeStation.findMany({ select: { districtId: true }, distinct: ['districtId'] })
+      ).map((r) => r.districtId?.toString()).filter(Boolean);
+
+      const missingPS = allDistricts.filter((d) => !districtIdsWithPS.includes(d.id.toString()));
+      if (missingPS.length > 0) {
+        console.log(`[remap-masters] Syncing PS for ${missingPS.length} district(s) missing PS...`);
+        for (let i = 0; i < missingPS.length; i += 5) {
+          await Promise.all(
+            missingPS.slice(i, i + 5).map((d) =>
+              syncPoliceStationsByDistrict(d.id).catch((e) =>
+                console.error(`[remap-masters] PS sync failed for ${d.name}:`, e.message)
+              )
+            )
+          );
+        }
+      }
+
+      await syncOffices();
+
+      // Step 2: remap complaint master IDs with freshest lookups
       const stats = await remapComplaintMasterIds();
-      return sendSuccess(reply, stats, 'Master mapping recomputed');
+      return sendSuccess(reply, {
+        ...stats,
+        message: `Synced ${missingPS.length} missing district(s) PS before remap`,
+      }, 'Master mapping recomputed');
     } catch (error) {
       return sendError(reply, `Remap failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   });
+
 
   fastify.get('/cctns/:id', {
     preHandler: [authenticate],

@@ -4,6 +4,7 @@ import { sendSuccess, sendError, sendNotFound } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { classifyComplaintStatus } from '../services/status.js';
 import { enrichWithMasterIds } from '../services/master-mapping.js';
+import { buildPrismaWhereClause } from '../utils/filters.js';
 
 export const complaintRoutes = async (fastify: FastifyInstance) => {
   const toBigInt = (value: unknown): bigint | null => {
@@ -46,38 +47,31 @@ export const complaintRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const { page = '1', limit = '10', search = '' } = request.query as Record<string, string>;
     
-    const pageNum = parseInt(page);
+    const pageNum  = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
 
-    const where: any = search ? {
+    // Merge global filter (district, station, office, classOfIncident, dates) with search
+    const globalWhere = buildPrismaWhereClause(request.query);
+    const searchWhere = search ? {
       OR: [
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { mobile: { contains: search, mode: 'insensitive' } },
-        { complRegNum: { contains: search, mode: 'insensitive' } },
-        { complDesc: { contains: search, mode: 'insensitive' } },
+        { firstName:   { contains: search, mode: 'insensitive' as const } },
+        { lastName:    { contains: search, mode: 'insensitive' as const } },
+        { mobile:      { contains: search, mode: 'insensitive' as const } },
+        { complRegNum: { contains: search, mode: 'insensitive' as const } },
+        { complDesc:   { contains: search, mode: 'insensitive' as const } },
       ],
     } : {};
+    const where: any = { ...globalWhere, ...searchWhere };
 
     const [complaints, total] = await Promise.all([
-      prisma.complaint.findMany({
-        where,
-        skip,
-        take: limitNum,
-        orderBy: { id: 'desc' },
-      }),
+      prisma.complaint.findMany({ where, skip, take: limitNum, orderBy: { id: 'desc' } }),
       prisma.complaint.count({ where }),
     ]);
 
     return sendSuccess(reply, {
       data: complaints,
-      pagination: {
-        page: pageNum,
-        limit: limitNum,
-        total,
-        totalPages: Math.ceil(total / limitNum),
-      },
+      pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) },
     });
   });
 

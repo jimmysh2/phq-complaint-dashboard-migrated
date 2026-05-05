@@ -367,11 +367,35 @@ export const DashboardPage = () => {
           <div className="loading-spinner"><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
         ) : (
           <div className="stats-grid">
-            <StatCard label="Total Received" value={(s?.totalReceived || 0).toLocaleString()} colorClass="blue" />
-            <StatCard label="Total Disposed" value={(s?.totalDisposed || 0).toLocaleString()} subValue={`${Math.round(((s?.totalDisposed || 0) / (s?.totalReceived || 1)) * 100)}% Clearance Rate`} colorClass="green" />
-            <StatCard label="Total Pending" value={(s?.totalPending || 0).toLocaleString()} colorClass="red" />
-            <StatCard label="Disposed Missing Date" value={(s?.disposedMissingDateCount || 0).toLocaleString()} colorClass="yellow" />
-            <StatCard label="Avg. Disposal Time" value={`${s?.avgDisposalTime || 0} Days`} subValue="From Registration to Disposal" colorClass="purple" />
+            <StatCard
+              label="Total Received"
+              value={(s?.totalReceived || 0).toLocaleString()}
+              colorClass="blue"
+            />
+            <StatCard
+              label="Total Disposed"
+              value={(s?.totalDisposed || 0).toLocaleString()}
+              subValue={`${Math.round(((s?.totalDisposed || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
+              colorClass="green"
+            />
+            <StatCard
+              label="Total Pending"
+              value={(s?.totalPending || 0).toLocaleString()}
+              subValue={`${Math.round(((s?.totalPending || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
+              colorClass="red"
+            />
+            <StatCard
+              label="Status Not Found"
+              value={(s?.totalUnknown || 0).toLocaleString()}
+              subValue="Status was not found in the record"
+              colorClass="yellow"
+            />
+            <StatCard
+              label="Disposal Date Not Found"
+              value={(s?.disposedMissingDateCount || 0).toLocaleString()}
+              subValue="Marked disposed but date not found"
+              colorClass="purple"
+            />
           </div>
         )}
 

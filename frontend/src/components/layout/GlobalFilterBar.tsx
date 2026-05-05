@@ -18,6 +18,8 @@ const MultiSelectDropdown = ({
   items,
   onAllClick,
   onToggleItem,
+  disabled,
+  disabledHint,
 }: {
   isOpen: boolean;
   toggle: () => void;
@@ -26,16 +28,20 @@ const MultiSelectDropdown = ({
   items: Option[];
   onAllClick: () => void;
   onToggleItem: (id: string) => void;
+  disabled?: boolean;
+  disabledHint?: string;
 }) => {
   const selectedLabels = items
     .filter((item) => selectedIds.includes(item.id))
     .map((item) => item.label);
 
-  const displayText = selectedIds.length === 0
-    ? allLabel
-    : selectedIds.length === 1
-      ? selectedLabels[0] || `${selectedIds.length} Selected`
-      : `${selectedIds.length} Selected`;
+  const displayText = disabled
+    ? (disabledHint ?? allLabel)
+    : selectedIds.length === 0
+      ? allLabel
+      : selectedIds.length === 1
+        ? selectedLabels[0] || `${selectedIds.length} Selected`
+        : `${selectedIds.length} Selected`;
 
   return (
     <>
@@ -43,17 +49,23 @@ const MultiSelectDropdown = ({
         className="filter-input"
         value="__custom__"
         onClick={(e) => {
+          if (disabled) return;
           e.preventDefault();
           toggle();
         }}
         onMouseDown={(e) => e.preventDefault()}
         onChange={() => {}}
-        style={{ cursor: 'pointer', minWidth: '140px' }}
+        style={{
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          minWidth: '140px',
+          opacity: disabled ? 0.5 : 1,
+        }}
+        title={disabled ? (disabledHint ?? '') : ''}
       >
         <option value="__custom__">{displayText}</option>
       </select>
 
-      {isOpen && (
+      {isOpen && !disabled && (
         <div
           style={{
             position: 'absolute',
@@ -89,30 +101,36 @@ const MultiSelectDropdown = ({
             {allLabel}
           </label>
 
-          {items.map((item) => (
-            <label
-              key={item.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '5px 10px',
-                cursor: 'pointer',
-                fontSize: '13px',
-                color: '#e2e8f0',
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
-              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-            >
-              <input
-                type="checkbox"
-                checked={selectedIds.includes(item.id)}
-                onChange={() => onToggleItem(item.id)}
-                style={{ accentColor: '#3b82f6' }}
-              />
-              {item.label}
-            </label>
-          ))}
+          {items.length === 0 ? (
+            <div style={{ padding: '10px', color: '#64748b', fontSize: '12px', textAlign: 'center' }}>
+              No options available
+            </div>
+          ) : (
+            items.map((item) => (
+              <label
+                key={item.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '5px 10px',
+                  cursor: 'pointer',
+                  fontSize: '13px',
+                  color: '#e2e8f0',
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(item.id)}
+                  onChange={() => onToggleItem(item.id)}
+                  style={{ accentColor: '#3b82f6' }}
+                />
+                {item.label}
+              </label>
+            ))
+          )}
         </div>
       )}
     </>
@@ -122,57 +140,69 @@ const MultiSelectDropdown = ({
 export const GlobalFilterBar = () => {
   const { filters, setFilter, resetFilters } = useFilters();
   const [districtDropdownOpen, setDistrictDropdownOpen] = useState(false);
-  const [stationDropdownOpen, setStationDropdownOpen] = useState(false);
-  const [officeDropdownOpen, setOfficeDropdownOpen] = useState(false);
-  const [classDropdownOpen, setClassDropdownOpen] = useState(false);
+  const [stationDropdownOpen,  setStationDropdownOpen]  = useState(false);
+  const [officeDropdownOpen,   setOfficeDropdownOpen]   = useState(false);
+  const [classDropdownOpen,    setClassDropdownOpen]    = useState(false);
 
   const districtRef = useRef<HTMLDivElement>(null);
-  const stationRef = useRef<HTMLDivElement>(null);
-  const officeRef = useRef<HTMLDivElement>(null);
-  const classRef = useRef<HTMLDivElement>(null);
+  const stationRef  = useRef<HTMLDivElement>(null);
+  const officeRef   = useRef<HTMLDivElement>(null);
+  const classRef    = useRef<HTMLDivElement>(null);
 
+  // Close all dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (districtRef.current && !districtRef.current.contains(event.target as Node)) setDistrictDropdownOpen(false);
-      if (stationRef.current && !stationRef.current.contains(event.target as Node)) setStationDropdownOpen(false);
-      if (officeRef.current && !officeRef.current.contains(event.target as Node)) setOfficeDropdownOpen(false);
-      if (classRef.current && !classRef.current.contains(event.target as Node)) setClassDropdownOpen(false);
+      if (stationRef.current  && !stationRef.current.contains(event.target as Node))  setStationDropdownOpen(false);
+      if (officeRef.current   && !officeRef.current.contains(event.target as Node))   setOfficeDropdownOpen(false);
+      if (classRef.current    && !classRef.current.contains(event.target as Node))    setClassDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const selectedDistrictIds = parseCsv(filters.districtIds);
-  const selectedStationIds = parseCsv(filters.policeStationIds);
-  const selectedOfficeIds = parseCsv(filters.officeIds);
+  const selectedStationIds  = parseCsv(filters.policeStationIds);
+  const selectedOfficeIds   = parseCsv(filters.officeIds);
   const selectedClassValues = parseCsv(filters.classOfIncident);
 
   const toggleCsvValue = (selected: string[], value: string) =>
     selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value];
 
+  // ── Reference data queries (hierarchically cascaded) ──────────────────────
+
   const { data: districts } = useQuery({
     queryKey: ['filter-districts'],
     queryFn: () => referenceApi.districts(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
 
-  const { data: policeStations } = useQuery({
+  // Police stations: only load PS from selected districts (if any)
+  const { data: policeStations, isFetching: psFetching } = useQuery({
     queryKey: ['filter-police-stations', filters.districtIds],
     queryFn: () => referenceApi.policeStations(filters.districtIds || undefined),
     staleTime: 5 * 60 * 1000,
   });
 
-  const { data: offices } = useQuery({
-    queryKey: ['filter-offices'],
-    queryFn: () => referenceApi.offices(),
+  // Offices: derive from complaint data scoped to selected district + PS
+  // Falls back to all offices when no district/PS is selected
+  const { data: offices, isFetching: officeFetching } = useQuery({
+    queryKey: ['filter-offices', filters.districtIds, filters.policeStationIds],
+    queryFn: () =>
+      referenceApi.offices({
+        districtIds:      filters.districtIds      || undefined,
+        policeStationIds: filters.policeStationIds || undefined,
+      }),
     staleTime: 5 * 60 * 1000,
   });
 
   const { data: classes } = useQuery({
     queryKey: ['filter-class-of-incident'],
     queryFn: () => referenceApi.crimeCategory(),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
   });
+
+  // ── Option lists ───────────────────────────────────────────────────────────
 
   const districtOptions = useMemo<Option[]>(
     () => (districts?.data || []).map((d: any) => ({ id: String(d.id), label: String(d.name) })),
@@ -194,6 +224,9 @@ export const GlobalFilterBar = () => {
     [classes]
   );
 
+  // ── Cascade cleanup: prune selections that are no longer valid ─────────────
+
+  // When district changes → prune any PS not in the new station list
   useEffect(() => {
     if (selectedStationIds.length === 0) return;
     const valid = new Set(stationOptions.map((item) => item.id));
@@ -201,10 +234,30 @@ export const GlobalFilterBar = () => {
     if (pruned.length !== selectedStationIds.length) {
       setFilter('policeStationIds', pruned.join(','));
     }
-  }, [filters.districtIds, stationOptions]);
+  }, [filters.districtIds, stationOptions]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When district or PS changes → prune offices not in the new office list
+  useEffect(() => {
+    if (selectedOfficeIds.length === 0) return;
+    const valid = new Set(officeOptions.map((item) => item.id));
+    const pruned = selectedOfficeIds.filter((id) => valid.has(id));
+    if (pruned.length !== selectedOfficeIds.length) {
+      setFilter('officeIds', pruned.join(','));
+    }
+  }, [filters.districtIds, filters.policeStationIds, officeOptions]);   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  const closeAll = () => {
+    setDistrictDropdownOpen(false);
+    setStationDropdownOpen(false);
+    setOfficeDropdownOpen(false);
+    setClassDropdownOpen(false);
+  };
 
   return (
     <div className="global-filter-bar">
+
+      {/* Date Range */}
       <div className="filter-group">
         <label>Date Range</label>
         <div style={{ display: 'flex', gap: '8px' }}>
@@ -228,53 +281,59 @@ export const GlobalFilterBar = () => {
         </div>
       </div>
 
+      {/* District (always fully loaded) */}
       <div className="filter-group" ref={districtRef} style={{ position: 'relative' }}>
         <label>District</label>
         <MultiSelectDropdown
           isOpen={districtDropdownOpen}
-          toggle={() => {
-            setDistrictDropdownOpen(!districtDropdownOpen);
-            setStationDropdownOpen(false);
-            setOfficeDropdownOpen(false);
-            setClassDropdownOpen(false);
-          }}
+          toggle={() => { closeAll(); setDistrictDropdownOpen((v) => !v); }}
           allLabel="All Districts"
           selectedIds={selectedDistrictIds}
           items={districtOptions}
-          onAllClick={() => setFilter('districtIds', '')}
+          onAllClick={() => {
+            setFilter('districtIds', '');
+            // Clearing district cascades down: clear PS + Office too
+            setFilter('policeStationIds', '');
+            setFilter('officeIds', '');
+          }}
           onToggleItem={(id) => setFilter('districtIds', toggleCsvValue(selectedDistrictIds, id).join(','))}
         />
       </div>
 
+      {/* Police Station (scoped to selected district) */}
       <div className="filter-group" ref={stationRef} style={{ position: 'relative' }}>
-        <label>Police Station</label>
+        <label>
+          Police Station
+          {psFetching && <span style={{ marginLeft: 4, color: '#64748b', fontSize: 10 }}>↻</span>}
+        </label>
         <MultiSelectDropdown
           isOpen={stationDropdownOpen}
-          toggle={() => {
-            setStationDropdownOpen(!stationDropdownOpen);
-            setDistrictDropdownOpen(false);
-            setOfficeDropdownOpen(false);
-            setClassDropdownOpen(false);
-          }}
-          allLabel="All Police Stations"
+          toggle={() => { closeAll(); setStationDropdownOpen((v) => !v); }}
+          allLabel={selectedDistrictIds.length === 0 ? 'All Stations' : 'All Stations in District'}
           selectedIds={selectedStationIds}
           items={stationOptions}
-          onAllClick={() => setFilter('policeStationIds', '')}
+          onAllClick={() => {
+            setFilter('policeStationIds', '');
+            setFilter('officeIds', '');   // cascade clear offices too
+          }}
           onToggleItem={(id) => setFilter('policeStationIds', toggleCsvValue(selectedStationIds, id).join(','))}
         />
       </div>
 
+      {/* Office (scoped to selected district + PS, derived from complaint data) */}
       <div className="filter-group" ref={officeRef} style={{ position: 'relative' }}>
-        <label>Office</label>
+        <label>
+          Office
+          {officeFetching && <span style={{ marginLeft: 4, color: '#64748b', fontSize: 10 }}>↻</span>}
+        </label>
         <MultiSelectDropdown
           isOpen={officeDropdownOpen}
-          toggle={() => {
-            setOfficeDropdownOpen(!officeDropdownOpen);
-            setDistrictDropdownOpen(false);
-            setStationDropdownOpen(false);
-            setClassDropdownOpen(false);
-          }}
-          allLabel="All Offices"
+          toggle={() => { closeAll(); setOfficeDropdownOpen((v) => !v); }}
+          allLabel={
+            selectedDistrictIds.length > 0 || selectedStationIds.length > 0
+              ? 'All Offices in Selection'
+              : 'All Offices'
+          }
           selectedIds={selectedOfficeIds}
           items={officeOptions}
           onAllClick={() => setFilter('officeIds', '')}
@@ -282,16 +341,12 @@ export const GlobalFilterBar = () => {
         />
       </div>
 
+      {/* Class of Incident */}
       <div className="filter-group" ref={classRef} style={{ position: 'relative' }}>
         <label>Class of Incident</label>
         <MultiSelectDropdown
           isOpen={classDropdownOpen}
-          toggle={() => {
-            setClassDropdownOpen(!classDropdownOpen);
-            setDistrictDropdownOpen(false);
-            setStationDropdownOpen(false);
-            setOfficeDropdownOpen(false);
-          }}
+          toggle={() => { closeAll(); setClassDropdownOpen((v) => !v); }}
           allLabel="All Classes"
           selectedIds={selectedClassValues}
           items={classOptions}

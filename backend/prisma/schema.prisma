@@ -104,10 +104,15 @@ model PoliceStation {
 }
 
 model Office {
-  id        BigInt   @id
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           BigInt   @id
+  name         String
+  districtId   BigInt?
+  districtName String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([districtId])
+  @@index([districtName])
 }
 
 model SyncRun {

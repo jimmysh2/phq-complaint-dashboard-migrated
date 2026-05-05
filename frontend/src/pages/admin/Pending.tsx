@@ -3,20 +3,22 @@ import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { DataTable, Column } from '@/components/data/DataTable';
+import { pendingApi } from '@/services/api';
+import { useFilters } from '@/contexts/FilterContext';
 
 const tabs = [
-  { id: 'all', label: 'All Pending' },
-  { id: '15-30', label: '15-30 Days' },
-  { id: '30-60', label: '30-60 Days' },
-  { id: 'over-60', label: 'Over 60 Days' },
-  { id: 'branch', label: 'By Branch' },
+  { id: 'all',      label: 'All Pending' },
+  { id: '15-30',    label: '15-30 Days' },
+  { id: '30-60',    label: '30-60 Days' },
+  { id: 'over-60',  label: 'Over 60 Days' },
+  { id: 'branch',   label: 'By Branch' },
 ];
 
-const ep: Record<string, string> = {
-  all: '/api/pending/all',
-  '15-30': '/api/pending/15-30-days',
-  '30-60': '/api/pending/30-60-days',
-  'over-60': '/api/pending/over-60-days',
+const pendingApiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>> = {
+  'all':      (p) => pendingApi.all(p),
+  '15-30':    (p) => pendingApi.fifteenToThirty(p),
+  '30-60':    (p) => pendingApi.thirtyToSixty(p),
+  'over-60':  (p) => pendingApi.overSixty(p),
 };
 
 export const PendingPage = () => {
@@ -24,6 +26,12 @@ export const PendingPage = () => {
   const type = sp.get('type') || 'all';
   const [branch, setBranch] = useState('');
   const [branches, setBranches] = useState<string[]>([]);
+
+  // Same pattern as Dashboard
+  const { filters } = useFilters();
+  const activeFilters = Object.fromEntries(
+    Object.entries(filters).filter(([_, v]) => v !== '')
+  ) as Record<string, string>;
 
   const { data: branchesData } = useQuery({
     queryKey: ['pending', 'branches'],
@@ -35,23 +43,21 @@ export const PendingPage = () => {
   });
 
   useEffect(() => {
-    if (branchesData?.data) {
-      setBranches(branchesData.data);
-    }
+    if (branchesData?.data) setBranches(branchesData.data);
   }, [branchesData]);
 
-  const getEndpoint = () => {
-    if (type === 'branch' && branch) {
-      return `/api/pending/branch/${encodeURIComponent(branch)}`;
-    }
-    return ep[type] || ep.all;
-  };
-
   const { data, isLoading } = useQuery({
-    queryKey: ['pending', type, branch],
+    queryKey: ['pending', type, branch, activeFilters],  // re-fetches on filter change
     queryFn: async () => {
-      const r = await fetch(getEndpoint(), { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
-      return r.json();
+      if (type === 'branch' && branch) {
+        const r = await fetch(
+          `/api/pending/branch/${encodeURIComponent(branch)}`,
+          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        );
+        return r.json();
+      }
+      const fn = pendingApiFnMap[type] || pendingApiFnMap['all'];
+      return fn(activeFilters);
     },
   });
 
@@ -59,21 +65,21 @@ export const PendingPage = () => {
   const total = rows.length;
 
   const tableData = rows.map(r => ({
-    regNum: r.complRegNum || '-',
+    regNum:   r.complRegNum || '-',
     district: r.addressDistrict || '-',
-    name: `${r.firstName || ''} ${r.lastName || ''}`.trim() || '-',
-    mobile: r.mobile || '-',
-    date: r.complRegDt ? new Date(String(r.complRegDt)).toLocaleDateString() : '-',
-    status: 'Pending',
+    name:     `${r.firstName || ''} ${r.lastName || ''}`.trim() || '-',
+    mobile:   r.mobile || '-',
+    date:     r.complRegDt ? new Date(String(r.complRegDt)).toLocaleDateString() : '-',
+    status:   'Pending',
   }));
 
   const cols: Column<typeof tableData[0]>[] = [
-    { key: 'regNum', label: 'Reg. No.', sortable: true },
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'mobile', label: 'Mobile', sortable: true },
-    { key: 'date', label: 'Reg. Date', sortable: true },
-    { key: 'status', label: 'Status', sortable: true },
+    { key: 'regNum',   label: 'Reg. No.',  sortable: true },
+    { key: 'district', label: 'District',  sortable: true },
+    { key: 'name',     label: 'Name',      sortable: true },
+    { key: 'mobile',   label: 'Mobile',    sortable: true },
+    { key: 'date',     label: 'Reg. Date', sortable: true },
+    { key: 'status',   label: 'Status',    sortable: true },
   ];
 
   return (
@@ -115,8 +121,8 @@ export const PendingPage = () => {
             columns={cols.map(c => ({
               ...c,
               render: (row) => {
-                if (c.key === 'regNum') return <span style={{ fontWeight: 500 }}>{String(row.regNum)}</span>;
-                if (c.key === 'status') return <span className="status-badge pending">Pending</span>;
+                if (c.key === 'regNum')  return <span style={{ fontWeight: 500 }}>{String(row.regNum)}</span>;
+                if (c.key === 'status')  return <span className="status-badge pending">Pending</span>;
                 return String(row[c.key as keyof typeof row] ?? '-');
               },
             }))}
