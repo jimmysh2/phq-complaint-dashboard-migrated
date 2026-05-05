@@ -221,11 +221,20 @@ let rollingIntervalHandle: NodeJS.Timeout | null = null;
 export const startCctnsBackgroundSync = () => {
   if (intervalHandle) return;
 
-  // Wait 15s before first sync — gives Neon DB time to wake from idle on cold start
-  console.log('[SYNC] Server ready. First sync will begin in 15 seconds...');
+  // Wait 15s before first recent sync — gives Neon DB time to wake from idle on cold start
+  console.log('[SYNC] Server ready. First recent sync will begin in 15 seconds...');
   setTimeout(() => {
     runCctnsSync().catch((error) => console.error('[SYNC] Initial sync failed:', error));
   }, 15_000);
+
+  // Wait 60s then fire the full rolling sync automatically on every startup.
+  // This fixes the "permanent pending" backlog immediately after each deploy
+  // without any manual curl/admin action required.
+  console.log('[SYNC] Full rolling sync (oldest pending → today) will begin in 60 seconds...');
+  setTimeout(() => {
+    console.log('[SYNC] Starting startup full rolling sync...');
+    runCctnsFullRollingSync().catch((error) => console.error('[SYNC] Startup rolling sync failed:', error));
+  }, 60_000);
 
   // Every 4 hours: sync last 2 days (new registrations + recent status changes)
   const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
