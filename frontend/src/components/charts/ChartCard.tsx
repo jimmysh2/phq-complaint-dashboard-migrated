@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BaseChart } from './Charts';
+import { BaseChart } from './BaseChart';
 import type { EChartsOption } from 'echarts';
 
 interface ChartCardProps {
