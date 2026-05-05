@@ -141,6 +141,8 @@ export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
   return result;
 };
 
+
+
 let intervalHandle: NodeJS.Timeout | null = null;
 
 export const startCctnsBackgroundSync = () => {

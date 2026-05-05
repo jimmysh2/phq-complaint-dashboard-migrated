@@ -135,7 +135,7 @@ const resolveOfficeId = (
   return officeByName.get(normalizeName(officeName)) ?? null;
 };
 
-type MasterLookups = {
+export type MasterLookups = {
   districtByName: Map<string, bigint>;
   districtIdSet: Set<string>;
   stationByName: Map<string, bigint>;
@@ -144,7 +144,8 @@ type MasterLookups = {
   officeIdSet: Set<string>;
 };
 
-const loadAllLookups = async (): Promise<MasterLookups> => {
+export const loadAllLookups = async (): Promise<MasterLookups> => {
+
   const [districtLookups, stationLookups, officeLookups] = await Promise.all([
     loadDistrictLookups(),
     loadPoliceStationLookups(),
