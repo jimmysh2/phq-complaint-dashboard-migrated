@@ -6,7 +6,6 @@ import {
   NormalizedCctnsComplaint,
 } from '../services/cctns-normalize.js';
 import { enrichWithMasterIds } from '../services/master-mapping.js';
-import { runMasterSync } from '../services/masterSync.js';
 
 const formatDateStr = (date: Date): string => {
   const dd = String(date.getDate()).padStart(2, '0');
@@ -137,17 +136,11 @@ export const runCctnsSync = async (): Promise<CctnsSyncResult | null> => {
       },
     }).catch(() => undefined);
     isSyncing = false;
-
-    // Fire-and-forget: sync any missing PS from govt API + remap complaint
-    // master IDs (districtMasterId / policeStationMasterId / officeMasterId).
-    // This runs AFTER the CCTNS sync completes and does NOT affect it.
-    runMasterSync('auto-post-cctns-sync').catch((e: any) =>
-      console.error('[SYNC] Post-sync master ID update failed:', e.message)
-    );
   }
 
   return result;
 };
+
 
 
 let intervalHandle: NodeJS.Timeout | null = null;

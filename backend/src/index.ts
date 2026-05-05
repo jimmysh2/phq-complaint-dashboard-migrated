@@ -18,7 +18,6 @@ import { cctnsRoutes } from './routes/cctns.js';
 import { importExportRoutes } from './routes/import-export.js';
 import { governmentRoutes } from './routes/government.js';
 import { startCctnsBackgroundSync } from './jobs/cctns-sync-job.js';
-import { scheduleStartupMasterSync } from './services/masterSync.js';
 
 export const app = Fastify({ logger: true });
 
@@ -53,7 +52,6 @@ if (process.env.VERCEL !== '1') {
   buildApp().then(async () => {
     try {
       startCctnsBackgroundSync();          // Regular CCTNS data fetch every 4h
-      scheduleStartupMasterSync();         // Auto-fix master IDs 30s after boot
       await app.listen({ port: 3001, host: '0.0.0.0' });
       console.log('✅ Server running on port 3001');
     } catch (err) {

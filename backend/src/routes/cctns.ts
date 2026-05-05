@@ -10,12 +10,10 @@ import {
 } from '../services/cctns-normalize.js';
 import {
   enrichWithMasterIds,
-  remapComplaintMasterIds,
   loadAllLookups,
   resolveMasterIds,
   MasterLookups,
 } from '../services/master-mapping.js';
-import { syncDistricts, syncOffices, syncPoliceStationsByDistrict } from './government.js';
 
 const processInBatches = async <T>(
   items: T[],
@@ -188,43 +186,7 @@ const runFetchJob = async (jobId: string, timeFrom: string, timeTo: string) => {
     
     const normalized = toNormalizedUnique(complaints);
     
-    // ── Step 1: Ensure master reference tables are populated BEFORE saving ──
-    // This guarantees policeStationMasterId etc. are resolved correctly at save time.
-    job.progress = 'Ensuring master reference data is up to date...';
-    console.log(`[FETCH-JOB ${jobId}] Syncing master data from govt API...`);
-    try {
-      // 1a. Sync districts (fast, always upsert)
-      await syncDistricts();
-
-      // 1b. Find districts that have NO police stations in DB and sync only them
-      //     This is targeted — avoids re-syncing all 22 districts every time
-      const allDistricts  = await prisma.district.findMany({ select: { id: true, name: true } });
-      const districtIdsWithPS = (await prisma.policeStation.findMany({ select: { districtId: true }, distinct: ['districtId'] })).map(r => r.districtId?.toString()).filter(Boolean);
-      const missingPS = allDistricts.filter(d => !districtIdsWithPS.includes(d.id.toString()));
-
-      if (missingPS.length > 0) {
-        console.log(`[FETCH-JOB ${jobId}] Syncing PS for ${missingPS.length} district(s) missing from DB: ${missingPS.map(d => d.name).join(', ')}`);
-        for (let i = 0; i < missingPS.length; i += 5) {
-          await Promise.all(
-            missingPS.slice(i, i + 5).map((d) =>
-              syncPoliceStationsByDistrict(d.id).catch((e) =>
-                console.error(`[FETCH-JOB ${jobId}] PS sync failed for district ${d.name}:`, e.message)
-              )
-            )
-          );
-        }
-      } else {
-        console.log(`[FETCH-JOB ${jobId}] All districts already have PS in DB — skipping PS sync`);
-      }
-
-      // 1c. Sync offices (fast, always upsert)
-      await syncOffices();
-    } catch (masterSyncError: any) {
-      console.error(`[FETCH-JOB ${jobId}] Master sync warning (continuing):`, masterSyncError.message);
-    }
-
-    // ── Step 2: Load lookups ONCE and save all complaints ─────────────────────
-    // Pre-loading ensures every complaint gets correct master IDs in one pass.
+    // Load master lookups ONCE and save all complaints in a single pass
     job.progress = `Saving ${normalized.length} records to database...`;
     console.log(`[FETCH-JOB ${jobId}] Loading master lookups once for batch save...`);
     const lookups = await loadAllLookups();
@@ -243,17 +205,6 @@ const runFetchJob = async (jobId: string, timeFrom: string, timeTo: string) => {
     job.completedAt = new Date();
     
     console.log(`[FETCH-JOB ${jobId}] Completed successfully:`, job.result);
-
-    // ── Step 3: Re-remap any remaining null master IDs in background ──────────
-    // Handles edge cases where some master IDs couldn't be resolved during save
-    // (e.g., district name mismatch). Non-fatal.
-    try {
-      job.progress = 'Remapping residual complaint master IDs...';
-      const remapStats = await remapComplaintMasterIds();
-      console.log(`[FETCH-JOB ${jobId}] Remap complete:`, remapStats);
-    } catch (remapError: any) {
-      console.error(`[FETCH-JOB ${jobId}] Post-sync remap failed (non-fatal):`, remapError.message);
-    }
 
     // Also create a SyncRun record for audit trail
     try {

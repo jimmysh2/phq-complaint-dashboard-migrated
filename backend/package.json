@@ -14,7 +14,8 @@
     "backup:prod": "tsx backup-supabase-before-reset.ts",
     "db:reset:prod": "prisma db push --force-reset --accept-data-loss",
     "seed:admin": "tsx create-admin.ts",
-    "backfill:april2026": "tsx backfill-april-2026.ts"
+    "backfill:april2026": "tsx backfill-april-2026.ts",
+    "seed:master": "node scripts/seed-master-data.js"
   },
   "dependencies": {
     "@fastify/cors": "^9.0.1",
