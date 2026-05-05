@@ -1,8 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database.js';
-import { sendSuccess } from '../utils/response.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { syncDistricts, syncOffices, syncPoliceStationsByDistrict } from './government.js';
+import { runMasterSync } from '../services/masterSync.js';
 
 const parseDistrictIds = (value: unknown): bigint[] =>
   String(value ?? '')
@@ -146,9 +147,24 @@ export const referenceRoutes = async (fastify: FastifyInstance) => {
         distinct: ['officeMasterId'],
       });
 
+      // Also prepare a filter for checking complaint existence (ignoring officeMasterId)
+      const withNullOfficeMasterId: Record<string, unknown> = {};
+      if (dIds.length > 0)  withNullOfficeMasterId.districtMasterId      = { in: dIds };
+      if (psIds.length > 0) withNullOfficeMasterId.policeStationMasterId = { in: psIds };
+
       const officeIds = rows.map((r) => r.officeMasterId!).filter(Boolean) as bigint[];
 
       if (officeIds.length === 0) {
+        // Offices empty — could mean officeMasterId is null on complaints (remap not run yet).
+        // Check if complaints actually exist for this district/PS filter.
+        const complaintsExist = await prisma.complaint.count({ where: withNullOfficeMasterId });
+        if (complaintsExist > 0) {
+          // Complaints exist but officeMasterId is null → trigger remap in background
+          console.log(`[branches] ${complaintsExist} complaint(s) found but officeMasterId=null — triggering background remap`);
+          runMasterSync('on-demand-office-remap').catch((e: any) =>
+            console.error('[branches] Background remap failed:', e.message)
+          );
+        }
         return sendSuccess(reply, []);
       }
 
