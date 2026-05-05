@@ -206,48 +206,58 @@ export const DashboardPage = () => {
   };
 
   // Disposal Time Matrix data
-  const disposalMatrixWithPct = disposalMatrix.map((row: any) => {
+  const cumulativeDisposalMatrix = disposalMatrix.map((row: any) => {
+    return {
+      ...row,
+      within7: row.u7,
+      within15: row.u7 + row.u15,
+      within30: row.u7 + row.u15 + row.u30,
+      above30: row.o30,
+    };
+  });
+
+  const disposalMatrixWithPct = cumulativeDisposalMatrix.map((row: any) => {
     const total = (row.u7 + row.u15 + row.u30 + row.o30) || 1;
     return {
       ...row,
-      pct_u7: Math.round(row.u7 * 100 / total),
-      pct_u15: Math.round(row.u15 * 100 / total),
-      pct_u30: Math.round(row.u30 * 100 / total),
-      pct_o30: Math.round(row.o30 * 100 / total),
+      pct_within7: Math.round(row.within7 * 100 / total),
+      pct_within15: Math.round(row.within15 * 100 / total),
+      pct_within30: Math.round(row.within30 * 100 / total),
+      pct_above30: Math.round(row.above30 * 100 / total),
     };
   });
 
   const disposalCols: Column<any>[] = [
     { key: 'district', label: 'District', sortable: true },
-    { key: 'u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'within7', label: 'Within 7 Days', sortable: true, align: 'center' },
+    { key: 'within15', label: 'Within 15 Days', sortable: true, align: 'center' },
+    { key: 'within30', label: 'Within 30 Days', sortable: true, align: 'center' },
+    { key: 'above30', label: 'Above 30 Days', sortable: true, align: 'center' },
   ];
 
   const renderDisposalDays = (col: any, row: any) => {
     if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'u7') return <span style={{ color: '#4ade80' }}>{row.u7}</span>;
-    if (col.key === 'u15') return <span style={{ color: '#a3e635' }}>{row.u15}</span>;
-    if (col.key === 'u30') return <span style={{ color: '#eab308' }}>{row.u30}</span>;
-    if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'within7') return <span style={{ color: '#4ade80' }}>{row.within7}</span>;
+    if (col.key === 'within15') return <span style={{ color: '#a3e635' }}>{row.within15}</span>;
+    if (col.key === 'within30') return <span style={{ color: '#eab308' }}>{row.within30}</span>;
+    if (col.key === 'above30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.above30}</span>;
     return row[col.key];
   };
 
   const disposalPctCols: Column<any>[] = [
     { key: 'district', label: 'District', sortable: true },
-    { key: 'pct_u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'pct_u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'pct_u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'pct_o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'pct_within7', label: 'Within 7 Days', sortable: true, align: 'center' },
+    { key: 'pct_within15', label: 'Within 15 Days', sortable: true, align: 'center' },
+    { key: 'pct_within30', label: 'Within 30 Days', sortable: true, align: 'center' },
+    { key: 'pct_above30', label: 'Above 30 Days', sortable: true, align: 'center' },
   ];
 
   const renderDisposalPct = (col: any, row: any) => {
     if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'pct_u7') return <span style={{ color: '#4ade80' }}>{row.pct_u7}%</span>;
-    if (col.key === 'pct_u15') return <span style={{ color: '#a3e635' }}>{row.pct_u15}%</span>;
-    if (col.key === 'pct_u30') return <span style={{ color: '#eab308' }}>{row.pct_u30}%</span>;
-    if (col.key === 'pct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'pct_within7') return <span style={{ color: '#4ade80' }}>{row.pct_within7}%</span>;
+    if (col.key === 'pct_within15') return <span style={{ color: '#a3e635' }}>{row.pct_within15}%</span>;
+    if (col.key === 'pct_within30') return <span style={{ color: '#eab308' }}>{row.pct_within30}%</span>;
+    if (col.key === 'pct_above30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_above30}%</span>;
     return row[col.key];
   };
 
@@ -255,7 +265,36 @@ export const DashboardPage = () => {
     <Layout>
       <div className="page-content space-y-6">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '8px' }}>
-          <h1 className="text-2xl font-bold text-slate-100">Executive Overview</h1>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-100">Executive Overview</h1>
+            <div className="text-sm text-slate-400 mt-1 flex flex-wrap gap-4 items-center">
+              <span>
+                <strong>Period:</strong>{' '}
+                {activeFilters.fromDate && activeFilters.toDate
+                  ? `${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')} to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
+                  : activeFilters.fromDate
+                  ? `From ${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')}`
+                  : activeFilters.toDate
+                  ? `Up to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
+                  : 'All Time'}
+              </span>
+              {s?.lastSyncTime && (
+                <>
+                  <span className="text-slate-600">|</span>
+                  <span title="Last time CCTNS data was successfully synced to this database" className="flex items-center gap-1">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="1 4 1 10 7 10"></polyline>
+                      <polyline points="23 20 23 14 17 14"></polyline>
+                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                    </svg>
+                    <strong>Last Sync:</strong> {new Date(s.lastSyncTime).toLocaleString('en-IN', {
+                      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                    })}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <button 
               className="btn-primary" 
@@ -316,12 +355,12 @@ export const DashboardPage = () => {
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matrixSummary), 'Pendency Ageing Matrix');
 
                 // Sheet 6: Disposal Time Matrix
-                const dispMatrix = disposalMatrix.map((d: any) => ({
+                const dispMatrix = cumulativeDisposalMatrix.map((d: any) => ({
                   'District': d.district,
-                  '< 7 Days (Disposed)': d.u7,
-                  '7 - 15 Days (Disposed)': d.u15,
-                  '15 - 30 Days (Disposed)': d.u30,
-                  '> 30 Days (Disposed)': d.o30
+                  'Within 7 Days (Disposed)': d.within7,
+                  'Within 15 Days (Disposed)': d.within15,
+                  'Within 30 Days (Disposed)': d.within30,
+                  'Above 30 Days (Disposed)': d.above30
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dispMatrix), 'Disposal Time Matrix');
                 
@@ -498,7 +537,7 @@ export const DashboardPage = () => {
               <div style={{ flex: 1, position: 'relative' }}>
                 <DataTable
                   title="Disposal Time Matrix (Total)"
-                  data={disposalMatrix}
+                  data={cumulativeDisposalMatrix}
                   columns={disposalCols.map(c => ({
                     ...c,
                     render: (row) => renderDisposalDays(c, row),
