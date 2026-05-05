@@ -261,41 +261,46 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     const limitNum = Math.min(500, Math.max(1, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where clause
-    const where: any = {};
+    // Build where clause using AND so multiple filters never overwrite each other
+    const andConditions: any[] = [];
 
     if (search) {
-      where.OR = [
-        { complRegNum: { contains: search, mode: 'insensitive' } },
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
-        { mobile: { contains: search, mode: 'insensitive' } },
-        { complDesc: { contains: search, mode: 'insensitive' } },
-        { districtName: { contains: search, mode: 'insensitive' } },
-        { addressPs: { contains: search, mode: 'insensitive' } },
-      ];
+      andConditions.push({
+        OR: [
+          { complRegNum:   { contains: search, mode: 'insensitive' } },
+          { firstName:     { contains: search, mode: 'insensitive' } },
+          { lastName:      { contains: search, mode: 'insensitive' } },
+          { mobile:        { contains: search, mode: 'insensitive' } },
+          { complDesc:     { contains: search, mode: 'insensitive' } },
+          { districtName:  { contains: search, mode: 'insensitive' } },
+          { addressPs:     { contains: search, mode: 'insensitive' } },
+        ],
+      });
     }
 
     if (district) {
-      where.OR = [
-        { districtName: { contains: district, mode: 'insensitive' } },
-        { addressDistrict: { contains: district, mode: 'insensitive' } },
-      ];
+      // Separate AND block — never overwrites the search OR block
+      andConditions.push({
+        OR: [
+          { districtName:    { contains: district, mode: 'insensitive' } },
+          { addressDistrict: { contains: district, mode: 'insensitive' } },
+        ],
+      });
     }
 
     if (statusGroup) {
-      where.statusGroup = statusGroup.toLowerCase();
+      andConditions.push({ statusGroup: statusGroup.toLowerCase() });
     }
 
     if (dateFrom || dateTo) {
-      where.complRegDt = {};
-      if (dateFrom) {
-        where.complRegDt.gte = new Date(dateFrom);
-      }
-      if (dateTo) {
-        where.complRegDt.lte = new Date(dateTo);
-      }
+      const dateFilter: any = {};
+      if (dateFrom) dateFilter.gte = new Date(dateFrom);
+      if (dateTo)   dateFilter.lte = new Date(dateTo);
+      andConditions.push({ complRegDt: dateFilter });
     }
+
+    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
+
 
     // Validate sortBy to prevent injection
     const allowedSortFields = [
