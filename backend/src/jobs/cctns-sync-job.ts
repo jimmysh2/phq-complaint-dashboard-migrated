@@ -220,33 +220,63 @@ export const runCctnsFullRollingSync = async (): Promise<void> => {
 let intervalHandle: NodeJS.Timeout | null = null;
 let rollingIntervalHandle: NodeJS.Timeout | null = null;
 
+const hasRunRecently = async (kindPattern: string, hours: number): Promise<boolean> => {
+  try {
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const recentRun = await prisma.syncRun.findFirst({
+      where: {
+        kind: { startsWith: kindPattern },
+        startedAt: { gte: cutoff },
+        status: { in: ['success', 'running', 'partial'] }
+      }
+    });
+    return !!recentRun;
+  } catch (err) {
+    console.error(`[SYNC] Could not check recent runs for ${kindPattern}:`, err);
+    return false;
+  }
+};
+
 export const startCctnsBackgroundSync = () => {
   if (intervalHandle) return;
 
   // Wait 15s before first recent sync — gives Neon DB time to wake from idle on cold start
   console.log('[SYNC] Server ready. First recent sync will begin in 15 seconds...');
-  setTimeout(() => {
-    runCctnsSync().catch((error) => console.error('[SYNC] Initial sync failed:', error));
+  setTimeout(async () => {
+    try {
+      if (await hasRunRecently('cctns-background', 1)) {
+        console.log('[SYNC] Background sync ran in the last hour. Skipping startup background sync.');
+        return;
+      }
+      await runCctnsSync();
+    } catch (error) {
+      console.error('[SYNC] Initial sync failed:', error);
+    }
   }, 15_000);
 
-  // Wait 60s then fire the full rolling sync automatically on every startup.
-  // This fixes the "permanent pending" backlog immediately after each deploy
-  // without any manual curl/admin action required.
-  console.log('[SYNC] Full rolling sync (oldest pending → today) will begin in 60 seconds...');
-  setTimeout(() => {
-    console.log('[SYNC] Starting startup full rolling sync...');
-    runCctnsFullRollingSync().catch((error) => console.error('[SYNC] Startup rolling sync failed:', error));
+  // Wait 60s then fire the full rolling sync conditionally
+  // Vercel cold starts happen constantly; this guard prevents multiple heavy syncs.
+  console.log('[SYNC] Startup rolling sync checks will begin in 60 seconds...');
+  setTimeout(async () => {
+    try {
+      if (await hasRunRecently('cctns-rolling', 12)) {
+        console.log('[SYNC] Rolling sync ran in the last 12 hours. Skipping startup rolling sync.');
+        return;
+      }
+      console.log('[SYNC] Starting startup full rolling sync...');
+      await runCctnsFullRollingSync();
+    } catch (error) {
+      console.error('[SYNC] Startup rolling sync failed:', error);
+    }
   }, 60_000);
 
-  // Every 4 hours: sync last 2 days (new registrations + recent status changes)
-  const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+  // Every 12 hours: sync last 2 days (new registrations + recent status changes)
+  const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
   intervalHandle = setInterval(() => {
     runCctnsSync().catch((error) => console.error('[SYNC] Scheduled sync failed:', error));
-  }, FOUR_HOURS_MS);
+  }, TWELVE_HOURS_MS);
 
   // Every 24 hours: full rolling sync from oldest pending complaint to today.
-  // This is the fix for "permanent pending" — a complaint registered months ago
-  // that gets disposed today will be caught and updated by this daily job.
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   rollingIntervalHandle = setInterval(() => {
     console.log('[SYNC] Starting daily full rolling sync...');
