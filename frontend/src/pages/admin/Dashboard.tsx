@@ -9,11 +9,26 @@ import { DataTable, Column } from '@/components/data/DataTable';
 import { dashboardApi } from '@/services/api';
 import { useFilters } from '@/contexts/FilterContext';
 
-const StatCard = ({ label, value, subValue, colorClass }: { label: string; value: string | number; subValue?: string; colorClass: string }) => (
-  <div className={`stat-card ${colorClass}`}>
+const StatCard = ({ label, value, subValue, colorClass, onClick }: { label: string; value: string | number; subValue?: string; colorClass: string; onClick?: () => void }) => (
+  <div
+    className={`stat-card ${colorClass}`}
+    onClick={onClick}
+    style={{ cursor: onClick ? 'pointer' : undefined, transition: 'transform 0.15s, box-shadow 0.15s' }}
+    onMouseEnter={(e) => { if (onClick) { (e.currentTarget as HTMLElement).style.transform = 'scale(1.025)'; (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 32px rgba(0,0,0,0.35)'; } }}
+    onMouseLeave={(e) => { if (onClick) { (e.currentTarget as HTMLElement).style.transform = ''; (e.currentTarget as HTMLElement).style.boxShadow = ''; } }}
+    title={onClick ? 'Click to view these complaints' : undefined}
+  >
     <div className="stat-card-label">{label}</div>
     <div className="stat-card-value">{value}</div>
     {subValue && <div className="text-xs mt-1 opacity-80">{subValue}</div>}
+    {onClick && (
+      <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M9 18l6-6-6-6"/>
+        </svg>
+        Click to view complaints
+      </div>
+    )}
   </div>
 );
 
@@ -89,6 +104,19 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
 export const DashboardPage = () => {
   const navigate = useNavigate();
   const { filters } = useFilters();
+
+  // Build CCTNS navigation URL including all active global filters so the
+  // gateway reproduces the exact same WHERE clause that produced the card count.
+  const buildCctnsUrl = (statusGroup: string) => {
+    const params = new URLSearchParams({ statusGroup });
+    if (filters.districtIds)      params.set('districtIds',      filters.districtIds);
+    if (filters.policeStationIds) params.set('policeStationIds', filters.policeStationIds);
+    if (filters.officeIds)        params.set('officeIds',        filters.officeIds);
+    if (filters.classOfIncident)  params.set('classOfIncident',  filters.classOfIncident);
+    if (filters.fromDate)         params.set('fromDate',         filters.fromDate);
+    if (filters.toDate)           params.set('toDate',           filters.toDate);
+    return `/admin/cctns?${params.toString()}`;
+  };
   
   // Clean empty filters before passing
   const activeFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''));
@@ -161,103 +189,103 @@ export const DashboardPage = () => {
   const sortedCategories = sortData(categories, categorySort);
 
   const matrixWithPct = matrix.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30) || 1;
+    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
     return {
       ...row,
-      pct_u7: Math.round(row.u7 * 100 / total),
+      pct_u7:  Math.round(row.u7  * 100 / total),
       pct_u15: Math.round(row.u15 * 100 / total),
       pct_u30: Math.round(row.u30 * 100 / total),
       pct_o30: Math.round(row.o30 * 100 / total),
+      pct_o60: Math.round((row.o60 || 0) * 100 / total),
     };
   });
 
   const matrixCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'u7',       label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'u15',      label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'u30',      label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'o30',      label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'o60',      label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderMatrixDays = (col: any, row: any) => {
     if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'u7') return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
+    if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
     if (col.key === 'u15') return <span style={{ color: '#eab308' }}>{row.u15}</span>;
     if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
     if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
     return row[col.key];
   };
 
   const matrixPctCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'pct_u7', label: '<7 Days', sortable: true, align: 'center' },
-    { key: 'pct_u15', label: '7-15 Days', sortable: true, align: 'center' },
-    { key: 'pct_u30', label: '15-30 Days', sortable: true, align: 'center' },
-    { key: 'pct_o30', label: '>30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'pct_u7',   label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'pct_o30',  label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'pct_o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderMatrixPct = (col: any, row: any) => {
-    if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'pct_u7') return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
-    if (col.key === 'pct_u15') return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
-    if (col.key === 'pct_u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
-    if (col.key === 'pct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'district')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'pct_u7')   return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
+    if (col.key === 'pct_u15')  return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
+    if (col.key === 'pct_u30')  return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
+    if (col.key === 'pct_o30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'pct_o60')  return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.pct_o60 || 0}%</span>;
     return row[col.key];
   };
 
   // Disposal Time Matrix data
-  const cumulativeDisposalMatrix = disposalMatrix.map((row: any) => {
+  const disposalMatrixWithPct = disposalMatrix.map((row: any) => {
+    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
     return {
       ...row,
-      within7: row.u7,
-      within15: row.u7 + row.u15,
-      within30: row.u7 + row.u15 + row.u30,
-      above30: row.o30,
-    };
-  });
-
-  const disposalMatrixWithPct = cumulativeDisposalMatrix.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30) || 1;
-    return {
-      ...row,
-      pct_within7: Math.round(row.within7 * 100 / total),
-      pct_within15: Math.round(row.within15 * 100 / total),
-      pct_within30: Math.round(row.within30 * 100 / total),
-      pct_above30: Math.round(row.above30 * 100 / total),
+      pct_u7:  Math.round(row.u7  * 100 / total),
+      pct_u15: Math.round(row.u15 * 100 / total),
+      pct_u30: Math.round(row.u30 * 100 / total),
+      pct_o30: Math.round(row.o30 * 100 / total),
+      pct_o60: Math.round((row.o60 || 0) * 100 / total),
     };
   });
 
   const disposalCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'within7', label: 'Within 7 Days', sortable: true, align: 'center' },
-    { key: 'within15', label: 'Within 15 Days', sortable: true, align: 'center' },
-    { key: 'within30', label: 'Within 30 Days', sortable: true, align: 'center' },
-    { key: 'above30', label: 'Above 30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'u7',       label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'u15',      label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'u30',      label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'o30',      label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'o60',      label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderDisposalDays = (col: any, row: any) => {
     if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'within7') return <span style={{ color: '#4ade80' }}>{row.within7}</span>;
-    if (col.key === 'within15') return <span style={{ color: '#a3e635' }}>{row.within15}</span>;
-    if (col.key === 'within30') return <span style={{ color: '#eab308' }}>{row.within30}</span>;
-    if (col.key === 'above30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.above30}</span>;
+    if (col.key === 'u7')  return <span style={{ color: '#4ade80' }}>{row.u7}</span>;
+    if (col.key === 'u15') return <span style={{ color: '#a3e635' }}>{row.u15}</span>;
+    if (col.key === 'u30') return <span style={{ color: '#eab308' }}>{row.u30}</span>;
+    if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
     return row[col.key];
   };
 
   const disposalPctCols: Column<any>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'pct_within7', label: 'Within 7 Days', sortable: true, align: 'center' },
-    { key: 'pct_within15', label: 'Within 15 Days', sortable: true, align: 'center' },
-    { key: 'pct_within30', label: 'Within 30 Days', sortable: true, align: 'center' },
-    { key: 'pct_above30', label: 'Above 30 Days', sortable: true, align: 'center' },
+    { key: 'district', label: 'District',      sortable: true },
+    { key: 'pct_u7',   label: '<7 Days',        sortable: true, align: 'center' },
+    { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
+    { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
+    { key: 'pct_o30',  label: '1-2 Months',     sortable: true, align: 'center' },
+    { key: 'pct_o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
   ];
 
   const renderDisposalPct = (col: any, row: any) => {
-    if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'pct_within7') return <span style={{ color: '#4ade80' }}>{row.pct_within7}%</span>;
-    if (col.key === 'pct_within15') return <span style={{ color: '#a3e635' }}>{row.pct_within15}%</span>;
-    if (col.key === 'pct_within30') return <span style={{ color: '#eab308' }}>{row.pct_within30}%</span>;
-    if (col.key === 'pct_above30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_above30}%</span>;
+    if (col.key === 'district')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'pct_u7')   return <span style={{ color: '#4ade80' }}>{row.pct_u7}%</span>;
+    if (col.key === 'pct_u15')  return <span style={{ color: '#a3e635' }}>{row.pct_u15}%</span>;
+    if (col.key === 'pct_u30')  return <span style={{ color: '#eab308' }}>{row.pct_u30}%</span>;
+    if (col.key === 'pct_o30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'pct_o60')  return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.pct_o60 || 0}%</span>;
     return row[col.key];
   };
 
@@ -265,36 +293,7 @@ export const DashboardPage = () => {
     <Layout>
       <div className="page-content space-y-6">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '8px' }}>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-100">Executive Overview</h1>
-            <div className="text-sm text-slate-400 mt-1 flex flex-wrap gap-4 items-center">
-              <span>
-                <strong>Period:</strong>{' '}
-                {activeFilters.fromDate && activeFilters.toDate
-                  ? `${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')} to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
-                  : activeFilters.fromDate
-                  ? `From ${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')}`
-                  : activeFilters.toDate
-                  ? `Up to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
-                  : 'All Time'}
-              </span>
-              {s?.lastSyncTime && (
-                <>
-                  <span className="text-slate-600">|</span>
-                  <span title="Last time CCTNS data was successfully synced to this database" className="flex items-center gap-1">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="1 4 1 10 7 10"></polyline>
-                      <polyline points="23 20 23 14 17 14"></polyline>
-                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
-                    </svg>
-                    <strong>Last Sync:</strong> {new Date(s.lastSyncTime).toLocaleString('en-IN', {
-                      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                    })}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
+          <h1 className="text-2xl font-bold text-slate-100">Executive Overview</h1>
           <div className="flex items-center gap-2">
             <button 
               className="btn-primary" 
@@ -355,12 +354,12 @@ export const DashboardPage = () => {
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matrixSummary), 'Pendency Ageing Matrix');
 
                 // Sheet 6: Disposal Time Matrix
-                const dispMatrix = cumulativeDisposalMatrix.map((d: any) => ({
+                const dispMatrix = disposalMatrix.map((d: any) => ({
                   'District': d.district,
-                  'Within 7 Days (Disposed)': d.within7,
-                  'Within 15 Days (Disposed)': d.within15,
-                  'Within 30 Days (Disposed)': d.within30,
-                  'Above 30 Days (Disposed)': d.above30
+                  '< 7 Days (Disposed)': d.u7,
+                  '7 - 15 Days (Disposed)': d.u15,
+                  '15 - 30 Days (Disposed)': d.u30,
+                  '> 30 Days (Disposed)': d.o30
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dispMatrix), 'Disposal Time Matrix');
                 
@@ -410,30 +409,35 @@ export const DashboardPage = () => {
               label="Total Received"
               value={(s?.totalReceived || 0).toLocaleString()}
               colorClass="blue"
+              onClick={() => navigate(buildCctnsUrl('all'))}
             />
             <StatCard
               label="Total Disposed"
               value={(s?.totalDisposed || 0).toLocaleString()}
               subValue={`${Math.round(((s?.totalDisposed || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
               colorClass="green"
+              onClick={() => navigate(buildCctnsUrl('disposed'))}
             />
             <StatCard
               label="Total Pending"
               value={(s?.totalPending || 0).toLocaleString()}
               subValue={`${Math.round(((s?.totalPending || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
               colorClass="red"
+              onClick={() => navigate(buildCctnsUrl('pending'))}
             />
             <StatCard
               label="Status Not Found"
               value={(s?.totalUnknown || 0).toLocaleString()}
               subValue="Status was not found in the record"
               colorClass="yellow"
+              onClick={() => navigate(buildCctnsUrl('unknown'))}
             />
             <StatCard
               label="Disposal Date Not Found"
               value={(s?.disposedMissingDateCount || 0).toLocaleString()}
               subValue="Marked disposed but date not found"
               colorClass="purple"
+              onClick={() => navigate(buildCctnsUrl('disposed_missing_date'))}
             />
           </div>
         )}
@@ -537,7 +541,7 @@ export const DashboardPage = () => {
               <div style={{ flex: 1, position: 'relative' }}>
                 <DataTable
                   title="Disposal Time Matrix (Total)"
-                  data={cumulativeDisposalMatrix}
+                  data={disposalMatrix}
                   columns={disposalCols.map(c => ({
                     ...c,
                     render: (row) => renderDisposalDays(c, row),

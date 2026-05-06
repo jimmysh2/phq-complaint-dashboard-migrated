@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { sendSuccess } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { getDistrictNameByIdMap } from '../services/master-mapping.js';
+import { buildPrismaWhereClause } from '../utils/filters.js';
 
 type BucketStats = { total: number; pending: number; disposed: number; unknown: number; missingDates: number };
 
@@ -19,10 +20,12 @@ const updateStats = (stats: BucketStats, statusGroup: string, isDisposedMissingD
 export const reportRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/reports/district', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const [districtMapById, complaints] = await Promise.all([
       getDistrictNameByIdMap(),
       prisma.complaint.findMany({
+        where,
         select: { districtMasterId: true, statusGroup: true, isDisposedMissingDate: true },
       }),
     ]);
@@ -38,14 +41,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/mode-receipt', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { receptionMode: { not: '' } },
+      where,
       select: { receptionMode: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
     for (const comp of complaints) {
-      const key = comp.receptionMode || 'Unknown';
+      if (!comp.receptionMode) continue;
+      const key = comp.receptionMode;
       const stats = map.get(key) || toStats();
       updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
       map.set(key, stats);
@@ -55,14 +60,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/nature-incident', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { classOfIncident: { not: '' } },
+      where,
       select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
     for (const comp of complaints) {
-      const key = comp.classOfIncident || 'Unknown';
+      if (!comp.classOfIncident) continue;
+      const key = comp.classOfIncident;
       const stats = map.get(key) || toStats();
       updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
       map.set(key, stats);
@@ -72,14 +79,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/type-against', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { respondentCategories: { not: '' } },
+      where,
       select: { respondentCategories: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
     for (const comp of complaints) {
-      const key = comp.respondentCategories || 'Unknown';
+      if (!comp.respondentCategories) continue;
+      const key = comp.respondentCategories;
       const stats = map.get(key) || toStats();
       updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
       map.set(key, stats);
@@ -89,8 +98,10 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/status', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
+      where,
       select: { statusRaw: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
@@ -105,14 +116,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/complaint-source', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { complaintSource: { not: '' } },
+      where,
       select: { complaintSource: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
     for (const comp of complaints) {
-      const key = comp.complaintSource || 'Unknown';
+      if (!comp.complaintSource) continue;
+      const key = comp.complaintSource;
       const stats = map.get(key) || toStats();
       updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
       map.set(key, stats);
@@ -122,14 +135,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/type-complaint', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { classOfIncident: { not: '' } },
+      where,
       select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
     for (const comp of complaints) {
-      const key = comp.classOfIncident || 'Unmapped';
+      if (!comp.classOfIncident) continue;
+      const key = comp.classOfIncident;
       const stats = map.get(key) || toStats();
       updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
       map.set(key, stats);
@@ -139,14 +154,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/branch-wise', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { branch: { not: '' } },
+      where,
       select: { branch: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
     for (const comp of complaints) {
-      const key = comp.branch || 'Unknown';
+      if (!comp.branch) continue;
+      const key = comp.branch;
       const stats = map.get(key) || toStats();
       updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
       map.set(key, stats);
@@ -156,15 +173,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/highlights', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { classOfIncident: { not: '' } },
+      where,
       select: { classOfIncident: true },
     });
     const map = new Map<string, number>();
     for (const comp of complaints) {
-      const key = comp.classOfIncident || 'Unmapped';
-      map.set(key, (map.get(key) || 0) + 1);
+      if (!comp.classOfIncident) continue;
+      map.set(comp.classOfIncident, (map.get(comp.classOfIncident) || 0) + 1);
     }
     const data = Array.from(map.entries())
       .sort((a, b) => b[1] - a[1])
@@ -175,11 +193,7 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/reports/date-wise', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const { fromDate, toDate } = request.query as { fromDate?: string; toDate?: string };
-    const where: any = {};
-    if (fromDate && toDate) {
-      where.complRegDt = { gte: new Date(fromDate), lte: new Date(toDate) };
-    }
+    const where = buildPrismaWhereClause(request.query);
     const [districtMapById, complaints] = await Promise.all([
       getDistrictNameByIdMap(),
       prisma.complaint.findMany({
@@ -199,14 +213,16 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
 
   fastify.get('/reports/action-taken', {
     preHandler: [authenticate],
-  }, async (_request, reply) => {
+  }, async (request, reply) => {
+    const where = buildPrismaWhereClause(request.query);
     const complaints = await prisma.complaint.findMany({
-      where: { actionTaken: { not: '' } },
+      where,
       select: { actionTaken: true, statusGroup: true, isDisposedMissingDate: true },
     });
     const map = new Map<string, BucketStats>();
     for (const comp of complaints) {
-      const key = comp.actionTaken || 'Unknown';
+      if (!comp.actionTaken) continue;
+      const key = comp.actionTaken;
       const stats = map.get(key) || toStats();
       updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
       map.set(key, stats);

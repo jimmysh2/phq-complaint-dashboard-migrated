@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
 import { DataTable, Column } from '@/components/data/DataTable';
+import { useFilters } from '@/contexts/FilterContext';
 import * as XLSX from 'xlsx';
 
 export const ComplaintsPage = () => {
@@ -11,23 +12,40 @@ export const ComplaintsPage = () => {
   const [page, setPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Same pattern as Dashboard — global filters drive the data
+  const { filters } = useFilters();
+  const activeFilters = Object.fromEntries(
+    Object.entries(filters).filter(([_, v]) => v !== '')
+  ) as Record<string, string>;
+
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['complaints', page, search],
+    queryKey: ['complaints', page, search, activeFilters],   // re-fetches on any filter change
     queryFn: async () => {
-      const params = new URLSearchParams({ page: String(page), limit: '50', search });
-      const r = await fetch(`/api/complaints?${params}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '50',
+        search,
+        ...activeFilters,          // district, station, office, classOfIncident, fromDate, toDate
+      });
+      const r = await fetch(`/api/complaints?${params}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+      });
       return r.json();
     },
   });
 
-  const complaints = data?.data?.data || [];
-  const pagination = data?.data?.pagination;
+  // Reset to page 1 whenever filters change
+  const complaints  = data?.data?.data || [];
+  const pagination  = data?.data?.pagination;
 
   const handleExport = async () => {
-    const r = await fetch('/api/export/complaints', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+    const params = new URLSearchParams({ ...activeFilters, search });
+    const r = await fetch(`/api/export/complaints?${params}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
     const blob = await r.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const url  = window.URL.createObjectURL(blob);
+    const a    = document.createElement('a');
     a.href = url; a.download = 'complaints.xlsx'; a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -38,7 +56,7 @@ export const ComplaintsPage = () => {
     const reader = new FileReader();
     reader.onload = async (ev) => {
       try {
-        const wb = XLSX.read(new Uint8Array(ev.target?.result as ArrayBuffer), { type: 'array' });
+        const wb   = XLSX.read(new Uint8Array(ev.target?.result as ArrayBuffer), { type: 'array' });
         const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
         await fetch('/api/import/complaints', {
           method: 'POST',
@@ -54,30 +72,36 @@ export const ComplaintsPage = () => {
   };
 
   const tableData = complaints.map((c: Record<string, unknown>) => ({
-    regNum: c.complRegNum || '-',
+    regNum:   c.complRegNum || '-',
     district: (c.district as Record<string, unknown>)?.name || c.addressDistrict || '-',
-    name: `${c.firstName || ''} ${c.lastName || ''}`.trim(),
-    mobile: c.mobile || '-',
-    date: c.complRegDt ? new Date(String(c.complRegDt)).toLocaleDateString() : '-',
-    status: c.statusOfComplaint || 'Pending',
-    id: c.id,
+    name:     `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+    mobile:   c.mobile || '-',
+    date:     c.complRegDt ? new Date(String(c.complRegDt)).toLocaleDateString() : '-',
+    status:   c.statusOfComplaint || 'Pending',
+    id:       c.id,
   }));
 
   const cols: Column<typeof tableData[0]>[] = [
-    { key: 'regNum', label: 'Reg. No.', sortable: true },
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'mobile', label: 'Mobile', sortable: true },
-    { key: 'date', label: 'Reg. Date', sortable: true },
-    { key: 'status', label: 'Status', sortable: true },
-    { key: 'action', label: 'Action', width: '60px' },
+    { key: 'regNum',   label: 'Reg. No.',  sortable: true },
+    { key: 'district', label: 'District',  sortable: true },
+    { key: 'name',     label: 'Name',      sortable: true },
+    { key: 'mobile',   label: 'Mobile',    sortable: true },
+    { key: 'date',     label: 'Reg. Date', sortable: true },
+    { key: 'status',   label: 'Status',    sortable: true },
+    { key: 'action',   label: 'Action',    width: '60px' },
   ];
 
   return (
     <Layout>
       <div className="page-content">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '12px' }}>
-          <input className="search-input" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} style={{ maxWidth: '280px' }} />
+          <input
+            className="search-input"
+            placeholder="Search by name, mobile, reg. no..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{ maxWidth: '280px' }}
+          />
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
             <input type="file" ref={fileInputRef} onChange={handleImport} accept=".xlsx,.xls" className="hidden" />
             <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>Import</Button>
@@ -114,7 +138,9 @@ export const ComplaintsPage = () => {
             {pagination && (
               <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }}>
                 <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                <span style={{ color: 'var(--text-muted)', fontSize: '12px', alignSelf: 'center' }}>{pagination.page} / {pagination.totalPages}</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '12px', alignSelf: 'center' }}>
+                  {pagination.page} / {pagination.totalPages} ({pagination.total.toLocaleString()} total)
+                </span>
                 <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages}>Next</Button>
               </div>
             )}

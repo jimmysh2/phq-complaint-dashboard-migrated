@@ -2,17 +2,14 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database.js';
 import { sendSuccess } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
-
-const PENDING_WHERE = { statusGroup: 'pending' as const };
+import { buildPrismaWhereClause } from '../utils/filters.js';
 
 export const pendingRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/pending/all', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const complaints = await prisma.complaint.findMany({
-      where: PENDING_WHERE,
-      orderBy: { complRegDt: 'asc' },
-    });
+    const where = { ...buildPrismaWhereClause(request.query), statusGroup: 'pending' as const };
+    const complaints = await prisma.complaint.findMany({ where, orderBy: { complRegDt: 'asc' } });
     return sendSuccess(reply, complaints);
   });
 
@@ -21,15 +18,14 @@ export const pendingRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const now = new Date();
     const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
-    const complaints = await prisma.complaint.findMany({
-      where: {
-        complRegDt: { lte: fifteenDaysAgo, gt: thirtyDaysAgo },
-        ...PENDING_WHERE,
-      },
-      orderBy: { complRegDt: 'asc' },
-    });
+    const thirtyDaysAgo  = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const baseWhere = buildPrismaWhereClause(request.query);
+    const where = {
+      ...baseWhere,
+      statusGroup: 'pending' as const,
+      complRegDt: { lte: fifteenDaysAgo, gt: thirtyDaysAgo },
+    };
+    const complaints = await prisma.complaint.findMany({ where, orderBy: { complRegDt: 'asc' } });
     return sendSuccess(reply, complaints);
   });
 
@@ -38,15 +34,14 @@ export const pendingRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-
-    const complaints = await prisma.complaint.findMany({
-      where: {
-        complRegDt: { lte: thirtyDaysAgo, gt: sixtyDaysAgo },
-        ...PENDING_WHERE,
-      },
-      orderBy: { complRegDt: 'asc' },
-    });
+    const sixtyDaysAgo  = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+    const baseWhere = buildPrismaWhereClause(request.query);
+    const where = {
+      ...baseWhere,
+      statusGroup: 'pending' as const,
+      complRegDt: { lte: thirtyDaysAgo, gt: sixtyDaysAgo },
+    };
+    const complaints = await prisma.complaint.findMany({ where, orderBy: { complRegDt: 'asc' } });
     return sendSuccess(reply, complaints);
   });
 
@@ -54,14 +49,13 @@ export const pendingRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-
-    const complaints = await prisma.complaint.findMany({
-      where: {
-        complRegDt: { lte: sixtyDaysAgo },
-        ...PENDING_WHERE,
-      },
-      orderBy: { complRegDt: 'asc' },
-    });
+    const baseWhere = buildPrismaWhereClause(request.query);
+    const where = {
+      ...baseWhere,
+      statusGroup: 'pending' as const,
+      complRegDt: { lte: sixtyDaysAgo },
+    };
+    const complaints = await prisma.complaint.findMany({ where, orderBy: { complRegDt: 'asc' } });
     return sendSuccess(reply, complaints);
   });
 
@@ -69,9 +63,8 @@ export const pendingRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const { branch } = request.params as { branch: string };
-
     const complaints = await prisma.complaint.findMany({
-      where: { branch, ...PENDING_WHERE },
+      where: { branch, statusGroup: 'pending' },
       orderBy: { complRegDt: 'asc' },
     });
     return sendSuccess(reply, complaints);
@@ -83,14 +76,9 @@ export const pendingRoutes = async (fastify: FastifyInstance) => {
     const { branch } = request.params as { branch: string };
     const now = new Date();
     const fifteenDaysAgo = new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-
+    const thirtyDaysAgo  = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     const complaints = await prisma.complaint.findMany({
-      where: {
-        branch,
-        complRegDt: { lte: fifteenDaysAgo, gt: thirtyDaysAgo },
-        ...PENDING_WHERE,
-      },
+      where: { branch, statusGroup: 'pending', complRegDt: { lte: fifteenDaysAgo, gt: thirtyDaysAgo } },
       orderBy: { complRegDt: 'asc' },
     });
     return sendSuccess(reply, complaints);
@@ -102,14 +90,9 @@ export const pendingRoutes = async (fastify: FastifyInstance) => {
     const { branch } = request.params as { branch: string };
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
-
+    const sixtyDaysAgo  = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
     const complaints = await prisma.complaint.findMany({
-      where: {
-        branch,
-        complRegDt: { lte: thirtyDaysAgo, gt: sixtyDaysAgo },
-        ...PENDING_WHERE,
-      },
+      where: { branch, statusGroup: 'pending', complRegDt: { lte: thirtyDaysAgo, gt: sixtyDaysAgo } },
       orderBy: { complRegDt: 'asc' },
     });
     return sendSuccess(reply, complaints);
@@ -120,13 +103,8 @@ export const pendingRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const { branch } = request.params as { branch: string };
     const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-
     const complaints = await prisma.complaint.findMany({
-      where: {
-        branch,
-        complRegDt: { lte: sixtyDaysAgo },
-        ...PENDING_WHERE,
-      },
+      where: { branch, statusGroup: 'pending', complRegDt: { lte: sixtyDaysAgo } },
       orderBy: { complRegDt: 'asc' },
     });
     return sendSuccess(reply, complaints);

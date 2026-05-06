@@ -51,7 +51,7 @@ export async function buildApp() {
 if (process.env.VERCEL !== '1') {
   buildApp().then(async () => {
     try {
-      startCctnsBackgroundSync(); // Start background sync
+      startCctnsBackgroundSync();          // Regular CCTNS data fetch every 4h
       await app.listen({ port: 3001, host: '0.0.0.0' });
       console.log('✅ Server running on port 3001');
     } catch (err) {
@@ -60,3 +60,4 @@ if (process.env.VERCEL !== '1') {
     }
   });
 }
+
