@@ -64,8 +64,20 @@ export const complaintRoutes = async (fastify: FastifyInstance) => {
     } : {};
     const where: any = { ...globalWhere, ...searchWhere };
 
+    const COMPLAINT_SELECT = {
+      id: true,
+      complRegNum: true,
+      districtName: true,
+      addressDistrict: true,
+      firstName: true,
+      lastName: true,
+      mobile: true,
+      complRegDt: true,
+      statusOfComplaint: true,
+    } as const;
+
     const [complaints, total] = await Promise.all([
-      prisma.complaint.findMany({ where, skip, take: limitNum, orderBy: { id: 'desc' } }),
+      prisma.complaint.findMany({ where, skip, take: limitNum, orderBy: { id: 'desc' }, select: COMPLAINT_SELECT }),
       prisma.complaint.count({ where }),
     ]);
 
