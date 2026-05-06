@@ -25,15 +25,15 @@
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env') });
 require('dotenv').config({ path: require('path').join(__dirname, '..', '.env.seed'), override: false });
 
-const BACKEND_URL   = (process.env.BACKEND_URL  || 'http://localhost:3001').replace(/\/$/, '');
-const JWT_TOKEN     = process.env.JWT_TOKEN || '';
-const STATE_CODE    = process.env.HARYANA_STATE_CODE || '13';
+const BACKEND_URL = (process.env.BACKEND_URL || 'http://localhost:3001').replace(/\/$/, '');
+const JWT_TOKEN = process.env.JWT_TOKEN || '';
+const STATE_CODE = process.env.HARYANA_STATE_CODE || '13';
 const PS_BATCH_SIZE = 3;
 
-const BASE         = process.env.HARYANA_POLICE_API_BASE    || 'https://api.haryanapolice.gov.in/eSaralServices/api/common';
-const DISTRICT_API = process.env.HARYANA_DISTRICT_API       || `${BASE}/district`;
-const PS_API       = process.env.HARYANA_POLICE_STATION_API || `${BASE}/GetPSByDistrict`;
-const OFFICE_API   = process.env.HARYANA_OFFICE_API         || `${BASE}/GetAllOffice`;
+const BASE = process.env.HARYANA_POLICE_API_BASE || 'https://api.haryanapolice.gov.in/eSaralServices/api/common';
+const DISTRICT_API = process.env.HARYANA_DISTRICT_API || `${BASE}/district`;
+const PS_API = process.env.HARYANA_POLICE_STATION_API || `${BASE}/GetPSByDistrict`;
+const OFFICE_API = process.env.HARYANA_OFFICE_API || `${BASE}/GetAllOffices`;
 
 if (!JWT_TOKEN) {
   console.error('\n❌  JWT_TOKEN is required.\n');
@@ -57,11 +57,11 @@ const parseJsonPayload = (rawText) => {
   const source = Array.isArray(parsed.Result)
     ? parsed.Result
     : Array.isArray(parsed.DropDownDTO)
-    ? parsed.DropDownDTO
-    : [];
+      ? parsed.DropDownDTO
+      : [];
   const items = [];
   for (const row of source) {
-    const id   = toId(row.ID ?? row.Id ?? row.id);
+    const id = toId(row.ID ?? row.Id ?? row.id);
     const name = String(row.Name ?? row.NAME ?? row.name ?? '').trim();
     if (id && name) items.push({ id, name });
   }
@@ -69,12 +69,12 @@ const parseJsonPayload = (rawText) => {
 };
 
 const parseXmlPayload = (rawText) => {
-  const xml   = rawText.replace(/<d2p1:/g, '<').replace(/<\/d2p1:/g, '</').replace(/<d3p1:/g, '<').replace(/<\/d3p1:/g, '</');
-  const ids   = Array.from(xml.matchAll(/<ID>(.*?)<\/ID>/g),    (m) => m[1]);
-  const names = Array.from(xml.matchAll(/<Name>(.*?)<\/Name>/g),(m) => m[1]);
+  const xml = rawText.replace(/<d2p1:/g, '<').replace(/<\/d2p1:/g, '</').replace(/<d3p1:/g, '<').replace(/<\/d3p1:/g, '</');
+  const ids = Array.from(xml.matchAll(/<ID>(.*?)<\/ID>/g), (m) => m[1]);
+  const names = Array.from(xml.matchAll(/<Name>(.*?)<\/Name>/g), (m) => m[1]);
   const items = [];
   for (let i = 0; i < ids.length; i++) {
-    const id   = toId(ids[i]);
+    const id = toId(ids[i]);
     const name = (names[i] || '').trim();
     if (id && name) items.push({ id, name });
   }
@@ -84,7 +84,7 @@ const parseXmlPayload = (rawText) => {
 // ── HTTP helper (uses native https to bypass govt API SSL cert issues) ─────
 
 const https = require('https');
-const http  = require('http');
+const http = require('http');
 
 const httpGet = (url) => new Promise((resolve, reject) => {
   const mod = url.startsWith('https') ? https : http;
@@ -126,7 +126,7 @@ const collectAllData = async () => {
     const batch = districts.slice(i, i + PS_BATCH_SIZE);
     const results = await Promise.all(batch.map(async (district) => {
       try {
-        const url   = `${PS_API}?state=${STATE_CODE}&district=${district.id}`;
+        const url = `${PS_API}?state=${STATE_CODE}&district=${district.id}`;
         const items = await fetchGovtItems(url);
         console.log(`      District "${district.name}": ${items.length} PS`);
         return items.map(ps => ({ ...ps, districtId: district.id, districtName: district.name }));
@@ -152,9 +152,9 @@ const collectAllData = async () => {
 const seedViaBackend = async (data) => {
   console.log(`\n[SAVING] POSTing to ${BACKEND_URL}/api/gov/bulk-seed ...`);
   const res = await fetch(`${BACKEND_URL}/api/gov/bulk-seed`, {
-    method:  'POST',
+    method: 'POST',
     headers: {
-      'Content-Type':  'application/json',
+      'Content-Type': 'application/json',
       'Authorization': `Bearer ${JWT_TOKEN}`,
     },
     body: JSON.stringify(data),
