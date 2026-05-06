@@ -298,47 +298,55 @@ export const DashboardPage = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '8px' }}>
           <div>
             <h1 className="text-2xl font-bold text-slate-100">Executive Overview</h1>
-            <div className="text-sm text-slate-400 mt-1 flex flex-wrap gap-4 items-center">
-              <span>
-                <strong>Period:</strong>{' '}
-                {activeFilters.fromDate && activeFilters.toDate
-                  ? `${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')} to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
-                  : activeFilters.fromDate
-                  ? `From ${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')}`
-                  : activeFilters.toDate
-                  ? `Up to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
-                  : (s?.dbMinDate && s?.dbMaxDate)
-                  ? `${new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} to ${new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                  : 'All Time'}
-              </span>
+            <div className="text-sm text-slate-300 mt-2 flex flex-wrap gap-3 items-center">
+              <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md shadow-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span className="font-medium text-slate-200">Period:</span>
+                <span>
+                  {activeFilters.fromDate && activeFilters.toDate
+                    ? `${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')} to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
+                    : activeFilters.fromDate
+                    ? `From ${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')}`
+                    : activeFilters.toDate
+                    ? `Up to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
+                    : (s?.dbMinDate && s?.dbMaxDate)
+                    ? `${new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} to ${new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                    : 'All Time'}
+                </span>
+              </div>
+              
               {s?.lastSyncTime && (
-                <>
-                  <span className="text-slate-600">|</span>
-                  <span title="Last time CCTNS data was successfully synced to this database" className="flex items-center gap-1">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="1 4 1 10 7 10"></polyline>
-                      <polyline points="23 20 23 14 17 14"></polyline>
-                      <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
-                    </svg>
-                    <strong>Last Sync:</strong> {new Date(s.lastSyncTime).toLocaleString('en-IN', {
+                <div title="Last time CCTNS data was successfully synced to this database" className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md shadow-sm">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400">
+                    <polyline points="1 4 1 10 7 10"></polyline>
+                    <polyline points="23 20 23 14 17 14"></polyline>
+                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
+                  </svg>
+                  <span className="font-medium text-slate-200">Last Sync:</span>
+                  <span>
+                    {new Date(s.lastSyncTime).toLocaleString('en-IN', {
                       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                     })}
                   </span>
-                </>
+                </div>
               )}
+              
               {s?.dbMinDate && s?.dbMaxDate && (
-                <>
-                  <span className="text-slate-600">|</span>
-                  <span title="Time period of data available in the database" className="flex items-center gap-1">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                      <line x1="16" y1="2" x2="16" y2="6"></line>
-                      <line x1="8" y1="2" x2="8" y2="6"></line>
-                      <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <strong>DB Data:</strong> from {new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} till {new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                <div title="Time period of data available in the database" className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md shadow-sm">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-400">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                    <polyline points="22,6 12,13 2,6"></polyline>
+                  </svg>
+                  <span className="font-medium text-slate-200">DB Data:</span>
+                  <span>
+                    {new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} to {new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
-                </>
+                </div>
               )}
             </div>
           </div>
