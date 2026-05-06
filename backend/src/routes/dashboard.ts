@@ -69,6 +69,14 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     `;
     const avgDisposalTime = Math.round(Number(avgResult[0]?.avg_days ?? 0));
 
+    // Last successful sync time — shown in the dashboard header (PR #4)
+    const lastSyncRun = await prisma.syncRun.findFirst({
+      where: { status: 'success', endedAt: { not: null } },
+      orderBy: { endedAt: 'desc' },
+      select: { endedAt: true },
+    });
+    const lastSyncTime = lastSyncRun?.endedAt ?? null;
+
     return sendCached(reply, {
       totalReceived,
       totalDisposed,
@@ -79,6 +87,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       pendingOverOneMonth: pendingOver1,
       pendingOverTwoMonths: pendingOver2,
       avgDisposalTime,
+      lastSyncTime,
     });
   });
 
