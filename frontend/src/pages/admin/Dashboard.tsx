@@ -160,6 +160,8 @@ export const DashboardPage = () => {
 
   const [districtSort, setDistrictSort] = useState<string>('total');
   const [categorySort, setCategorySort] = useState<string>('total');
+  const [pendencyView, setPendencyView] = useState<'numbers' | 'pct'>('numbers');
+  const [disposalView, setDisposalView] = useState<'numbers' | 'pct'>('numbers');
 
   const stateTotal = s?.totalReceived || 1;
 
@@ -547,86 +549,98 @@ export const DashboardPage = () => {
           />
         </div>
 
-        <div className="dashboard-matrices-grid">
-          <div className="bg-slate-800 rounded-lg p-5 border border-slate-700" style={{ display: 'flex', flexDirection: 'column' }}>
-            <h2 className="text-lg font-bold text-slate-100 mb-4">Pendency Ageing Matrix (Total)</h2>
-            {ml ? (
-              <div className="text-slate-400">Loading matrix...</div>
-            ) : (
-              <div style={{ flex: 1, position: 'relative' }}>
-                <DataTable
-                  title="Pendency Ageing Matrix (Total)"
-                  data={matrix}
-                  columns={matrixCols.map(c => ({
-                    ...c,
-                    render: (row) => renderMatrixDays(c, row),
-                  }))}
-                  onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
-                  maxHeight="400px"
-                />
-              </div>
-            )}
+        {/* ── Pendency Ageing Matrix (single card, Numbers / % toggle) ─────────── */}
+        <div className="bg-slate-800 rounded-lg p-5 border border-slate-700">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+            <h2 className="text-lg font-bold text-slate-100">Pendency Ageing Matrix</h2>
+            <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155' }}>
+              {(['numbers', 'pct'] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setPendencyView(v)}
+                  style={{
+                    padding: '4px 14px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s',
+                    backgroundColor: pendencyView === v ? '#3b82f6' : 'transparent',
+                    color: pendencyView === v ? '#fff' : '#94a3b8',
+                  }}
+                >
+                  {v === 'numbers' ? '# Numbers' : '% Percent'}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="bg-slate-800 rounded-lg p-5 border border-slate-700" style={{ display: 'flex', flexDirection: 'column' }}>
-            <h2 className="text-lg font-bold text-slate-100 mb-4">Pendency Ageing Matrix (%)</h2>
-            {ml ? (
-              <div className="text-slate-400">Loading matrix...</div>
-            ) : (
-              <div style={{ flex: 1, position: 'relative' }}>
-                <DataTable
-                  title="Pendency Ageing Matrix (%)"
-                  data={matrixWithPct}
-                  columns={matrixPctCols.map(c => ({
-                    ...c,
-                    render: (row) => renderMatrixPct(c, row),
-                  }))}
-                  onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
-                  maxHeight="400px"
-                />
-              </div>
-            )}
-          </div>
+          {ml ? (
+            <div className="text-slate-400">Loading matrix...</div>
+          ) : pendencyView === 'numbers' ? (
+            <DataTable
+              title="Pendency Ageing Matrix"
+              data={matrix}
+              columns={matrixCols.map(c => ({ ...c, render: (row) => renderMatrixDays(c, row) }))}
+              onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
+              maxHeight="400px"
+            />
+          ) : (
+            <DataTable
+              title="Pendency Ageing Matrix (%)"
+              data={matrixWithPct}
+              columns={matrixPctCols.map(c => ({ ...c, render: (row) => renderMatrixPct(c, row) }))}
+              onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
+              maxHeight="400px"
+            />
+          )}
         </div>
 
-        <div className="dashboard-matrices-grid">
-          <div className="bg-slate-800 rounded-lg p-5 border border-slate-700" style={{ display: 'flex', flexDirection: 'column' }}>
-            <h2 className="text-lg font-bold text-slate-100 mb-4">Disposal Time Matrix (Total)</h2>
-            {dml ? (
-              <div className="text-slate-400">Loading matrix...</div>
-            ) : (
-              <div style={{ flex: 1, position: 'relative' }}>
-                <DataTable
-                  title="Disposal Time Matrix (Total)"
-                  data={cumulativeDisposalMatrix}
-                  columns={disposalCols.map(c => ({
-                    ...c,
-                    render: (row) => renderDisposalDays(c, row),
-                  }))}
-                  onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)} 
-                  maxHeight="400px"
-                />
-              </div>
-            )}
+        {/* ── Disposal Time Matrix (single card, Numbers / % toggle) ─────────── */}
+        <div className="bg-slate-800 rounded-lg p-5 border border-slate-700">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+            <h2 className="text-lg font-bold text-slate-100">Disposal Time Matrix</h2>
+            <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155' }}>
+              {(['numbers', 'pct'] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setDisposalView(v)}
+                  style={{
+                    padding: '4px 14px',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.18s',
+                    backgroundColor: disposalView === v ? '#10b981' : 'transparent',
+                    color: disposalView === v ? '#fff' : '#94a3b8',
+                  }}
+                >
+                  {v === 'numbers' ? '# Numbers' : '% Percent'}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="bg-slate-800 rounded-lg p-5 border border-slate-700" style={{ display: 'flex', flexDirection: 'column' }}>
-            <h2 className="text-lg font-bold text-slate-100 mb-4">Disposal Time Matrix (%)</h2>
-            {dml ? (
-              <div className="text-slate-400">Loading matrix...</div>
-            ) : (
-              <div style={{ flex: 1, position: 'relative' }}>
-                <DataTable
-                  title="Disposal Time Matrix (%)"
-                  data={disposalMatrixWithPct}
-                  columns={disposalPctCols.map(c => ({
-                    ...c,
-                    render: (row) => renderDisposalPct(c, row),
-                  }))}
-                  onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)} 
-                  maxHeight="400px"
-                />
-              </div>
-            )}
-          </div>
+          {dml ? (
+            <div className="text-slate-400">Loading matrix...</div>
+          ) : disposalView === 'numbers' ? (
+            <DataTable
+              title="Disposal Time Matrix"
+              data={cumulativeDisposalMatrix}
+              columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
+              onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
+              maxHeight="400px"
+            />
+          ) : (
+            <DataTable
+              title="Disposal Time Matrix (%)"
+              data={disposalMatrixWithPct}
+              columns={disposalPctCols.map(c => ({ ...c, render: (row) => renderDisposalPct(c, row) }))}
+              onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
+              maxHeight="400px"
+            />
+          )}
         </div>
       </div>
     </Layout>
