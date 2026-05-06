@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database.js';
-import { sendSuccess, sendError } from '../utils/response.js';
+import { sendSuccess, sendCached, sendError } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { buildPrismaWhereClause } from '../utils/filters.js';
 import { cached } from '../utils/cache.js';
@@ -69,7 +69,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     `;
     const avgDisposalTime = Math.round(Number(avgResult[0]?.avg_days ?? 0));
 
-    return sendSuccess(reply, {
+    return sendCached(reply, {
       totalReceived,
       totalDisposed,
       totalPending,
@@ -107,7 +107,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       }
       return Array.from(districtMap.entries()).map(([district, stats]) => ({ district, ...stats }));
     });
-    return sendSuccess(reply, data);
+    return sendCached(reply, data);
   });
 
   fastify.get('/dashboard/duration-wise', {
@@ -135,7 +135,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         .sort((a, b) => a[1].sortKey - b[1].sortKey)
         .map(([duration, stats]) => ({ duration, total: stats.total, pending: stats.pending, disposed: stats.disposed, unknown: stats.unknown }));
     });
-    return sendSuccess(reply, data);
+    return sendCached(reply, data);
   });
 
   fastify.get('/dashboard/date-wise', {
@@ -238,7 +238,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         o60: Number(r.o60),
       }));
     });
-    return sendSuccess(reply, data);
+    return sendCached(reply, data);
   });
 
   fastify.get('/dashboard/disposal-matrix', {
@@ -284,7 +284,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         missingDisposalDates: missingDates,
       };
     });
-    return sendSuccess(reply, data);
+    return sendCached(reply, data);
   });
 
   fastify.get<{ Params: { district: string } }>('/dashboard/district-analysis/:district', {
@@ -405,7 +405,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
 
     const categories = Array.from(categoryMap.entries()).map(([category, stats]) => ({ category, ...stats }));
 
-    return sendSuccess(reply, {
+    return sendCached(reply, {
       district: districtParam || UNMAPPED,
       policeStations,
       categories,
@@ -415,27 +415,27 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/dashboard/category-wise', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const complaints = await prisma.complaint.findMany({
-      where: buildPrismaWhereClause(request.query),
-      select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
+    const q = JSON.stringify(request.query);
+    const data = await cached(`category-wise:${q}`, 5 * 60 * 1000, async () => {
+      const complaints = await prisma.complaint.findMany({
+        where: buildPrismaWhereClause(request.query),
+        select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
+      });
+      const categoryMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
+      for (const comp of complaints) {
+        const category = comp.classOfIncident || UNMAPPED;
+        const stats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
+        stats.total++;
+        if (comp.statusGroup === 'pending') stats.pending++;
+        else if (comp.statusGroup === 'disposed') stats.disposed++;
+        else stats.unknown++;
+        if (comp.isDisposedMissingDate) stats.missingDates++;
+        categoryMap.set(category, stats);
+      }
+      return Array.from(categoryMap.entries())
+        .map(([category, stats]) => ({ category, ...stats }))
+        .sort((a, b) => b.total - a.total);
     });
-
-    const categoryMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
-    for (const comp of complaints) {
-      const category = comp.classOfIncident || UNMAPPED;
-      const stats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
-      stats.total++;
-      if (comp.statusGroup === 'pending') stats.pending++;
-      else if (comp.statusGroup === 'disposed') stats.disposed++;
-      else stats.unknown++;
-      if (comp.isDisposedMissingDate) stats.missingDates++;
-      categoryMap.set(category, stats);
-    }
-
-    const data = Array.from(categoryMap.entries())
-      .map(([category, stats]) => ({ category, ...stats }))
-      .sort((a, b) => b.total - a.total);
-
-    return sendSuccess(reply, data);
+    return sendCached(reply, data);
   });
 };

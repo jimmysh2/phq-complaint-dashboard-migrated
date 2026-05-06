@@ -15,6 +15,26 @@ export const sendSuccess = <T>(
   return reply.code(statusCode).send(response);
 };
 
+/**
+ * Like sendSuccess but adds Cache-Control headers.
+ *
+ * On Vercel, in-memory caches reset per invocation (serverless is stateless).
+ * Cache-Control headers tell Vercel's edge network to cache the response
+ * so identical requests within `ttlSeconds` don't hit the DB at all.
+ *
+ * @param ttlSeconds - How long to cache (default: 5 minutes)
+ */
+export const sendCached = <T>(
+  reply: FastifyReply,
+  data: T,
+  ttlSeconds = 300,
+  message = 'Success'
+) => {
+  reply.header('Cache-Control', `public, max-age=${ttlSeconds}, s-maxage=${ttlSeconds}, stale-while-revalidate=60`);
+  return sendSuccess(reply, data, message);
+};
+
+
 export const sendError = (
   reply: FastifyReply,
   message: string,
