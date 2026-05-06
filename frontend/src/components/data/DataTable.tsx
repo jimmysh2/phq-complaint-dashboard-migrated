@@ -55,11 +55,11 @@ export function DataTable<T extends Record<string, unknown>>({
   }, [filteredData, sortKey, sortDir]);
 
   const renderTable = (isExpanded: boolean) => (
-    <div style={{ overflowY: 'auto', flex: 1, maxHeight: isExpanded ? 'calc(100vh - 100px)' : maxHeight }}>
+    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: isExpanded ? 'calc(100vh - 100px)' : maxHeight }}>
       <table className="data-table" style={isExpanded ? { fontSize: '15px' } : undefined}>
         <thead>
           <tr>
-            {columns.map(col => (
+            {columns.map((col, colIdx) => (
               <th
                 key={col.key}
                 style={{ 
@@ -67,7 +67,15 @@ export function DataTable<T extends Record<string, unknown>>({
                   cursor: col.sortable ? 'pointer' : 'default', 
                   textAlign: col.align,
                   fontSize: isExpanded ? '13px' : undefined,
-                  padding: isExpanded ? '18px 24px' : undefined
+                  padding: isExpanded ? '18px 24px' : undefined,
+                  // Freeze first column
+                  ...(colIdx === 0 ? {
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 20,
+                    background: '#0f172a',
+                    boxShadow: '2px 0 6px rgba(0,0,0,0.4)',
+                  } : {}),
                 }}
                 onClick={() => col.sortable && handleSort(col.key)}
               >
@@ -87,12 +95,20 @@ export function DataTable<T extends Record<string, unknown>>({
           {sorted.length > 0 ? (
             sorted.map((row, i) => (
               <tr key={i} onClick={() => onRowClick?.(row)} style={{ cursor: onRowClick ? 'pointer' : 'default' }}>
-                {columns.map(col => (
+                {columns.map((col, colIdx) => (
                   <td 
                     key={col.key} 
                     style={{ 
                       textAlign: col.align, 
-                      padding: isExpanded ? '18px 24px' : undefined 
+                      padding: isExpanded ? '18px 24px' : undefined,
+                      // Freeze first column
+                      ...(colIdx === 0 ? {
+                        position: 'sticky',
+                        left: 0,
+                        zIndex: 10,
+                        background: 'var(--bg-card)',
+                        boxShadow: '2px 0 6px rgba(0,0,0,0.3)',
+                      } : {}),
                     }}
                   >
                     {col.render ? col.render(row) : String(row[col.key] ?? '-')}
