@@ -77,6 +77,12 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     });
     const lastSyncTime = lastSyncRun?.endedAt ?? null;
 
+    // Get DB date range
+    const globalDates = await prisma.complaint.aggregate({
+      _min: { complRegDt: true },
+      _max: { complRegDt: true },
+    });
+
     return sendCached(reply, {
       totalReceived,
       totalDisposed,
@@ -88,6 +94,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       pendingOverTwoMonths: pendingOver2,
       avgDisposalTime,
       lastSyncTime,
+      dbMinDate: globalDates._min.complRegDt,
+      dbMaxDate: globalDates._max.complRegDt,
     });
   });
 

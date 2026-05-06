@@ -307,6 +307,8 @@ export const DashboardPage = () => {
                   ? `From ${new Date(activeFilters.fromDate).toLocaleDateString('en-IN')}`
                   : activeFilters.toDate
                   ? `Up to ${new Date(activeFilters.toDate).toLocaleDateString('en-IN')}`
+                  : (s?.dbMinDate && s?.dbMaxDate)
+                  ? `${new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} to ${new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
                   : 'All Time'}
               </span>
               {s?.lastSyncTime && (
@@ -321,6 +323,20 @@ export const DashboardPage = () => {
                     <strong>Last Sync:</strong> {new Date(s.lastSyncTime).toLocaleString('en-IN', {
                       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                     })}
+                  </span>
+                </>
+              )}
+              {s?.dbMinDate && s?.dbMaxDate && (
+                <>
+                  <span className="text-slate-600">|</span>
+                  <span title="Time period of data available in the database" className="flex items-center gap-1">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                      <line x1="16" y1="2" x2="16" y2="6"></line>
+                      <line x1="8" y1="2" x2="8" y2="6"></line>
+                      <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    <strong>DB Data:</strong> from {new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} till {new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
                 </>
               )}
