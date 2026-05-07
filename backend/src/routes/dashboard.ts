@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database.js';
+import { Prisma } from '@prisma/client';
 import { sendSuccess, sendCached, sendError } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { buildPrismaWhereClause } from '../utils/filters.js';
@@ -8,6 +9,66 @@ import {
   getDistrictNameByIdMap,
   getPoliceStationNameByIdMap,
 } from '../services/master-mapping.js';
+
+/**
+ * Build a dynamic SQL WHERE fragment + Prisma.sql params from the request query.
+ * Returns a Prisma.Sql object that can be embedded in a template literal with ${}
+ */
+const buildRawWhereClause = (query: any): Prisma.Sql => {
+  const parts: Prisma.Sql[] = [Prisma.sql`"statusGroup" IS NOT NULL`];
+
+  const parseCsv = (v: unknown) =>
+    String(v ?? '').split(',').map(s => s.trim()).filter(Boolean);
+
+  const districtIds = parseCsv(query.districtIds)
+    .filter(v => /^-?\d+$/.test(v))
+    .map(v => BigInt(v));
+  if (districtIds.length > 0) {
+    parts.push(Prisma.sql`"districtMasterId" IN (${Prisma.join(districtIds)})`);
+  }
+
+  const policeStationIds = parseCsv(query.policeStationIds)
+    .filter(v => /^-?\d+$/.test(v))
+    .map(v => BigInt(v));
+  if (policeStationIds.length > 0) {
+    parts.push(Prisma.sql`"policeStationMasterId" IN (${Prisma.join(policeStationIds)})`);
+  }
+
+  const officeIds = parseCsv(query.officeIds)
+    .filter(v => /^-?\d+$/.test(v))
+    .map(v => BigInt(v));
+  if (officeIds.length > 0) {
+    parts.push(Prisma.sql`"officeMasterId" IN (${Prisma.join(officeIds)})`);
+  }
+
+  const classOfIncident = parseCsv(query.classOfIncident);
+  if (classOfIncident.length > 0) {
+    if (classOfIncident.includes(UNMAPPED)) {
+      const nonUnmapped = classOfIncident.filter(c => c !== UNMAPPED);
+      if (nonUnmapped.length > 0) {
+        parts.push(Prisma.sql`(COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') IN (${Prisma.join(nonUnmapped)}) OR COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') = 'Unmapped')`);
+      } else {
+        parts.push(Prisma.sql`COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') = 'Unmapped'`);
+      }
+    } else {
+      parts.push(Prisma.sql`COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') IN (${Prisma.join(classOfIncident)})`);
+    }
+  }
+
+  const fromDate = query.from_date || query.fromDate;
+  const toDate   = query.to_date   || query.toDate;
+  if (fromDate) {
+    parts.push(Prisma.sql`"complRegDt" >= ${new Date(fromDate as string)}`);
+  }
+  if (toDate) {
+    // include the full last day
+    const end = new Date(toDate as string);
+    end.setHours(23, 59, 59, 999);
+    parts.push(Prisma.sql`"complRegDt" <= ${end}`);
+  }
+
+  return Prisma.join(parts, ' AND ');
+};
 
 const UNMAPPED = 'Unmapped';
 
@@ -104,25 +165,34 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const q = JSON.stringify(request.query);
     const data = await cached(`district-wise:${q}`, 5 * 60 * 1000, async () => {
-      const [districtMapById, complaints] = await Promise.all([
+      const filterWhere = buildRawWhereClause(request.query);
+      const [districtMapById, rows] = await Promise.all([
         getDistrictNameByIdMap(),
-        prisma.complaint.findMany({
-          where: buildPrismaWhereClause(request.query),
-          select: { districtMasterId: true, statusGroup: true, isDisposedMissingDate: true },
-        }),
+        prisma.$queryRaw<Array<{
+          districtMasterId: bigint | null;
+          total: bigint; pending: bigint; disposed: bigint; unknown: bigint; missingDates: bigint;
+        }>>`
+          SELECT 
+            "districtMasterId",
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'pending') as pending,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'disposed') as disposed,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'unknown') as unknown,
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = true) as "missingDates"
+          FROM "Complaint"
+          WHERE ${filterWhere}
+          GROUP BY "districtMasterId"
+        `,
       ]);
-      const districtMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
-      for (const comp of complaints) {
-        const district = getDistrictLabel(comp.districtMasterId, districtMapById);
-        const stats = districtMap.get(district) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
-        stats.total++;
-        if (comp.statusGroup === 'pending') stats.pending++;
-        else if (comp.statusGroup === 'disposed') stats.disposed++;
-        else stats.unknown++;
-        if (comp.isDisposedMissingDate) stats.missingDates++;
-        districtMap.set(district, stats);
-      }
-      return Array.from(districtMap.entries()).map(([district, stats]) => ({ district, ...stats }));
+      
+      return rows.map(r => ({
+        district: getDistrictLabel(r.districtMasterId, districtMapById),
+        total: Number(r.total),
+        pending: Number(r.pending),
+        disposed: Number(r.disposed),
+        unknown: Number(r.unknown),
+        missingDates: Number(r.missingDates),
+      }));
     });
     return sendCached(reply, data);
   });
@@ -132,25 +202,64 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const q = JSON.stringify(request.query);
     const data = await cached(`duration-wise:${q}`, 5 * 60 * 1000, async () => {
-      const complaints = await prisma.complaint.findMany({
-        where: buildPrismaWhereClause(request.query),
-        select: { complRegDt: true, statusGroup: true },
-      });
-      const durationMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; sortKey: number }>();
-      for (const comp of complaints) {
-        if (!comp.complRegDt) continue;
-        const d = new Date(comp.complRegDt);
-        const key = `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
-        const stats = durationMap.get(key) || { total: 0, pending: 0, disposed: 0, unknown: 0, sortKey: d.getTime() };
-        stats.total++;
-        if (comp.statusGroup === 'pending') stats.pending++;
-        else if (comp.statusGroup === 'disposed') stats.disposed++;
-        else stats.unknown++;
-        durationMap.set(key, stats);
+      const rq = request.query as Record<string, string>;
+      const fromDate = rq.fromDate || rq.from_date;
+      const toDate   = rq.toDate   || rq.to_date;
+
+      let useDayGranularity = false;
+      if (fromDate && toDate) {
+        const diffDays = (new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60 * 24);
+        useDayGranularity = diffDays <= 31;
       }
-      return Array.from(durationMap.entries())
-        .sort((a, b) => a[1].sortKey - b[1].sortKey)
-        .map(([duration, stats]) => ({ duration, total: stats.total, pending: stats.pending, disposed: stats.disposed, unknown: stats.unknown }));
+
+      const filterWhere = buildRawWhereClause(request.query);
+      let rows: any[];
+
+      if (useDayGranularity) {
+        rows = await prisma.$queryRaw`
+          SELECT
+            DATE_TRUNC('day', "complRegDt") as "dateVal",
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'pending') as pending,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'disposed') as disposed,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'unknown') as unknown
+          FROM "Complaint"
+          WHERE "complRegDt" IS NOT NULL
+            AND ${filterWhere}
+          GROUP BY DATE_TRUNC('day', "complRegDt")
+          ORDER BY DATE_TRUNC('day', "complRegDt") ASC
+        `;
+      } else {
+        rows = await prisma.$queryRaw`
+          SELECT
+            DATE_TRUNC('month', "complRegDt") as "dateVal",
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'pending') as pending,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'disposed') as disposed,
+            COUNT(*) FILTER (WHERE "statusGroup" = 'unknown') as unknown
+          FROM "Complaint"
+          WHERE "complRegDt" IS NOT NULL
+            AND ${filterWhere}
+          GROUP BY DATE_TRUNC('month', "complRegDt")
+          ORDER BY DATE_TRUNC('month', "complRegDt") ASC
+        `;
+      }
+
+      return rows.map((r: any) => {
+        const d = new Date(r.dateVal);
+        const duration = useDayGranularity
+          ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+          : `${d.toLocaleString('default', { month: 'short' })} ${d.getFullYear()}`;
+        
+        return {
+          duration,
+          total: Number(r.total),
+          pending: Number(r.pending),
+          disposed: Number(r.disposed),
+          unknown: Number(r.unknown),
+          granularity: useDayGranularity ? 'day' : 'month',
+        };
+      });
     });
     return sendCached(reply, data);
   });
@@ -229,7 +338,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const q = JSON.stringify(request.query);
     const data = await cached(`ageing-matrix:${q}`, 5 * 60 * 1000, async () => {
-      // SQL GROUP BY: transfers ~30 rows (one per district) instead of 50,000+ complaint rows
+      // Build dynamic filter clause so ALL global filters (classOfIncident, districtIds, etc.) are respected
+      const filterWhere = buildRawWhereClause(request.query);
       const rows = await prisma.$queryRaw<Array<{
         districtMasterId: bigint | null;
         u7: bigint; u15: bigint; u30: bigint; o30: bigint; o60: bigint;
@@ -242,7 +352,9 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
           COUNT(*) FILTER (WHERE NOW() - "complRegDt" >= INTERVAL '30 days' AND NOW() - "complRegDt" < INTERVAL '60 days') AS o30,
           COUNT(*) FILTER (WHERE NOW() - "complRegDt" >= INTERVAL '60 days')                                               AS o60
         FROM "Complaint"
-        WHERE "statusGroup" = 'pending' AND "complRegDt" IS NOT NULL
+        WHERE "statusGroup" = 'pending'
+          AND "complRegDt" IS NOT NULL
+          AND ${filterWhere}
         GROUP BY "districtMasterId"
       `;
       const districtMapById = await getDistrictNameByIdMap();
@@ -263,7 +375,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const q = JSON.stringify(request.query);
     const data = await cached(`disposal-matrix:${q}`, 5 * 60 * 1000, async () => {
-      // SQL GROUP BY: transfers ~30 rows instead of 80,000+ disposal rows
+      // Build dynamic filter clause so ALL global filters are respected
+      const filterWhere = buildRawWhereClause(request.query);
       const [rows, missingDates] = await Promise.all([
         prisma.$queryRaw<Array<{
           districtMasterId: bigint | null;
@@ -282,6 +395,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
             AND "complRegDt" IS NOT NULL
             AND "disposalDate" IS NOT NULL
             AND "disposalDate" >= "complRegDt"
+            AND ${filterWhere}
           GROUP BY "districtMasterId"
         `,
         prisma.complaint.count({
@@ -434,24 +548,31 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const q = JSON.stringify(request.query);
     const data = await cached(`category-wise:${q}`, 5 * 60 * 1000, async () => {
-      const complaints = await prisma.complaint.findMany({
-        where: buildPrismaWhereClause(request.query),
-        select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
-      });
-      const categoryMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
-      for (const comp of complaints) {
-        const category = comp.classOfIncident || UNMAPPED;
-        const stats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
-        stats.total++;
-        if (comp.statusGroup === 'pending') stats.pending++;
-        else if (comp.statusGroup === 'disposed') stats.disposed++;
-        else stats.unknown++;
-        if (comp.isDisposedMissingDate) stats.missingDates++;
-        categoryMap.set(category, stats);
-      }
-      return Array.from(categoryMap.entries())
-        .map(([category, stats]) => ({ category, ...stats }))
-        .sort((a, b) => b.total - a.total);
+      const filterWhere = buildRawWhereClause(request.query);
+      const rows = await prisma.$queryRaw<Array<{
+        category: string;
+        total: bigint; pending: bigint; disposed: bigint; unknown: bigint; missingDates: bigint;
+      }>>`
+        SELECT 
+          COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') as category,
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE "statusGroup" = 'pending') as pending,
+          COUNT(*) FILTER (WHERE "statusGroup" = 'disposed') as disposed,
+          COUNT(*) FILTER (WHERE "statusGroup" = 'unknown') as unknown,
+          COUNT(*) FILTER (WHERE "isDisposedMissingDate" = true) as "missingDates"
+        FROM "Complaint"
+        WHERE ${filterWhere}
+        GROUP BY COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped')
+        ORDER BY total DESC
+      `;
+      return rows.map(r => ({
+        category: r.category,
+        total: Number(r.total),
+        pending: Number(r.pending),
+        disposed: Number(r.disposed),
+        unknown: Number(r.unknown),
+        missingDates: Number(r.missingDates),
+      }));
     });
     return sendCached(reply, data);
   });

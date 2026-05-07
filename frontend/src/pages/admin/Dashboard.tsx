@@ -158,6 +158,10 @@ export const DashboardPage = () => {
   const categories = categoryData?.data || [];
   const disposalMatrix = disposalMatrixData?.data?.rows || disposalMatrixData?.data || [];
 
+  // Detect granularity from backend response (day vs month) for adaptive chart title
+  const trendGranularity: 'day' | 'month' = durations.length > 0 && durations[0]?.granularity === 'day' ? 'day' : 'month';
+  const trendChartTitle = trendGranularity === 'day' ? 'State-wide Trend (Daily)' : 'State-wide Trend (Monthly)';
+
   const [districtSort, setDistrictSort] = useState<string>('total');
   const [categorySort, setCategorySort] = useState<string>('total');
   const [pendencyView, setPendencyView] = useState<'numbers' | 'pct'>('numbers');
@@ -182,6 +186,16 @@ export const DashboardPage = () => {
           aVal = a.total > 0 ? a.pending / a.total : 0; bVal = b.total > 0 ? b.pending / b.total : 0; break;
         case 'disposed_pct':
           aVal = a.total > 0 ? a.disposed / a.total : 0; bVal = b.total > 0 ? b.disposed / b.total : 0; break;
+        case 'az': {
+          const la = String(a.district ?? a.category ?? '');
+          const lb = String(b.district ?? b.category ?? '');
+          return la.localeCompare(lb);
+        }
+        case 'za': {
+          const la = String(a.district ?? a.category ?? '');
+          const lb = String(b.district ?? b.category ?? '');
+          return lb.localeCompare(la);
+        }
       }
       return bVal - aVal;
     });
@@ -392,14 +406,14 @@ export const DashboardPage = () => {
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(categorySummary), 'Category Totals');
 
-                // Sheet 4: Monthly Trend
+                // Sheet 4: Trend
                 const trendSummary = durations.map((d: any) => ({
-                  'Month': d.duration || d.month,
+                  [trendGranularity === 'day' ? 'Date' : 'Month']: d.duration || d.month,
                   'Total': d.total,
                   'Disposed': d.disposed,
                   'Pending': d.pending
                 }));
-                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trendSummary), 'Monthly Trend');
+                XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(trendSummary), trendGranularity === 'day' ? 'Daily Trend' : 'Monthly Trend');
 
                 // Sheet 5: Pendency Ageing Matrix
                 const matrixSummary = matrix.map((d: any) => ({
@@ -502,7 +516,7 @@ export const DashboardPage = () => {
 
         <div className="dashboard-charts-grid">
           <ChartCard
-            title="State-wide Trend (Monthly)"
+            title={trendChartTitle}
             option={getDurationLineOptions(durations)}
             fullOption={getDurationLineOptions(durations)}
             height="320px"
@@ -520,6 +534,8 @@ export const DashboardPage = () => {
                   { value: 'total_pct_state', label: 'Total % (from state total)' },
                   { value: 'pending_pct', label: 'Pending % (from district total)' },
                   { value: 'disposed_pct', label: 'Disposed % (from district total)' },
+                  { value: 'az', label: 'A → Z' },
+                  { value: 'za', label: 'Z → A' },
                 ]}
               />
             }
@@ -540,6 +556,8 @@ export const DashboardPage = () => {
                   { value: 'total_pct_state', label: 'Total % (from state total)' },
                   { value: 'pending_pct', label: 'Pending % (from category total)' },
                   { value: 'disposed_pct', label: 'Disposed % (from category total)' },
+                  { value: 'az', label: 'A → Z' },
+                  { value: 'za', label: 'Z → A' },
                 ]}
               />
             }

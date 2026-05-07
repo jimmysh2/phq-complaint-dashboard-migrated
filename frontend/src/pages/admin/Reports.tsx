@@ -1,3 +1,4 @@
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
@@ -34,9 +35,52 @@ const apiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>
   'action-taken':     (p) => reportsApi.actionTaken(p),
 };
 
+// ─── Reusable sort dropdown (local to this page) ─────────────────────────────
+type SortOpt = { label: string; value: string };
+const CHART_SORTS: SortOpt[] = [
+  { label: 'By Total ↓',    value: 'total'    },
+  { label: 'By Pending ↓',  value: 'pending'  },
+  { label: 'By Disposed ↓', value: 'disposed' },
+  { label: 'A → Z',         value: 'az'       },
+  { label: 'Z → A',         value: 'za'       },
+];
+
+const ChartSortDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  const cur = CHART_SORTS.find(o => o.value === value)?.label ?? 'Sort';
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(v => !v)} className="chart-expand-btn"
+        style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
+        </svg>{cur}
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 9999, minWidth: 180, padding: '4px 0' }}>
+          {CHART_SORTS.map(opt => (
+            <div key={opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{ padding: '7px 14px', fontSize: 12, cursor: 'pointer', color: value === opt.value ? '#60a5fa' : '#cbd5e1', fontWeight: value === opt.value ? 600 : 400, backgroundColor: value === opt.value ? 'rgba(51,65,85,0.6)' : 'transparent' }}
+              onMouseEnter={e => { if (value !== opt.value) (e.currentTarget as HTMLElement).style.backgroundColor = '#334155'; }}
+              onMouseLeave={e => { if (value !== opt.value) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+            >{opt.label}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const ReportsPage = () => {
   const [sp] = useSearchParams();
   const type = sp.get('type') || 'district';
+  const [chartSort, setChartSort] = useState<string>('total');
 
   // Same pattern as Dashboard — read global filters, strip empty values
   const { filters } = useFilters();
@@ -56,31 +100,40 @@ export const ReportsPage = () => {
   const unk     = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.unknown || 0), 0);
   const missing = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.missingDates || 0), 0);
 
-  const tableData = rows.map((r: Record<string, unknown>, i: number) => {
-    const tot = Number(r.total || r.count || 0);
-    const p   = Number(r.pending  || 0);
-    const d   = Number(r.disposed || 0);
-    const u   = Number(r.unknown  || 0);
-    const rawName = String(
-      r.district || r.branch || r.mode || r.status ||
-      r.natureOfIncident || r.typeAgainst || r.actionTaken ||
-      r.complaintSource || r.typeOfComplaint || ''
-    );
-    const displayName =
-      type === 'status' && (!rawName || rawName.trim() === '')
-        ? 'Status Not Found'
-        : rawName || `Item ${i + 1}`;
-    return {
-      name:     displayName,
-      total:    tot,
-      pending:  p,
-      disposed: d,
-      unknown:  u,
-      pendPct:  tot > 0 ? Math.round((p / tot) * 100) + '%' : '0%',
-      dispPct:  tot > 0 ? Math.round((d / tot) * 100) + '%' : '0%',
-      unknPct:  tot > 0 ? Math.round((u / tot) * 100) + '%' : '0%',
-    };
-  });
+  const tableData = useMemo(() => {
+    const mapped = rows.map((r: Record<string, unknown>, i: number) => {
+      const tot = Number(r.total || r.count || 0);
+      const p   = Number(r.pending  || 0);
+      const d   = Number(r.disposed || 0);
+      const u   = Number(r.unknown  || 0);
+      const rawName = String(
+        r.district || r.branch || r.mode || r.status ||
+        r.natureOfIncident || r.typeAgainst || r.actionTaken ||
+        r.complaintSource || r.typeOfComplaint || ''
+      );
+      const displayName =
+        type === 'status' && (!rawName || rawName.trim() === '')
+          ? 'Status Not Found'
+          : rawName || `Item ${i + 1}`;
+      return {
+        name:     displayName,
+        total:    tot,
+        pending:  p,
+        disposed: d,
+        unknown:  u,
+        pendPct:  tot > 0 ? Math.round((p / tot) * 100) + '%' : '0%',
+        dispPct:  tot > 0 ? Math.round((d / tot) * 100) + '%' : '0%',
+        unknPct:  tot > 0 ? Math.round((u / tot) * 100) + '%' : '0%',
+      };
+    });
+    return [...mapped].sort((a, b) => {
+      if (chartSort === 'az') return a.name.localeCompare(b.name);
+      if (chartSort === 'za') return b.name.localeCompare(a.name);
+      if (chartSort === 'pending')  return b.pending  - a.pending;
+      if (chartSort === 'disposed') return b.disposed - a.disposed;
+      return b.total - a.total; // default
+    });
+  }, [rows, type, chartSort]);
 
   const columns: Column<typeof tableData[0]>[] = [
     { key: 'name',     label: 'Name',                sortable: true },
@@ -93,25 +146,45 @@ export const ReportsPage = () => {
     { key: 'unknPct',  label: 'Status Not Found %',  sortable: true, align: 'center' },
   ];
 
-  const chartOption = (() => {
+  // Chart preview: top 25 sorted rows reversed so highest appears at the top of horizontal bar
+  const chartRows = tableData.slice(0, 25).reverse();
+
+  const chartOption = useMemo(() => {
     if (type === 'district' || type === 'branch-wise' || type === 'date-wise')
-      return getDistrictBarOptions(rows);
+      return getDistrictBarOptions(chartRows.map(d => ({ ...d, district: d.name })));
     if (type === 'mode-receipt' || type === 'status') {
-      return getPieOptions(rows.map((d: Record<string, unknown>) => ({
-        name: (() => {
-          const n = String(d.mode || d.status || '');
-          return type === 'status' && (!n || n.trim() === '') ? 'Unknown Status (No Value from API)' : n;
-        })(),
-        value: Number(d.count || d.total || 0),
+      return getPieOptions(chartRows.map(d => ({
+        name: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status (No Value from API)' : d.name,
+        value: d.total,
       })));
     }
-    return getStackedBarOptions(rows.map((d: Record<string, unknown>) => ({
-      category: String(d.natureOfIncident || d.typeAgainst || d.actionTaken || d.complaintSource || d.typeOfComplaint || ''),
-      total:    Number(d.total    || 0),
-      pending:  Number(d.pending  || 0),
-      disposed: Number(d.disposed || 0),
+    return getStackedBarOptions(chartRows.map(d => ({
+      category: d.name,
+      total:    d.total,
+      pending:  d.pending,
+      disposed: d.disposed,
+      unknown:  d.unknown,
     })));
-  })();
+  }, [chartRows, type]);
+
+  const fullChartOption = useMemo(() => {
+    const allRowsRev = [...tableData].reverse();
+    if (type === 'district' || type === 'branch-wise' || type === 'date-wise')
+      return getDistrictBarOptions(allRowsRev.map(d => ({ ...d, district: d.name })));
+    if (type === 'mode-receipt' || type === 'status') {
+      return getPieOptions(allRowsRev.map(d => ({
+        name: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status (No Value from API)' : d.name,
+        value: d.total,
+      })));
+    }
+    return getStackedBarOptions(allRowsRev.map(d => ({
+      category: d.name,
+      total:    d.total,
+      pending:  d.pending,
+      disposed: d.disposed,
+      unknown:  d.unknown,
+    })));
+  }, [tableData, type]);
 
   return (
     <Layout>
@@ -152,7 +225,14 @@ export const ReportsPage = () => {
             <ChartCard
               title={tabs.find(t => t.id === type)?.label || 'Report'}
               option={chartOption}
+              fullOption={fullChartOption}
               height="280px"
+              actions={
+                <ChartSortDropdown
+                  value={chartSort}
+                  onChange={v => setChartSort(v)}
+                />
+              }
             />
 
             <DataTable

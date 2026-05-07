@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -5,6 +6,46 @@ import { Layout } from '@/components/layout/Layout';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { getStackedBarOptions } from '@/components/charts/Charts';
 import { DataTable, Column } from '@/components/data/DataTable';
+
+// ─── Mini sort dropdown ─────────────────────────────────────────────────────
+const CAT_SORTS = [
+  { label: 'By Pending ↓',  value: 'pending'  },
+  { label: 'By Total ↓',    value: 'total'    },
+  { label: 'By Disposed ↓', value: 'disposed' },
+  { label: 'A → Z',         value: 'az'       },
+  { label: 'Z → A',         value: 'za'       },
+];
+const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
+  const cur = CAT_SORTS.find(o => o.value === value)?.label ?? 'Sort';
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(v => !v)} className="chart-expand-btn"
+        style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
+        </svg>{cur}
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 9999, minWidth: 180, padding: '4px 0' }}>
+          {CAT_SORTS.map(opt => (
+            <div key={opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{ padding: '7px 14px', fontSize: 12, cursor: 'pointer', color: value === opt.value ? '#60a5fa' : '#cbd5e1', fontWeight: value === opt.value ? 600 : 400, backgroundColor: value === opt.value ? 'rgba(51,65,85,0.6)' : 'transparent' }}
+              onMouseEnter={e => { if (value !== opt.value) (e.currentTarget as HTMLElement).style.backgroundColor = '#334155'; }}
+              onMouseLeave={e => { if (value !== opt.value) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+            >{opt.label}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const StatCard = ({ label, value, subValue, colorClass }: { label: string; value: string | number; subValue?: string; colorClass: string }) => (
   <div className={`stat-card ${colorClass}`}>
@@ -17,6 +58,7 @@ const StatCard = ({ label, value, subValue, colorClass }: { label: string; value
 export const DistrictDetail = () => {
   const { district } = useParams<{ district: string }>();
   const navigate = useNavigate();
+  const [catSort, setCatSort] = useState<string>('pending');
 
   const { data, isLoading } = useQuery({
     queryKey: ['district-analysis', district],
@@ -30,7 +72,16 @@ export const DistrictDetail = () => {
   });
 
   const policeStations = data?.data?.policeStations || [];
-  const categories = data?.data?.categories || [];
+  const rawCategories  = data?.data?.categories || [];
+
+  // Sort categories for the chart
+  const categories = [...rawCategories].sort((a: any, b: any) => {
+    if (catSort === 'az')       return String(a.category).localeCompare(String(b.category));
+    if (catSort === 'za')       return String(b.category).localeCompare(String(a.category));
+    if (catSort === 'total')    return b.total    - a.total;
+    if (catSort === 'disposed') return b.disposed - a.disposed;
+    return b.pending - a.pending; // default
+  });
   
   // Aggregates
   const totalReceived = policeStations.reduce((sum: number, ps: any) => sum + ps.total, 0);
@@ -366,8 +417,15 @@ export const DistrictDetail = () => {
               <div className="lg:col-span-1">
                 <ChartCard
                   title="Complaints by Class of Incident"
-                  option={getStackedBarOptions(categories.slice(0, 10))}
+                  option={getStackedBarOptions(categories.slice(0, 12).reverse())}
+                  fullOption={getStackedBarOptions([...categories].reverse())}
                   height="450px"
+                  actions={
+                    <CatSortDropdown
+                      value={catSort}
+                      onChange={v => setCatSort(v)}
+                    />
+                  }
                 />
               </div>
             </div>

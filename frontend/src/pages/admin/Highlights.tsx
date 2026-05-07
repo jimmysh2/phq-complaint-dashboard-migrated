@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Layout } from '@/components/layout/Layout';
 import { ChartCard } from '@/components/charts/ChartCard';
@@ -7,13 +7,131 @@ import { getDistrictBarOptions, getStackedBarOptions } from '@/components/charts
 import { dashboardApi } from '@/services/api';
 import { useFilters } from '@/contexts/FilterContext';
 
-const PREVIEW_COUNT = 5;
+// ─── Reusable Sort Dropdown ───────────────────────────────────────────────────
+
+type SortOption = { label: string; value: string };
+
+const SortDropdown = ({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  options: SortOption[];
+}) => {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const current = options.find(o => o.value === value)?.label ?? 'Sort';
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="chart-expand-btn"
+        title="Sort chart"
+        style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <line x1="4" y1="6" x2="20" y2="6" />
+          <line x1="8" y1="12" x2="16" y2="12" />
+          <line x1="10" y1="18" x2="14" y2="18" />
+        </svg>
+        {current}
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute',
+          top: '100%',
+          right: 0,
+          marginTop: 4,
+          backgroundColor: '#1e293b',
+          border: '1px solid #334155',
+          borderRadius: 6,
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          zIndex: 9999,
+          minWidth: 190,
+          padding: '4px 0',
+        }}>
+          {options.map(opt => (
+            <div
+              key={opt.value}
+              onClick={() => { onChange(opt.value); setOpen(false); }}
+              style={{
+                padding: '7px 14px',
+                fontSize: 12,
+                cursor: 'pointer',
+                color: value === opt.value ? '#60a5fa' : '#cbd5e1',
+                fontWeight: value === opt.value ? 600 : 400,
+                backgroundColor: value === opt.value ? 'rgba(51,65,85,0.6)' : 'transparent',
+              }}
+              onMouseEnter={e => { if (value !== opt.value) (e.currentTarget as HTMLElement).style.backgroundColor = '#334155'; }}
+              onMouseLeave={e => { if (value !== opt.value) (e.currentTarget as HTMLElement).style.backgroundColor = 'transparent'; }}
+            >
+              {opt.label}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Sort helpers ─────────────────────────────────────────────────────────────
+
+type SortKey = 'pending' | 'total' | 'disposed' | 'pendPct' | 'az' | 'za';
+
+function sortRows<T extends { pending: number; total: number; disposed: number; pendPct: number }>(
+  rows: (T & { district?: string; category?: string })[],
+  key: SortKey,
+): (T & { district?: string; category?: string })[] {
+  return [...rows].sort((a, b) => {
+    switch (key) {
+      case 'pending':  return b.pending  - a.pending;
+      case 'total':    return b.total    - a.total;
+      case 'disposed': return b.disposed - a.disposed;
+      case 'pendPct':  return b.pendPct  - a.pendPct;
+      case 'az': {
+        const la = String(a.district ?? a.category ?? '');
+        const lb = String(b.district ?? b.category ?? '');
+        return la.localeCompare(lb);
+      }
+      case 'za': {
+        const la = String(a.district ?? a.category ?? '');
+        const lb = String(b.district ?? b.category ?? '');
+        return lb.localeCompare(la);
+      }
+      default: return 0;
+    }
+  });
+}
+
+const SORT_OPTIONS: SortOption[] = [
+  { label: 'By Total ↓',   value: 'total'    },
+  { label: 'By Pending ↓',  value: 'pending'  },
+  { label: 'By Disposed ↓',value: 'disposed' },
+  { label: 'By Pend % ↓',  value: 'pendPct'  },
+  { label: 'A → Z',        value: 'az'       },
+  { label: 'Z → A',        value: 'za'       },
+];
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export const HotspotsPage = () => {
-  const [showAllDistricts, setShowAllDistricts] = useState(false);
-  const [showAllCategories, setShowAllCategories] = useState(false);
   const { filters } = useFilters();
   const activeFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''));
+
+  const [districtSort, setDistrictSort] = useState<SortKey>('total');
+  const [categorySort, setCategorySort] = useState<SortKey>('total');
 
   const { data: dd, isLoading: dl } = useQuery({
     queryKey: ['dashboard', 'district', activeFilters],
@@ -25,158 +143,163 @@ export const HotspotsPage = () => {
     queryFn: () => dashboardApi.categoryWise(activeFilters),
   });
 
-  const allDistrictRows = ((dd?.data || []) as any[]).map(r => ({
-    ...r,
-    pendPct: r.total > 0 ? (r.pending / r.total) * 100 : 0
-  }));
-  const allCategoryRows = ((cd?.data || []) as any[]).map(r => ({
-    ...r,
-    pendPct: r.total > 0 ? (r.pending / r.total) * 100 : 0
-  }));
+  // All rows enriched with pendPct
+  const rawDistrictRows = useMemo(
+    () =>
+      ((dd?.data || []) as any[]).map(r => ({
+        ...r,
+        pendPct: r.total > 0 ? Math.round((r.pending / r.total) * 100) : 0,
+      })),
+    [dd],
+  );
 
-  const districtRows = showAllDistricts ? allDistrictRows : allDistrictRows.slice(0, PREVIEW_COUNT);
-  const categoryRows = showAllCategories ? allCategoryRows : allCategoryRows.slice(0, PREVIEW_COUNT);
+  const rawCategoryRows = useMemo(
+    () =>
+      ((cd?.data || []) as any[]).map(r => ({
+        ...r,
+        pendPct: r.total > 0 ? Math.round((r.pending / r.total) * 100) : 0,
+      })),
+    [cd],
+  );
 
-  const districtCols: Column<typeof allDistrictRows[0]>[] = [
-    { key: 'district', label: 'District', sortable: true },
-    { key: 'total', label: 'Total', sortable: true, align: 'right' },
-    { key: 'pending', label: 'Pending', sortable: true, align: 'right' },
-    { key: 'disposed', label: 'Disposed', sortable: true, align: 'right' },
-    { key: 'pendPct', label: 'Pending %', sortable: true, align: 'center' },
+  // Sorted full datasets — used for both chart preview and table
+  const sortedDistrictRows = useMemo(
+    () => sortRows(rawDistrictRows, districtSort),
+    [rawDistrictRows, districtSort],
+  );
+
+  const sortedCategoryRows = useMemo(
+    () => sortRows(rawCategoryRows, categorySort),
+    [rawCategoryRows, categorySort],
+  );
+
+  // ── Column definitions ────────────────────────────────────────────────────
+
+  const districtCols: Column<any>[] = [
+    { key: 'district',  label: 'District',          sortable: true },
+    { key: 'total',     label: 'Total',              sortable: true, align: 'right' },
+    { key: 'pending',   label: 'Pending',            sortable: true, align: 'right' },
+    { key: 'disposed',  label: 'Disposed',           sortable: true, align: 'right' },
+    { key: 'pendPct',   label: 'Pending %',          sortable: true, align: 'center' },
   ];
 
-  const categoryCols: Column<typeof allCategoryRows[0]>[] = [
-    { key: 'category', label: 'Class of Incident', sortable: true },
-    { key: 'total', label: 'Total', sortable: true, align: 'right' },
-    { key: 'pending', label: 'Pending', sortable: true, align: 'right' },
-    { key: 'disposed', label: 'Disposed', sortable: true, align: 'right' },
-    { key: 'pendPct', label: 'Pending %', sortable: true, align: 'center' },
+  const categoryCols: Column<any>[] = [
+    { key: 'category',  label: 'Class of Incident',  sortable: true },
+    { key: 'total',     label: 'Total',              sortable: true, align: 'right' },
+    { key: 'pending',   label: 'Pending',            sortable: true, align: 'right' },
+    { key: 'disposed',  label: 'Disposed',           sortable: true, align: 'right' },
+    { key: 'pendPct',   label: 'Pending %',          sortable: true, align: 'center' },
   ];
 
-  const renderTableData = (c: any, row: any) => {
-    if (c.key === 'district' || c.key === 'category') return <span style={{ fontWeight: 500, fontSize: '13px' }}>{String(row[c.key])}</span>;
-    if (c.key === 'total') return <span style={{ fontWeight: 600 }}>{row.total.toLocaleString()}</span>;
-    if (c.key === 'pending') return <span style={{ color: '#fbbf24', fontWeight: 500 }}>{row.pending.toLocaleString()}</span>;
+  const renderDistrictRow = (c: Column<any>, row: any) => {
+    if (c.key === 'district') return <span style={{ fontWeight: 500, fontSize: '13px' }}>{String(row.district)}</span>;
+    if (c.key === 'total')    return <span style={{ fontWeight: 600 }}>{row.total.toLocaleString()}</span>;
+    if (c.key === 'pending')  return <span style={{ color: '#fbbf24', fontWeight: 500 }}>{row.pending.toLocaleString()}</span>;
     if (c.key === 'disposed') return <span style={{ color: '#34d399', fontWeight: 500 }}>{row.disposed.toLocaleString()}</span>;
-    if (c.key === 'pendPct') {
-      const pct = row.total > 0 ? Math.round((row.pending / row.total) * 100) + '%' : '0%';
-      return <span className="status-badge pending">{pct}</span>;
-    }
+    if (c.key === 'pendPct')  return <span className="status-badge pending">{row.pendPct}%</span>;
     return String(row[c.key] ?? '-');
   };
+
+  const renderCategoryRow = (c: Column<any>, row: any) => {
+    if (c.key === 'category') return <span style={{ fontWeight: 500, fontSize: '13px' }}>{String(row.category)}</span>;
+    if (c.key === 'total')    return <span style={{ fontWeight: 600 }}>{row.total.toLocaleString()}</span>;
+    if (c.key === 'pending')  return <span style={{ color: '#fbbf24', fontWeight: 500 }}>{row.pending.toLocaleString()}</span>;
+    if (c.key === 'disposed') return <span style={{ color: '#34d399', fontWeight: 500 }}>{row.disposed.toLocaleString()}</span>;
+    if (c.key === 'pendPct')  return <span className="status-badge pending">{row.pendPct}%</span>;
+    return String(row[c.key] ?? '-');
+  };
+
+  // Chart previews — top 25 of sorted, reversed so the bar chart reads highest at top
+  const districtChartData  = sortedDistrictRows.slice(0, 25).reverse();
+  const categoryChartData  = sortedCategoryRows.slice(0, 25).reverse();
 
   return (
     <Layout>
       <div className="page-content">
         {dl || cl ? (
-          <div className="loading-spinner"><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
+          <div className="loading-spinner">
+            <svg width="28" height="28" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+          </div>
         ) : (
           <>
-            {/* Charts Row */}
+            {/* ── Charts Row ─────────────────────────────────────────────────── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
               <ChartCard
                 title="District-wise Hotspots"
-                option={getDistrictBarOptions(allDistrictRows.slice(0, 10))}
+                option={getDistrictBarOptions(districtChartData)}
+                fullOption={getDistrictBarOptions([...sortedDistrictRows].reverse())}
                 height="320px"
+                actions={
+                  <SortDropdown
+                    value={districtSort}
+                    onChange={v => setDistrictSort(v as SortKey)}
+                    options={SORT_OPTIONS}
+                  />
+                }
               />
               <ChartCard
                 title="Class of Incident Hotspots"
-                option={getStackedBarOptions(allCategoryRows.slice(0, 10))}
+                option={getStackedBarOptions(categoryChartData)}
+                fullOption={getStackedBarOptions([...sortedCategoryRows].reverse())}
                 height="320px"
+                actions={
+                  <SortDropdown
+                    value={categorySort}
+                    onChange={v => setCategorySort(v as SortKey)}
+                    options={SORT_OPTIONS}
+                  />
+                }
               />
             </div>
 
-            {/* Side-by-side adaptive table grid */}
+            {/* ── Full Tables ────────────────────────────────────────────────── */}
             <div className="highlights-tables-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
 
-              {/* LEFT: District wise */}
+              {/* District table — ALL rows, DataTable handles sort/search/expand */}
               <div className="highlights-section">
                 <div className="highlights-section-header">
                   <div>
                     <h3 className="highlights-section-title">District-wise Hotspots</h3>
                     <span className="highlights-section-meta">
-                      {districtRows.length} of {allDistrictRows.length} shown
+                      {sortedDistrictRows.length} districts · sorted by{' '}
+                      {SORT_OPTIONS.find(o => o.value === districtSort)?.label}
                     </span>
                   </div>
-                  {allDistrictRows.length > PREVIEW_COUNT && (
-                    <button
-                      className={`show-all-btn ${showAllDistricts ? 'expanded' : ''}`}
-                      onClick={() => setShowAllDistricts(!showAllDistricts)}
-                    >
-                      <span>{showAllDistricts ? 'Less' : `All ${allDistrictRows.length}`}</span>
-                      <svg
-                        width="14" height="14" fill="none" viewBox="0 0 24 24"
-                        style={{ transition: 'transform 0.3s ease', transform: showAllDistricts ? 'rotate(180deg)' : 'none' }}
-                      >
-                        <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
                 </div>
-
-                <div
-                  className="highlights-table-wrapper"
-                  style={{
-                    maxHeight: showAllDistricts ? '620px' : `${PREVIEW_COUNT * 52 + 48}px`,
-                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    overflowY: showAllDistricts ? 'auto' : 'hidden',
-                  }}
-                >
-                  <DataTable
-                    title="District-wise Hotspots"
-                    data={districtRows}
-                    columns={districtCols.map(c => ({
-                      ...c,
-                      render: (row) => renderTableData(c, row),
-                    }))}
-                    maxHeight="none"
-                  />
-                </div>
+                <DataTable
+                  title="District-wise Hotspots"
+                  data={sortedDistrictRows}
+                  columns={districtCols.map(c => ({
+                    ...c,
+                    render: (row) => renderDistrictRow(c, row),
+                  }))}
+                  maxHeight="520px"
+                />
               </div>
 
-              {/* RIGHT: Class of incident wise */}
+              {/* Category table — ALL rows */}
               <div className="highlights-section">
                 <div className="highlights-section-header">
                   <div>
                     <h3 className="highlights-section-title">Class of Incident Hotspots</h3>
                     <span className="highlights-section-meta">
-                      {categoryRows.length} of {allCategoryRows.length} shown
+                      {sortedCategoryRows.length} categories · sorted by{' '}
+                      {SORT_OPTIONS.find(o => o.value === categorySort)?.label}
                     </span>
                   </div>
-                  {allCategoryRows.length > PREVIEW_COUNT && (
-                    <button
-                      className={`show-all-btn ${showAllCategories ? 'expanded' : ''}`}
-                      onClick={() => setShowAllCategories(!showAllCategories)}
-                    >
-                      <span>{showAllCategories ? 'Less' : `All ${allCategoryRows.length}`}</span>
-                      <svg
-                        width="14" height="14" fill="none" viewBox="0 0 24 24"
-                        style={{ transition: 'transform 0.3s ease', transform: showAllCategories ? 'rotate(180deg)' : 'none' }}
-                      >
-                        <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  )}
                 </div>
-
-                <div
-                  className="highlights-table-wrapper"
-                  style={{
-                    maxHeight: showAllCategories ? '620px' : `${PREVIEW_COUNT * 52 + 48}px`,
-                    transition: 'max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                    overflowY: showAllCategories ? 'auto' : 'hidden',
-                  }}
-                >
-                  <DataTable
-                    title="Class of Incident Hotspots"
-                    data={categoryRows}
-                    columns={categoryCols.map(c => ({
-                      ...c,
-                      render: (row) => renderTableData(c, row),
-                    }))}
-                    maxHeight="none"
-                  />
-                </div>
+                <DataTable
+                  title="Class of Incident Hotspots"
+                  data={sortedCategoryRows}
+                  columns={categoryCols.map(c => ({
+                    ...c,
+                    render: (row) => renderCategoryRow(c, row),
+                  }))}
+                  maxHeight="520px"
+                />
               </div>
 
             </div>

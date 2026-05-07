@@ -38,7 +38,20 @@ export const buildPrismaWhereClause = (query: any) => {
 
   const classOfIncident = parseCsv(query.classOfIncident);
   if (classOfIncident.length > 0) {
-    where.classOfIncident = { in: classOfIncident };
+    if (classOfIncident.includes('Unmapped')) {
+      const nonUnmapped = classOfIncident.filter(c => c !== 'Unmapped');
+      where.OR = where.OR || [];
+      where.OR.push({
+        OR: [
+          { classOfIncident: { in: nonUnmapped } },
+          { classOfIncident: null },
+          { classOfIncident: '' },
+          { classOfIncident: ' ' }
+        ]
+      });
+    } else {
+      where.classOfIncident = { in: classOfIncident };
+    }
   }
 
   const fromDate = query.from_date || query.fromDate;

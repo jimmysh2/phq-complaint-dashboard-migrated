@@ -31,6 +31,22 @@ const MultiSelectDropdown = ({
   disabled?: boolean;
   disabledHint?: string;
 }) => {
+  const [searchText, setSearchText] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input when dropdown opens; reset search when it closes
+  useEffect(() => {
+    if (isOpen) {
+      setSearchText('');
+      setTimeout(() => searchRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  const filteredItems = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return q ? items.filter(item => item.label.toLowerCase().includes(q)) : items;
+  }, [items, searchText]);
+
   const selectedLabels = items
     .filter((item) => selectedIds.includes(item.id))
     .map((item) => item.label);
@@ -78,59 +94,93 @@ const MultiSelectDropdown = ({
             borderRadius: '4px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
             zIndex: 9999,
-            maxHeight: '280px',
-            overflowY: 'auto',
-            minWidth: '180px',
+            minWidth: '220px',
           }}
         >
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '6px 10px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              color: '#e2e8f0',
-              borderBottom: '1px solid #1e293b',
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
-            onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-          >
-            <input type="checkbox" checked={selectedIds.length === 0} onChange={onAllClick} style={{ accentColor: '#3b82f6' }} />
-            {allLabel}
-          </label>
+          {/* ── Sticky search box ── */}
+          <div style={{
+            padding: '6px 8px',
+            borderBottom: '1px solid #1e293b',
+            position: 'sticky',
+            top: 0,
+            backgroundColor: '#0f172a',
+            zIndex: 1,
+          }}>
+            <input
+              ref={searchRef}
+              type="text"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Search..."
+              onMouseDown={(e) => e.stopPropagation()}
+              style={{
+                width: '100%',
+                padding: '4px 8px',
+                fontSize: '12px',
+                backgroundColor: '#1e293b',
+                border: '1px solid #334155',
+                borderRadius: '4px',
+                color: '#e2e8f0',
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+          </div>
 
-          {items.length === 0 ? (
-            <div style={{ padding: '10px', color: '#64748b', fontSize: '12px', textAlign: 'center' }}>
-              No options available
-            </div>
-          ) : (
-            items.map((item) => (
+          {/* ── Scrollable list ── */}
+          <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
+            {/* "All" option — only visible when no search is active */}
+            {!searchText && (
               <label
-                key={item.id}
                 style={{
                   display: 'flex',
                   alignItems: 'center',
                   gap: '8px',
-                  padding: '5px 10px',
+                  padding: '6px 10px',
                   cursor: 'pointer',
                   fontSize: '13px',
                   color: '#e2e8f0',
+                  borderBottom: '1px solid #1e293b',
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
                 onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
               >
-                <input
-                  type="checkbox"
-                  checked={selectedIds.includes(item.id)}
-                  onChange={() => onToggleItem(item.id)}
-                  style={{ accentColor: '#3b82f6' }}
-                />
-                {item.label}
+                <input type="checkbox" checked={selectedIds.length === 0} onChange={onAllClick} style={{ accentColor: '#3b82f6' }} />
+                {allLabel}
               </label>
-            ))
-          )}
+            )}
+
+            {filteredItems.length === 0 ? (
+              <div style={{ padding: '10px', color: '#64748b', fontSize: '12px', textAlign: 'center' }}>
+                No results for &ldquo;{searchText}&rdquo;
+              </div>
+            ) : (
+              filteredItems.map((item) => (
+                <label
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '5px 10px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    color: '#e2e8f0',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.includes(item.id)}
+                    onChange={() => onToggleItem(item.id)}
+                    style={{ accentColor: '#3b82f6' }}
+                  />
+                  {item.label}
+                </label>
+              ))
+            )}
+          </div>
         </div>
       )}
     </>
