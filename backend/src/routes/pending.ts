@@ -23,8 +23,8 @@ const PENDING_SELECT = {
 export const pendingRoutes = async (fastify: FastifyInstance) => {
   const handlePaginatedRequest = async (request: any, reply: any, baseWhere: any) => {
     const { page = '1', limit = '50', search = '' } = request.query;
-    const pageNum  = parseInt(page) || 1;
-    const limitNum = parseInt(limit) || 50;
+    const pageNum  = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(50000, Math.max(1, parseInt(limit) || 50));
     const skip = (pageNum - 1) * limitNum;
 
     let searchWhere = {};

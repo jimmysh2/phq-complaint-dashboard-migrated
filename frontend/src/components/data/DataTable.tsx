@@ -253,10 +253,12 @@ export function DataTable<T extends Record<string, unknown>>({
             i,
             {
               halign: (col.align as 'left' | 'center' | 'right' | undefined) || 'left',
-              cellWidth: 'auto',
+              // Use minimal cell widths if many columns, else auto
+              cellWidth: columns.length > 8 ? 'wrap' : 'auto',
             },
           ])
         ),
+        tableWidth: 'auto',
         didDrawPage: (hookData) => {
           drawHeader();
 

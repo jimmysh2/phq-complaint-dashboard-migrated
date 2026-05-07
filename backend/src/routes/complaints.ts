@@ -47,8 +47,8 @@ export const complaintRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const { page = '1', limit = '10', search = '' } = request.query as Record<string, string>;
     
-    const pageNum  = parseInt(page);
-    const limitNum = parseInt(limit);
+    const pageNum  = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(50000, Math.max(1, parseInt(limit) || 10));
     const skip = (pageNum - 1) * limitNum;
 
     // Merge global filter (district, station, office, classOfIncident, dates) with search

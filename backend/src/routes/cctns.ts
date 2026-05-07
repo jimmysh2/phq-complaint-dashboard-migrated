@@ -280,7 +280,8 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     } = request.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page, 10));
-    const limitNum = Math.min(500, Math.max(1, parseInt(limit, 10)));
+    // Allow up to 50,000 records for export requests; normal UI requests stay at ≤500
+    const limitNum = Math.min(50000, Math.max(1, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
     // Build where clause using AND so multiple filters never overwrite each other
