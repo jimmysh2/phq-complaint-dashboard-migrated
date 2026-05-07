@@ -960,78 +960,20 @@ export const CCTNSPage = () => {
               </div>
             ) : (
               <>
-                <div
-                  style={{
-                    marginBottom: 10,
-                    fontSize: 13,
-                    color: 'var(--text-muted)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 8,
-                  }}
-                >
-                  <span>
-                    Showing <strong>{syncedData.length}</strong> of{' '}
-                    <strong>{syncedPagination?.total || 0}</strong> records
-                    {syncedPagination && (
-                      <span>
-                        {' '}
-                        — Page {syncedPagination.page} of {syncedPagination.totalPages}
-                      </span>
-                    )}
-                  </span>
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <select
-                      value={limit}
-                      onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); }}
-                      className="form-input"
-                      style={{ width: 80, fontSize: 12 }}
-                    >
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
-                    <span style={{ fontSize: 12 }}>per page</span>
-                  </div>
-                </div>
-                <DataTable
-                  title="CCTNS Database Gateway"
-                  data={syncedData}
-                  columns={recordCols}
-                  maxHeight="calc(100vh - 400px)"
-                />
-                {/* Pagination controls */}
-                {syncedPagination && syncedPagination.totalPages > 1 && (
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'center',
-                      gap: 6,
-                      marginTop: 12,
-                      alignItems: 'center',
-                    }}
-                  >
-                    <Button
-                      variant="secondary"
-                      disabled={page <= 1}
-                      onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    >
-                      ← Prev
-                    </Button>
-                    <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                      Page {page} of {syncedPagination.totalPages}
-                    </span>
-                    <Button
-                      variant="secondary"
-                      disabled={page >= syncedPagination.totalPages}
-                      onClick={() => setPage((p) => Math.min(syncedPagination.totalPages, p + 1))}
-                    >
-                      Next →
-                    </Button>
-                  </div>
-                )}
+                  <DataTable
+                    title="CCTNS Database Gateway"
+                    data={syncedData}
+                    columns={recordCols}
+                    maxHeight="calc(100vh - 400px)"
+                    pagination={syncedPagination ? {
+                      page: syncedPagination.page,
+                      limit,
+                      total: syncedPagination.total,
+                      totalPages: syncedPagination.totalPages,
+                      onPageChange: setPage,
+                      onLimitChange: (l) => { setLimit(l); setPage(1); }
+                    } : undefined}
+                  />
               </>
             )}
           </>

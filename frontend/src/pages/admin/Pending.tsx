@@ -1,9 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
-import { DataTable, Column } from '@/components/data/DataTable';
-import { pendingApi } from '@/services/api';
+import { DataTable } from '@/components/data/DataTable';
 import { useFilters } from '@/contexts/FilterContext';
 
 const tabs = [
@@ -14,24 +13,24 @@ const tabs = [
   { id: 'branch',   label: 'By Branch' },
 ];
 
-const pendingApiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>> = {
-  'all':      (p) => pendingApi.all(p),
-  '15-30':    (p) => pendingApi.fifteenToThirty(p),
-  '30-60':    (p) => pendingApi.thirtyToSixty(p),
-  'over-60':  (p) => pendingApi.overSixty(p),
-};
 
 export const PendingPage = () => {
   const [sp] = useSearchParams();
   const type = sp.get('type') || 'all';
-  const [branch, setBranch] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
+  const [search, setSearch] = useState('');
   const [branches, setBranches] = useState<string[]>([]);
+  const [branch, setBranch] = useState<string>('');
 
   // Same pattern as Dashboard
   const { filters } = useFilters();
   const activeFilters = Object.fromEntries(
     Object.entries(filters).filter(([_, v]) => v !== '')
   ) as Record<string, string>;
+
+  // Reset page when tab changes
+  useEffect(() => { setPage(1); }, [type, branch]);
 
   const { data: branchesData } = useQuery({
     queryKey: ['pending', 'branches'],
@@ -47,33 +46,46 @@ export const PendingPage = () => {
   }, [branchesData]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['pending', type, branch, activeFilters],  // re-fetches on filter change
+    queryKey: ['pending', type, branch, page, limit, search, activeFilters],  // re-fetches on filter change
     queryFn: async () => {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: String(limit),
+        search,
+        ...activeFilters,
+      });
+
       if (type === 'branch' && branch) {
         const r = await fetch(
-          `/api/pending/branch/${encodeURIComponent(branch)}`,
+          `/api/pending/branch/${encodeURIComponent(branch)}?${params}`,
+          { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
+        );
+        return r.json();
+      } else if (type !== 'branch') {
+        const r = await fetch(
+          `/api/pending/${type}?${params}`,
           { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }
         );
         return r.json();
       }
-      const fn = pendingApiFnMap[type] || pendingApiFnMap['all'];
-      return fn(activeFilters);
+      return { data: [], pagination: null };
     },
+    enabled: type !== 'branch' || !!branch,
   });
 
-  const rows = (data?.data || []) as Record<string, unknown>[];
-  const total = rows.length;
+  const rows = (data?.data?.data || data?.data || []) as Record<string, unknown>[];
+  const pagination = data?.data?.pagination || data?.pagination;
 
-  const tableData = rows.map(r => ({
+  const tableData = useMemo(() => rows.map(r => ({
     regNum:   r.complRegNum || '-',
-    district: r.addressDistrict || '-',
+    district: r.districtName || r.addressDistrict || '-',
     name:     `${r.firstName || ''} ${r.lastName || ''}`.trim() || '-',
     mobile:   r.mobile || '-',
     date:     r.complRegDt ? new Date(String(r.complRegDt)).toLocaleDateString() : '-',
     status:   'Pending',
-  }));
+  })), [rows]);
 
-  const cols: Column<typeof tableData[0]>[] = [
+  const cols = [
     { key: 'regNum',   label: 'Reg. No.',  sortable: true },
     { key: 'district', label: 'District',  sortable: true },
     { key: 'name',     label: 'Name',      sortable: true },
@@ -91,11 +103,17 @@ export const PendingPage = () => {
               <Link key={t.id} to={`?type=${t.id}`} className={`tab-item ${type === t.id ? 'active' : ''}`}>{t.label}</Link>
             ))}
           </div>
-          <span style={{ fontSize: '12px', color: '#fbbf24', fontWeight: 600 }}>{total} records</span>
         </div>
 
-        {type === 'branch' && (
-          <div style={{ marginBottom: '16px' }}>
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '16px', alignItems: 'center' }}>
+          <input
+            className="search-input"
+            placeholder="Search pending complaints..."
+            value={search}
+            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            style={{ maxWidth: '280px' }}
+          />
+          {type === 'branch' && (
             <select
               value={branch}
               onChange={e => setBranch(e.target.value)}
@@ -107,8 +125,8 @@ export const PendingPage = () => {
                 <option key={b} value={b}>{b}</option>
               ))}
             </select>
-          </div>
-        )}
+          )}
+        </div>
 
         {isLoading ? (
           <div className="loading-spinner"><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
@@ -127,6 +145,14 @@ export const PendingPage = () => {
               },
             }))}
             maxHeight="calc(100vh - 160px)"
+            pagination={pagination ? {
+              page: pagination.page,
+              limit,
+              total: pagination.total,
+              totalPages: pagination.totalPages,
+              onPageChange: setPage,
+              onLimitChange: (l) => { setLimit(l); setPage(1); }
+            } : undefined}
           />
         )}
       </div>

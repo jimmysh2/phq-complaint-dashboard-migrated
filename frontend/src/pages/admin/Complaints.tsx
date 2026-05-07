@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx';
 export const ComplaintsPage = () => {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(50);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Same pattern as Dashboard — global filters drive the data
@@ -19,11 +20,11 @@ export const ComplaintsPage = () => {
   ) as Record<string, string>;
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['complaints', page, search, activeFilters],   // re-fetches on any filter change
+    queryKey: ['complaints', page, limit, search, activeFilters],   // re-fetches on any filter change
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
-        limit: '50',
+        limit: String(limit),
         search,
         ...activeFilters,          // district, station, office, classOfIncident, fromDate, toDate
       });
@@ -36,19 +37,9 @@ export const ComplaintsPage = () => {
 
   // Reset to page 1 whenever filters change
   const complaints  = data?.data?.data || [];
-  const pagination  = data?.data?.pagination;
+  const pagination  = data?.data?.pagination || data?.pagination;
 
-  const handleExport = async () => {
-    const params = new URLSearchParams({ ...activeFilters, search });
-    const r = await fetch(`/api/export/complaints?${params}`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-    });
-    const blob = await r.blob();
-    const url  = window.URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = 'complaints.xlsx'; a.click();
-    window.URL.revokeObjectURL(url);
-  };
+  // Export is handled by DataTable component
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -105,7 +96,7 @@ export const ComplaintsPage = () => {
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
             <input type="file" ref={fileInputRef} onChange={handleImport} accept=".xlsx,.xls" className="hidden" />
             <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>Import</Button>
-            <Button variant="secondary" onClick={handleExport}>Export</Button>
+            {/* The export button in header can stay or be removed since we have one in table now */}
             <Link to="/admin/complaints/add"><Button>Add</Button></Link>
           </div>
         </div>
@@ -115,36 +106,33 @@ export const ComplaintsPage = () => {
         ) : tableData.length === 0 ? (
           <div className="empty-state"><p>No complaints found</p></div>
         ) : (
-          <>
-            <DataTable
-              title="All Complaints"
-              data={tableData}
-              columns={cols.map(c => ({
-                ...c,
-                render: (row) => {
-                  if (c.key === 'regNum') return <span style={{ fontWeight: 500 }}>{String(row.regNum)}</span>;
-                  if (c.key === 'status') {
-                    const d = String(row.status).toLowerCase().includes('disposed');
-                    return <span className={`status-badge ${d ? 'disposed' : 'pending'}`}>{String(row.status)}</span>;
-                  }
-                  if (c.key === 'action') {
-                    return <Link to={`/admin/complaints/${row.id}`} style={{ color: '#a5b4fc', textDecoration: 'none', fontWeight: 500 }}>View</Link>;
-                  }
-                  return String(row[c.key as keyof typeof row] ?? '-');
-                },
-              }))}
-              maxHeight="calc(100vh - 160px)"
-            />
-            {pagination && (
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', padding: '10px' }}>
-                <Button variant="secondary" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
-                <span style={{ color: 'var(--text-muted)', fontSize: '12px', alignSelf: 'center' }}>
-                  {pagination.page} / {pagination.totalPages} ({pagination.total.toLocaleString()} total)
-                </span>
-                <Button variant="secondary" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= pagination.totalPages}>Next</Button>
-              </div>
-            )}
-          </>
+          <DataTable
+            title="All Complaints"
+            data={tableData}
+            columns={cols.map(c => ({
+              ...c,
+              render: (row) => {
+                if (c.key === 'regNum') return <span style={{ fontWeight: 500 }}>{String(row.regNum)}</span>;
+                if (c.key === 'status') {
+                  const d = String(row.status).toLowerCase().includes('disposed');
+                  return <span className={`status-badge ${d ? 'disposed' : 'pending'}`}>{String(row.status)}</span>;
+                }
+                if (c.key === 'action') {
+                  return <Link to={`/admin/complaints/${row.id}`} style={{ color: '#a5b4fc', textDecoration: 'none', fontWeight: 500 }}>View</Link>;
+                }
+                return String(row[c.key as keyof typeof row] ?? '-');
+              },
+            }))}
+            maxHeight="calc(100vh - 160px)"
+            pagination={pagination ? {
+              page: pagination.page,
+              limit,
+              total: pagination.total,
+              totalPages: pagination.totalPages,
+              onPageChange: setPage,
+              onLimitChange: (l) => { setLimit(l); setPage(1); }
+            } : undefined}
+          />
         )}
       </div>
     </Layout>

@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import * as XLSX from 'xlsx';
 
 export interface Column<T> {
   key: string;
@@ -10,12 +11,22 @@ export interface Column<T> {
   align?: 'left' | 'center' | 'right';
 }
 
+export interface PaginationProps {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onLimitChange: (limit: number) => void;
+}
+
 interface Props<T> {
   data: T[];
   columns: Column<T>[];
   maxHeight?: string;
   onRowClick?: (row: T) => void;
   title?: string;
+  pagination?: PaginationProps;
 }
 
 export function DataTable<T extends Record<string, unknown>>({
@@ -24,6 +35,7 @@ export function DataTable<T extends Record<string, unknown>>({
   maxHeight = 'calc(100vh - 220px)',
   onRowClick,
   title = 'Data View',
+  pagination,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
@@ -54,77 +66,148 @@ export function DataTable<T extends Record<string, unknown>>({
     });
   }, [filteredData, sortKey, sortDir]);
 
+  const handleExportExcel = () => {
+    const exportData = sorted.map(row => {
+      const obj: any = {};
+      columns.forEach(col => {
+        obj[col.label] = row[col.key as keyof typeof row] ?? '-';
+      });
+      return obj;
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportData), 'Export');
+    XLSX.writeFile(wb, `${title.replace(/\s+/g, '_')}_Export.xlsx`);
+  };
+
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   const renderTable = (isExpanded: boolean) => (
-    <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: isExpanded ? 'calc(100vh - 100px)' : maxHeight }}>
-      <table className="data-table" style={isExpanded ? { fontSize: '15px' } : undefined}>
-        <thead>
-          <tr>
-            {columns.map((col, colIdx) => (
-              <th
-                key={col.key}
-                style={{ 
-                  width: col.width, 
-                  cursor: col.sortable ? 'pointer' : 'default', 
-                  textAlign: col.align,
-                  fontSize: isExpanded ? '13px' : undefined,
-                  padding: isExpanded ? '18px 24px' : undefined,
-                  // Freeze first column
-                  ...(colIdx === 0 ? {
-                    position: 'sticky',
-                    left: 0,
-                    zIndex: 20,
-                    background: '#0f172a',
-                    boxShadow: '2px 0 6px rgba(0,0,0,0.4)',
-                  } : {}),
-                }}
-                onClick={() => col.sortable && handleSort(col.key)}
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+      {/* Top Header Controls (Export & Pagination) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={handleExportExcel} style={{ padding: '6px 12px', fontSize: '12px', background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            Excel
+          </button>
+          <button onClick={handleExportPDF} style={{ padding: '6px 12px', fontSize: '12px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
+            PDF
+          </button>
+        </div>
+        
+        {pagination && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Records per page:</span>
+              <select 
+                value={pagination.limit} 
+                onChange={(e) => pagination.onLimitChange(Number(e.target.value))}
+                style={{ background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border)', borderRadius: '4px', padding: '4px 6px', fontSize: '12px', outline: 'none' }}
               >
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                  {col.label}
-                  {col.sortable && (
-                    <span style={{ fontSize: '9px', opacity: sortKey === col.key ? 1 : 0.3 }}>
-                      {sortKey === col.key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-                    </span>
-                  )}
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {sorted.length > 0 ? (
-            sorted.map((row, i) => (
-              <tr key={i} onClick={() => onRowClick?.(row)} style={{ cursor: onRowClick ? 'pointer' : 'default' }}>
-                {columns.map((col, colIdx) => (
-                  <td 
-                    key={col.key} 
-                    style={{ 
-                      textAlign: col.align, 
-                      padding: isExpanded ? '18px 24px' : undefined,
-                      // Freeze first column
-                      ...(colIdx === 0 ? {
-                        position: 'sticky',
-                        left: 0,
-                        zIndex: 10,
-                        background: 'var(--bg-card)',
-                        boxShadow: '2px 0 6px rgba(0,0,0,0.3)',
-                      } : {}),
-                    }}
-                  >
-                    {col.render ? col.render(row) : String(row[col.key] ?? '-')}
-                  </td>
-                ))}
-              </tr>
-            ))
-          ) : (
+                <option value={20} style={{ background: 'var(--bg-card)', color: '#fff' }}>20</option>
+                <option value={50} style={{ background: 'var(--bg-card)', color: '#fff' }}>50</option>
+                <option value={100} style={{ background: 'var(--bg-card)', color: '#fff' }}>100</option>
+              </select>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Page <strong style={{ color: '#fff' }}>{pagination.page}</strong> of <strong style={{ color: '#fff' }}>{pagination.totalPages}</strong> (Total: {pagination.total})
+              </span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <button 
+                  disabled={pagination.page <= 1} 
+                  onClick={() => pagination.onPageChange(pagination.page - 1)} 
+                  style={{ padding: '4px 8px', background: pagination.page <= 1 ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)', color: pagination.page <= 1 ? 'var(--text-muted)' : '#fff', border: '1px solid var(--border)', borderRadius: '4px', cursor: pagination.page <= 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  &larr;
+                </button>
+                <button 
+                  disabled={pagination.page >= pagination.totalPages} 
+                  onClick={() => pagination.onPageChange(pagination.page + 1)} 
+                  style={{ padding: '4px 8px', background: pagination.page >= pagination.totalPages ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.1)', color: pagination.page >= pagination.totalPages ? 'var(--text-muted)' : '#fff', border: '1px solid var(--border)', borderRadius: '4px', cursor: pagination.page >= pagination.totalPages ? 'not-allowed' : 'pointer' }}
+                >
+                  &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: isExpanded ? 'calc(100vh - 160px)' : maxHeight }}>
+        <table className="data-table" style={isExpanded ? { fontSize: '15px' } : undefined}>
+          <thead>
             <tr>
-              <td colSpan={columns.length} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
-                No records found.
-              </td>
+              {columns.map((col, colIdx) => (
+                <th
+                  key={col.key}
+                  style={{ 
+                    width: col.width, 
+                    cursor: col.sortable ? 'pointer' : 'default', 
+                    textAlign: col.align,
+                    fontSize: isExpanded ? '13px' : undefined,
+                    padding: isExpanded ? '18px 24px' : undefined,
+                    // Freeze first column
+                    ...(colIdx === 0 ? {
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 20,
+                      background: '#0f172a',
+                      boxShadow: '2px 0 6px rgba(0,0,0,0.4)',
+                    } : {}),
+                  }}
+                  onClick={() => col.sortable && handleSort(col.key)}
+                >
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                    {col.label}
+                    {col.sortable && (
+                      <span style={{ fontSize: '9px', opacity: sortKey === col.key ? 1 : 0.3 }}>
+                        {sortKey === col.key ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+                      </span>
+                    )}
+                  </span>
+                </th>
+              ))}
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {sorted.length > 0 ? (
+              sorted.map((row, i) => (
+                <tr key={i} onClick={() => onRowClick?.(row)} style={{ cursor: onRowClick ? 'pointer' : 'default' }}>
+                  {columns.map((col, colIdx) => (
+                    <td 
+                      key={col.key} 
+                      style={{ 
+                        textAlign: col.align, 
+                        padding: isExpanded ? '18px 24px' : undefined,
+                        // Freeze first column
+                        ...(colIdx === 0 ? {
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 10,
+                          background: '#132035',
+                          boxShadow: '2px 0 6px rgba(0,0,0,0.3)',
+                        } : {}),
+                      }}
+                    >
+                      {col.render ? col.render(row) : String(row[col.key] ?? '-')}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={columns.length} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                  No records found.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 
