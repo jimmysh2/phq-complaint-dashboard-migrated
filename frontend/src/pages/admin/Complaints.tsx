@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
@@ -124,6 +124,21 @@ export const ComplaintsPage = () => {
               },
             }))}
             maxHeight="calc(100vh - 160px)"
+            activeFilters={{ ...(search ? { search } : {}), ...activeFilters }}
+            onFetchAllForExport={useCallback(async () => {
+              const params = new URLSearchParams({ page: '1', limit: String(pagination?.total || 9999), search, ...activeFilters });
+              const r = await fetch(`/api/complaints?${params}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+              const json = await r.json();
+              const allRows = (json?.data?.data || json?.data || []) as Record<string, unknown>[];
+              return allRows.map((c) => ({
+                regNum:   c.complRegNum || '-',
+                district: (c.district as Record<string, unknown>)?.name || c.addressDistrict || '-',
+                name:     `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+                mobile:   c.mobile || '-',
+                date:     c.complRegDt ? new Date(String(c.complRegDt)).toLocaleDateString() : '-',
+                status:   c.statusOfComplaint || 'Pending',
+              }));
+            }, [search, activeFilters, pagination?.total])}
             pagination={pagination ? {
               page: pagination.page,
               limit,

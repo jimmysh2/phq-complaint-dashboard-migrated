@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { DataTable } from '@/components/data/DataTable';
@@ -134,7 +134,7 @@ export const PendingPage = () => {
           <div className="empty-state"><p>No pending complaints</p></div>
         ) : (
           <DataTable
-            title="Pending Complaints"
+            title={`Pending Complaints - ${tabs.find(t => t.id === type)?.label || type}`}
             data={tableData}
             columns={cols.map(c => ({
               ...c,
@@ -145,6 +145,24 @@ export const PendingPage = () => {
               },
             }))}
             maxHeight="calc(100vh - 160px)"
+            activeFilters={{ tab: type, ...(search ? { search } : {}), ...(branch ? { branch } : {}), ...activeFilters }}
+            onFetchAllForExport={useCallback(async () => {
+              const params = new URLSearchParams({ page: '1', limit: String(pagination?.total || 9999), search, ...activeFilters });
+              const url = type === 'branch' && branch
+                ? `/api/pending/branch/${encodeURIComponent(branch)}?${params}`
+                : `/api/pending/${type}?${params}`;
+              const r = await fetch(url, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+              const json = await r.json();
+              const allRows = (json?.data?.data || json?.data || []) as Record<string, unknown>[];
+              return allRows.map(row => ({
+                regNum:   row.complRegNum || '-',
+                district: row.districtName || row.addressDistrict || '-',
+                name:     `${row.firstName || ''} ${row.lastName || ''}`.trim() || '-',
+                mobile:   row.mobile || '-',
+                date:     row.complRegDt ? new Date(String(row.complRegDt)).toLocaleDateString() : '-',
+                status:   'Pending',
+              }));
+            }, [type, branch, search, activeFilters, pagination?.total])}
             pagination={pagination ? {
               page: pagination.page,
               limit,
