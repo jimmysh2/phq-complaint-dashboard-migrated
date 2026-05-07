@@ -20,13 +20,13 @@ export const ComplaintsPage = () => {
   ) as Record<string, string>;
 
   const { data, isLoading, refetch } = useQuery({
-    queryKey: ['complaints', page, limit, search, activeFilters],   // re-fetches on any filter change
+    queryKey: ['complaints', page, limit, search, activeFilters],
     queryFn: async () => {
       const params = new URLSearchParams({
         page: String(page),
         limit: String(limit),
         search,
-        ...activeFilters,          // district, station, office, classOfIncident, fromDate, toDate
+        ...activeFilters,
       });
       const r = await fetch(`/api/complaints?${params}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
@@ -35,11 +35,8 @@ export const ComplaintsPage = () => {
     },
   });
 
-  // Reset to page 1 whenever filters change
   const complaints  = data?.data?.data || [];
   const pagination  = data?.data?.pagination || data?.pagination;
-
-  // Export is handled by DataTable component
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -82,6 +79,35 @@ export const ComplaintsPage = () => {
     { key: 'action',   label: 'Action',    width: '60px' },
   ];
 
+  // ── Top-level hook: fetch ALL complaints for export ───────────────────────
+  const fetchAllComplaintsForExport = useCallback(async () => {
+    const params = new URLSearchParams({
+      page: '1',
+      limit: String(pagination?.total || 9999),
+      search,
+      ...activeFilters,
+    });
+    const r = await fetch(`/api/complaints?${params}`, {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+    });
+    const json = await r.json();
+    const allRows = (json?.data?.data || json?.data || []) as Record<string, unknown>[];
+    return allRows.map((c) => ({
+      regNum:   c.complRegNum || '-',
+      district: (c.district as Record<string, unknown>)?.name || c.addressDistrict || '-',
+      name:     `${c.firstName || ''} ${c.lastName || ''}`.trim(),
+      mobile:   c.mobile || '-',
+      date:     c.complRegDt ? new Date(String(c.complRegDt)).toLocaleDateString() : '-',
+      status:   c.statusOfComplaint || 'Pending',
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, JSON.stringify(activeFilters), pagination?.total]);
+
+  const complaintsExportFilters = {
+    ...(search ? { search } : {}),
+    ...activeFilters,
+  };
+
   return (
     <Layout>
       <div className="page-content">
@@ -96,7 +122,6 @@ export const ComplaintsPage = () => {
           <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
             <input type="file" ref={fileInputRef} onChange={handleImport} accept=".xlsx,.xls" className="hidden" />
             <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>Import</Button>
-            {/* The export button in header can stay or be removed since we have one in table now */}
             <Link to="/admin/complaints/add"><Button>Add</Button></Link>
           </div>
         </div>
@@ -124,21 +149,8 @@ export const ComplaintsPage = () => {
               },
             }))}
             maxHeight="calc(100vh - 160px)"
-            activeFilters={{ ...(search ? { search } : {}), ...activeFilters }}
-            onFetchAllForExport={useCallback(async () => {
-              const params = new URLSearchParams({ page: '1', limit: String(pagination?.total || 9999), search, ...activeFilters });
-              const r = await fetch(`/api/complaints?${params}`, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
-              const json = await r.json();
-              const allRows = (json?.data?.data || json?.data || []) as Record<string, unknown>[];
-              return allRows.map((c) => ({
-                regNum:   c.complRegNum || '-',
-                district: (c.district as Record<string, unknown>)?.name || c.addressDistrict || '-',
-                name:     `${c.firstName || ''} ${c.lastName || ''}`.trim(),
-                mobile:   c.mobile || '-',
-                date:     c.complRegDt ? new Date(String(c.complRegDt)).toLocaleDateString() : '-',
-                status:   c.statusOfComplaint || 'Pending',
-              }));
-            }, [search, activeFilters, pagination?.total])}
+            activeFilters={complaintsExportFilters}
+            onFetchAllForExport={fetchAllComplaintsForExport}
             pagination={pagination ? {
               page: pagination.page,
               limit,

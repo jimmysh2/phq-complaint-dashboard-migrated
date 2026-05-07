@@ -249,6 +249,33 @@ export const CCTNSPage = () => {
 
   const isFetching = fetchMutation.isPending || !!activeJobId;
 
+  // —— Export: fetch all records (no pagination limit) for Excel/PDF export ——
+  const fetchAllCctnsForExport = useCallback(async () => {
+    const allData = await cctnsApi.listPaginated({
+      page: 1,
+      limit: syncedPagination?.total || 9999,
+      search: searchQuery || undefined,
+      district: filterDistrict || undefined,
+      statusGroup: filterStatus || undefined,
+      isDisposedMissingDate: filterMissingDateOnly ? 'true' : undefined,
+      dateFrom: filterDateFrom || undefined,
+      dateTo: filterDateTo || undefined,
+      sortBy,
+      sortOrder,
+    });
+    return (allData.data?.data || []) as Record<string, unknown>[];
+  }, [searchQuery, filterDistrict, filterStatus, filterMissingDateOnly, filterDateFrom, filterDateTo, sortBy, sortOrder, syncedPagination?.total]);
+
+  const cctnsActiveFilters = {
+    ...(searchQuery ? { search: searchQuery } : {}),
+    ...(filterDistrict ? { district: filterDistrict } : {}),
+    ...(filterStatus ? { status: filterStatus } : {}),
+    ...(filterDateFrom ? { from: filterDateFrom } : {}),
+    ...(filterDateTo ? { to: filterDateTo } : {}),
+    ...(filterMissingDateOnly ? { missingDate: 'yes' } : {}),
+  };
+
+
   // —— Table columns — ALL complaint fields ——
   const fmtDate = (val: any) => {
     if (!val) return '—';
@@ -965,29 +992,8 @@ export const CCTNSPage = () => {
                     data={syncedData}
                     columns={recordCols}
                     maxHeight="calc(100vh - 400px)"
-                    activeFilters={{
-                      ...(searchQuery ? { search: searchQuery } : {}),
-                      ...(filterDistrict ? { district: filterDistrict } : {}),
-                      ...(filterStatus ? { status: filterStatus } : {}),
-                      ...(filterDateFrom ? { from: filterDateFrom } : {}),
-                      ...(filterDateTo ? { to: filterDateTo } : {}),
-                      ...(filterMissingDateOnly ? { missingDate: 'yes' } : {}),
-                    }}
-                    onFetchAllForExport={useCallback(async () => {
-                      const allData = await cctnsApi.listPaginated({
-                        page: 1,
-                        limit: syncedPagination?.total || 9999,
-                        search: searchQuery || undefined,
-                        district: filterDistrict || undefined,
-                        statusGroup: filterStatus || undefined,
-                        isDisposedMissingDate: filterMissingDateOnly ? 'true' : undefined,
-                        dateFrom: filterDateFrom || undefined,
-                        dateTo: filterDateTo || undefined,
-                        sortBy,
-                        sortOrder,
-                      });
-                      return (allData.data?.data || []) as Record<string, unknown>[];
-                    }, [searchQuery, filterDistrict, filterStatus, filterMissingDateOnly, filterDateFrom, filterDateTo, sortBy, sortOrder, syncedPagination?.total])}
+                    activeFilters={cctnsActiveFilters}
+                    onFetchAllForExport={fetchAllCctnsForExport}
                     pagination={syncedPagination ? {
                       page: syncedPagination.page,
                       limit,
