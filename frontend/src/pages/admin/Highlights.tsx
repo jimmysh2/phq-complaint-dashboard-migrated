@@ -226,7 +226,7 @@ export const HotspotsPage = () => {
         ) : (
           <>
             {/* ── Charts Row ─────────────────────────────────────────────────── */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+            <div className="charts-grid" style={{ gap: '16px', marginBottom: '24px' }}>
               <ChartCard
                 title="District-wise Hotspots"
                 option={getDistrictBarOptions(districtChartData)}
@@ -256,7 +256,7 @@ export const HotspotsPage = () => {
             </div>
 
             {/* ── Full Tables ────────────────────────────────────────────────── */}
-            <div className="highlights-tables-grid" style={{ gridTemplateColumns: '1fr 1fr' }}>
+            <div className="highlights-tables-grid">
 
               {/* District table — ALL rows, DataTable handles sort/search/expand */}
               <div className="highlights-section">

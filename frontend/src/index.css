@@ -1188,8 +1188,7 @@ body {
 /* Side-by-side adaptive grid for Highlights tables */
 .highlights-tables-grid {
   display: grid;
-  /* Left (narrow: 3 cols) gets roughly 38%, Right (wide: 6 cols) gets roughly 62% */
-  grid-template-columns: 7fr 11fr;
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   align-items: start; /* each card sizes to its own content */
 }
