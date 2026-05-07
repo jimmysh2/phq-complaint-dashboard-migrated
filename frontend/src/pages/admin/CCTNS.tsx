@@ -63,9 +63,17 @@ export const CCTNSPage = () => {
   const [timeFrom, setTimeFrom] = useState(thirtyDaysAgoIsoStr());
   const [timeTo, setTimeTo] = useState(todayIsoStr());
 
-  // Sync job state
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  // Sync job state (persist in localStorage so navigation doesn't kill it)
+  const [activeJobId, setActiveJobId] = useState<string | null>(() => localStorage.getItem('cctnsActiveJobId'));
   const [jobStatus, setJobStatus] = useState<string>('');
+  
+  useEffect(() => {
+    if (activeJobId) {
+      localStorage.setItem('cctnsActiveJobId', activeJobId);
+    } else {
+      localStorage.removeItem('cctnsActiveJobId');
+    }
+  }, [activeJobId]);
   const pollRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Synced records filters
@@ -666,6 +674,68 @@ export const CCTNSPage = () => {
           </div>
         )}
 
+        {/* —— Global Job Status / Progress Bar —— */}
+        {activeJobId && (
+          <div
+            style={{
+              marginBottom: 16,
+              padding: '12px 16px',
+              borderRadius: 8,
+              background:
+                jobStatus === 'success'
+                  ? 'rgba(34,197,94,0.1)'
+                  : jobStatus === 'error'
+                  ? 'rgba(239,68,68,0.1)'
+                  : 'rgba(59,130,246,0.1)',
+              border: `1px solid ${
+                jobStatus === 'success'
+                  ? 'rgba(34,197,94,0.3)'
+                  : jobStatus === 'error'
+                  ? 'rgba(239,68,68,0.3)'
+                  : 'rgba(59,130,246,0.3)'
+              }`,
+              fontSize: 13,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+              <strong>
+                {jobStatus === 'pending' && 'Starting sync job...'}
+                {jobStatus === 'running' &&
+                  `Syncing: ${jobQuery.data?.data?.progress || 'Processing...'}`}
+                {jobStatus === 'success' && 'Sync completed successfully'}
+                {jobStatus === 'error' && `Sync failed: ${jobQuery.data?.data?.error || 'Unknown error'}`}
+              </strong>
+              {jobQuery.data?.data?.result && (
+                <span style={{ color: 'var(--text-muted)' }}>
+                  Fetched: {jobQuery.data.data.result.fetched} | Unique:{' '}
+                  {jobQuery.data.data.result.uniqueComplaints} | Saved:{' '}
+                  {jobQuery.data.data.result.created + jobQuery.data.data.result.updated} | Errors:{' '}
+                  {jobQuery.data.data.result.errors}
+                </span>
+              )}
+            </div>
+            
+            {/* Progress Bar */}
+            {(jobStatus === 'pending' || jobStatus === 'running') && (
+              <div style={{ width: '100%', background: 'rgba(0,0,0,0.1)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                <div 
+                  style={{ 
+                    height: '100%', 
+                    background: '#3b82f6', 
+                    width: `${jobQuery.data?.data?.progressPercentage || 0}%`,
+                    transition: 'width 0.3s ease-in-out'
+                  }} 
+                />
+              </div>
+            )}
+            {jobStatus === 'success' && (
+              <div style={{ width: '100%', background: 'rgba(0,0,0,0.1)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: '#22c55e', width: '100%' }} />
+              </div>
+            )}
+          </div>
+        )}
+
         {/* —— Live Tab: Date Range + Fetch Button + Latest Records —— */}
         {isConfigured && activeTab === 'live' && (
           <>
@@ -743,47 +813,6 @@ export const CCTNSPage = () => {
                 >
                   Dismiss
                 </button>
-              </div>
-            )}
-
-            {/* —— Job status feedback —— */}
-            {activeJobId && (
-              <div
-                style={{
-                  marginBottom: 12,
-                  padding: '10px 14px',
-                  borderRadius: 8,
-                  background:
-                    jobStatus === 'success'
-                      ? 'rgba(34,197,94,0.1)'
-                      : jobStatus === 'error'
-                      ? 'rgba(239,68,68,0.1)'
-                      : 'rgba(59,130,246,0.1)',
-                  border: `1px solid ${
-                    jobStatus === 'success'
-                      ? 'rgba(34,197,94,0.3)'
-                      : jobStatus === 'error'
-                      ? 'rgba(239,68,68,0.3)'
-                      : 'rgba(59,130,246,0.3)'
-                  }`,
-                  fontSize: 13,
-                }}
-              >
-                <strong>
-                  {jobStatus === 'pending' && 'Starting sync job...'}
-                  {jobStatus === 'running' &&
-                    `Syncing: ${jobQuery.data?.data?.progress || 'Processing...'}`}
-                  {jobStatus === 'success' && 'Sync completed successfully'}
-                  {jobStatus === 'error' && `Sync failed: ${jobQuery.data?.data?.error || 'Unknown error'}`}
-                </strong>
-                {jobQuery.data?.data?.result && (
-                  <span style={{ marginLeft: 8, color: 'var(--text-muted)' }}>
-                    Fetched: {jobQuery.data.data.result.fetched} | Unique:{' '}
-                    {jobQuery.data.data.result.uniqueComplaints} | Saved:{' '}
-                    {jobQuery.data.data.result.created + jobQuery.data.data.result.updated} | Errors:{' '}
-                    {jobQuery.data.data.result.errors}
-                  </span>
-                )}
               </div>
             )}
 

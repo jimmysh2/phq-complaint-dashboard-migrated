@@ -52,7 +52,7 @@ const formatDdMmYyyy = (date: Date): string => {
   return `${dd}/${mm}/${yyyy}`;
 };
 
-const collectComplaintsByRange = async (timeFrom: string, timeTo: string) => {
+const collectComplaintsByRange = async (timeFrom: string, timeTo: string, onProgress?: (pct: number) => void) => {
   const start = parseDdMmYyyy(timeFrom);
   const end = parseDdMmYyyy(timeTo);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
@@ -62,6 +62,9 @@ const collectComplaintsByRange = async (timeFrom: string, timeTo: string) => {
   const rows: CctnsComplaintRow[] = [];
   const WINDOW_DAYS = 3;
   let cursor = new Date(start);
+  const totalDays = Math.max(1, (end.getTime() - start.getTime()) / (1000 * 3600 * 24) + 1);
+  let daysProcessed = 0;
+
   while (cursor <= end) {
     const chunkStart = new Date(cursor);
     const chunkEnd = new Date(cursor);
@@ -76,6 +79,12 @@ const collectComplaintsByRange = async (timeFrom: string, timeTo: string) => {
     );
     rows.push(...(chunkRows as CctnsComplaintRow[]));
 
+    const currentChunkDays = (chunkEnd.getTime() - chunkStart.getTime()) / (1000 * 3600 * 24) + 1;
+    daysProcessed += currentChunkDays;
+    if (onProgress) {
+      onProgress(Math.min(80, Math.round((daysProcessed / totalDays) * 80)));
+    }
+
     cursor = new Date(chunkEnd);
     cursor.setDate(cursor.getDate() + 1);
   }
@@ -83,7 +92,7 @@ const collectComplaintsByRange = async (timeFrom: string, timeTo: string) => {
   return rows;
 };
 
-const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[], lookups: MasterLookups) => {
+const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[], lookups: MasterLookups, onProgress?: (pct: number) => void) => {
   let created = 0;
   let updated = 0;
   let errors = 0;
@@ -100,6 +109,9 @@ const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[], lookup
   if (validRows.length < rows.length) {
     console.log(`ℹ️ Filtered out ${rows.length - validRows.length} invalid records`);
   }
+
+  const totalRows = validRows.length;
+  let processedRows = 0;
 
   // Use the pre-loaded lookups for every record — avoids N×3 DB queries
   await processInBatches(validRows, 50, async (data) => {
@@ -131,6 +143,10 @@ const saveNormalizedComplaints = async (rows: NormalizedCctnsComplaint[], lookup
         errors++;
       }
     }
+    processedRows++;
+    if (onProgress && totalRows > 0) {
+      onProgress(80 + Math.min(20, Math.round((processedRows / totalRows) * 20)));
+    }
   });
 
   created = Math.max(validRows.length - updated - errors, 0);
@@ -144,6 +160,7 @@ interface FetchJob {
   timeFrom: string;
   timeTo: string;
   progress?: string;
+  progressPercentage?: number;
   result?: {
     fetched: number;
     uniqueComplaints: number;
@@ -175,11 +192,15 @@ const runFetchJob = async (jobId: string, timeFrom: string, timeTo: string) => {
     }
 
     job.progress = 'Fetching from CCTNS API...';
+    job.progressPercentage = 0;
     console.log(`[FETCH-JOB ${jobId}] Fetching from CCTNS API...`);
     
     let complaints: CctnsComplaintRow[] = [];
     try {
-      complaints = await collectComplaintsByRange(timeFrom, timeTo);
+      complaints = await collectComplaintsByRange(timeFrom, timeTo, (pct) => {
+        job.progressPercentage = pct;
+        job.progress = `Fetching from CCTNS API... (${pct}%)`;
+      });
     } catch (fetchError: any) {
       console.error(`[FETCH-JOB ${jobId}] CCTNS API fetch failed:`, fetchError.message);
       throw new Error(`CCTNS API failed: ${fetchError.message}`);
@@ -196,7 +217,10 @@ const runFetchJob = async (jobId: string, timeFrom: string, timeTo: string) => {
     const lookups = await loadAllLookups();
     console.log(`[FETCH-JOB ${jobId}] Saving ${normalized.length} records to database...`);
     
-    const { created, updated, errors } = await saveNormalizedComplaints(normalized, lookups);
+    const { created, updated, errors } = await saveNormalizedComplaints(normalized, lookups, (pct) => {
+      job.progressPercentage = pct;
+      job.progress = `Saving records to database... (${pct}%)`;
+    });
     
     job.status = 'success';
     job.result = {
@@ -530,6 +554,7 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
       id: job.id,
       status: job.status,
       progress: job.progress,
+      progressPercentage: job.progressPercentage,
       result: job.result,
       error: job.error,
       startedAt: job.startedAt,
