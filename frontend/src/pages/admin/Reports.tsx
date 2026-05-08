@@ -245,7 +245,20 @@ export const ReportsPage = () => {
               columns={[
                 { key: 'name', label: oldestDistrict ? 'Police Station' : 'District', sortable: true },
                 { key: 'oldestDate', label: 'Oldest Complaint Date', sortable: true },
-                { key: 'complaintNumber', label: 'Complaint Number', sortable: true }
+                { 
+                  key: 'complaintNumber', 
+                  label: 'Complaint Number', 
+                  sortable: true,
+                  render: (row: any) => row.complaintNumber && row.complaintNumber !== 'N/A' ? (
+                    <Link
+                      to={`/admin/cctns?tab=synced&search=${encodeURIComponent(row.complaintNumber)}`}
+                      style={{ color: '#60a5fa', textDecoration: 'underline' }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {row.complaintNumber}
+                    </Link>
+                  ) : (row.complaintNumber || 'N/A')
+                }
               ]}
               maxHeight="calc(100vh - 160px)"
               onRowClick={!oldestDistrict ? (row: any) => { if (row.id) setOldestDistrict({ id: row.id, name: row.name }); } : undefined}

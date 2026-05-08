@@ -140,25 +140,32 @@ export const CCTNSPage = () => {
     }
   }, [jobQuery.data, queryClient]);
 
-  // —— Sync filter state when URL ?statusGroup param changes ——
+  // —— Sync filter state when URL ?statusGroup or ?search param changes ——
   // This handles the case where the component is reused (not remounted) when
   // navigating from dashboard card clicks multiple times (same route, different query string).
   useEffect(() => {
-    const sg = searchParams.get('statusGroup') || '';
-    if (!sg) return; // No URL filter — leave manual state alone
-
-    // Map special values
-    const resolved = sg === 'all' ? '' : sg === 'disposed_missing_date' ? 'disposed' : sg;
-    setActiveTab('synced');
-    setFilterStatus(resolved);
-    setFilterMissingDateOnly(sg === 'disposed_missing_date');
-    setSearchQuery('');
-    setFilterDistrict('');
-    setFilterDateFrom('');
-    setFilterDateTo('');
-    setSortBy('id');
-    setSortOrder('desc');
-    setPage(1);
+    const sg = searchParams.get('statusGroup');
+    const searchVal = searchParams.get('search');
+    
+    if (sg || searchVal) {
+      setActiveTab('synced');
+      setPage(1);
+      
+      if (sg) {
+        const resolved = sg === 'all' ? '' : sg === 'disposed_missing_date' ? 'disposed' : sg;
+        setFilterStatus(resolved);
+        setFilterMissingDateOnly(sg === 'disposed_missing_date');
+        setFilterDistrict('');
+        setFilterDateFrom('');
+        setFilterDateTo('');
+      }
+      
+      if (searchVal) {
+        setSearchQuery(searchVal);
+      } else if (sg) {
+        setSearchQuery('');
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
@@ -361,12 +368,9 @@ export const CCTNSPage = () => {
       label: 'Description',
       sortable: false,
       render: (row) => (
-        <span
-          title={row.complDesc || ''}
-          style={{ maxWidth: 240, display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-        >
+        <div style={{ maxHeight: '150px', overflowY: 'auto', paddingRight: '4px' }}>
           {row.complDesc || '—'}
-        </span>
+        </div>
       ),
     },
     { key: 'complaintSource', label: 'Complaint Source', sortable: false },
@@ -537,9 +541,9 @@ export const CCTNSPage = () => {
       label: 'Details',
       sortable: false,
       render: (row) => (
-        <span style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '300px', display: 'inline-block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        <div style={{ maxHeight: '100px', overflowY: 'auto' }}>
           {row.message || '—'}
-        </span>
+        </div>
       ),
     },
   ];

@@ -297,7 +297,7 @@ export function DataTable<T extends Record<string, unknown>>({
       {/* Top Header Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: '10px' }}>
         {/* Export Buttons */}
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
           <button
             ref={exportBtnRef}
             onClick={handleExportExcel}
@@ -336,10 +336,18 @@ export function DataTable<T extends Record<string, unknown>>({
           )}
         </div>
 
+        {/* Table Title (Middle) */}
+        {title && !isExpanded && (
+          <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 600, color: '#e2e8f0', padding: '0 10px' }}>
+            {title}
+          </div>
+        )}
+
         {/* Pagination Controls */}
-        {pagination && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end' }}>
+          {pagination && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ fontSize: '12px', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>Rows per page:</span>
               <select
                 value={pagination.limit}
@@ -374,8 +382,9 @@ export function DataTable<T extends Record<string, unknown>>({
                 </button>
               </div>
             </div>
-          </div>
-        )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Table Scroll Area */}

@@ -829,10 +829,10 @@ body {
   font-size: 13px;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 250px;
+  white-space: normal;
+  word-break: break-word;
+  min-width: 100px;
+  max-width: 300px;
   transition: background 0.2s ease;
 }
 
