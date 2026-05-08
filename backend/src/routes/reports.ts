@@ -2,7 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database.js';
 import { sendSuccess } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
-import { getDistrictNameByIdMap } from '../services/master-mapping.js';
+import { getDistrictNameByIdMap, getPoliceStationNameByIdMap } from '../services/master-mapping.js';
 import { buildPrismaWhereClause } from '../utils/filters.js';
 
 type BucketStats = { total: number; pending: number; disposed: number; unknown: number; missingDates: number };
@@ -228,5 +228,74 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([actionTaken, stats]) => ({ actionTaken, ...stats })));
+  });
+
+  fastify.get('/reports/oldest-pending', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const query = request.query as any;
+    const where = buildPrismaWhereClause(query);
+    const targetDistrictId = query.districtMasterId;
+
+    if (targetDistrictId) {
+      // PS-wise for specific district
+      const psOldest = await prisma.complaint.findMany({
+        where: { ...where, statusGroup: 'pending', complRegDt: { not: null }, districtMasterId: BigInt(targetDistrictId) },
+        distinct: ['policeStationMasterId'],
+        orderBy: [
+          { policeStationMasterId: 'asc' },
+          { complRegDt: 'asc' }
+        ],
+        select: {
+          policeStationMasterId: true,
+          complRegDt: true,
+          complRegNum: true,
+        }
+      });
+
+      const psMap = await getPoliceStationNameByIdMap();
+      
+      const results = psOldest.map(c => {
+        const psId = c.policeStationMasterId ? c.policeStationMasterId.toString() : null;
+        return {
+          id: psId,
+          type: 'ps',
+          name: psId && psMap.has(psId) ? psMap.get(psId) : 'Unmapped',
+          oldestDate: c.complRegDt,
+          complaintNumber: c.complRegNum
+        };
+      });
+      return sendSuccess(reply, results);
+
+    } else {
+      // District-wise for all districts
+      const districtOldest = await prisma.complaint.findMany({
+        where: { ...where, statusGroup: 'pending', complRegDt: { not: null } },
+        distinct: ['districtMasterId'],
+        orderBy: [
+          { districtMasterId: 'asc' },
+          { complRegDt: 'asc' }
+        ],
+        select: {
+          districtMasterId: true,
+          complRegDt: true,
+          complRegNum: true,
+        }
+      });
+
+      const districtMap = await getDistrictNameByIdMap();
+      
+      const results = districtOldest.map(c => {
+        const distId = c.districtMasterId ? c.districtMasterId.toString() : null;
+        return {
+          id: distId,
+          type: 'district',
+          name: distId && districtMap.has(distId) ? districtMap.get(distId) : 'Unmapped',
+          oldestDate: c.complRegDt,
+          complaintNumber: c.complRegNum
+        };
+      });
+      return sendSuccess(reply, results);
+    }
   });
 };

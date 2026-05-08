@@ -186,6 +186,10 @@ export const reportsApi = {
     const response = await api.get('/api/reports/action-taken', { params });
     return response.data;
   },
+  oldestPending: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/oldest-pending', { params });
+    return response.data;
+  },
 };
 
 export const pendingApi = {

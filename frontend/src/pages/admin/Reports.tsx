@@ -19,9 +19,9 @@ const tabs = [
   { id: 'branch-wise', label: 'Branch' },
   { id: 'date-wise', label: 'Date Wise' },
   { id: 'action-taken', label: 'Action Taken' },
+  { id: 'oldest-pending', label: 'Oldest Pending' },
 ];
 
-// Maps tab id → reportsApi function
 const apiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>> = {
   'district':         (p) => reportsApi.district(p),
   'mode-receipt':     (p) => reportsApi.modeReceipt(p),
@@ -33,6 +33,7 @@ const apiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>
   'branch-wise':      (p) => reportsApi.branchWise(p),
   'date-wise':        (p) => reportsApi.dateWise(p),
   'action-taken':     (p) => reportsApi.actionTaken(p),
+  'oldest-pending':   (p) => reportsApi.oldestPending(p),
 };
 
 // ─── Reusable sort dropdown (local to this page) ─────────────────────────────
@@ -88,9 +89,21 @@ export const ReportsPage = () => {
     Object.entries(filters).filter(([_, v]) => v !== '')
   ) as Record<string, string>;
 
+  const [oldestDistrict, setOldestDistrict] = useState<{ id: string, name: string } | null>(null);
+
+  // Reset drill-down when tab changes
+  useEffect(() => {
+    setOldestDistrict(null);
+  }, [type]);
+
   const { data, isLoading } = useQuery({
-    queryKey: ['reports', type, activeFilters],   // re-fetches on any filter change
-    queryFn: () => (apiFnMap[type] || apiFnMap['district'])(activeFilters),
+    queryKey: ['reports', type, activeFilters, oldestDistrict?.id],   // re-fetches on any filter change
+    queryFn: () => {
+      if (type === 'oldest-pending' && oldestDistrict) {
+        return apiFnMap[type]({ ...activeFilters, districtMasterId: oldestDistrict.id });
+      }
+      return (apiFnMap[type] || apiFnMap['district'])(activeFilters);
+    },
   });
 
   const rows = data?.data || [];
@@ -197,6 +210,47 @@ export const ReportsPage = () => {
 
         {isLoading ? (
           <div className="loading-spinner"><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
+        ) : type === 'oldest-pending' ? (
+          <div>
+            {oldestDistrict && (
+              <button 
+                onClick={() => setOldestDistrict(null)}
+                style={{ 
+                  background: 'none', 
+                  border: 'none', 
+                  color: '#60a5fa', 
+                  cursor: 'pointer', 
+                  marginBottom: '16px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '4px',
+                  fontSize: '14px',
+                  fontWeight: 500
+                }}
+              >
+                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Districts
+              </button>
+            )}
+            <DataTable
+              title={oldestDistrict ? `PS wise Oldest Pending Complaints - ${oldestDistrict.name}` : "Oldest Pending Complaints - Districts"}
+              data={rows.map((r: any) => ({
+                id: r.id,
+                name: r.name || 'Unmapped',
+                oldestDate: r.oldestDate ? r.oldestDate.split('T')[0] : 'N/A',
+                complaintNumber: r.complaintNumber || 'N/A'
+              }))}
+              columns={[
+                { key: 'name', label: oldestDistrict ? 'Police Station' : 'District', sortable: true },
+                { key: 'oldestDate', label: 'Oldest Complaint Date', sortable: true },
+                { key: 'complaintNumber', label: 'Complaint Number', sortable: true }
+              ]}
+              maxHeight="calc(100vh - 160px)"
+              onRowClick={!oldestDistrict ? (row: any) => { if (row.id) setOldestDistrict({ id: row.id, name: row.name }); } : undefined}
+            />
+          </div>
         ) : (
           <>
             <div className="summary-row">
