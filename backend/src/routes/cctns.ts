@@ -600,6 +600,24 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit, 10)));
     const skip = (pageNum - 1) * limitNum;
 
+    // Clean up stale 'running' jobs (older than 1 hour) killed by Vercel timeouts
+    const staleTime = new Date(Date.now() - 60 * 60 * 1000);
+    try {
+      await prisma.syncRun.updateMany({
+        where: {
+          status: 'running',
+          startedAt: { lt: staleTime },
+        },
+        data: {
+          status: 'error',
+          message: 'Job timed out or was killed by serverless environment',
+          endedAt: new Date(),
+        },
+      });
+    } catch (e) {
+      console.error('[SYNC] Failed to clean up stale jobs:', e);
+    }
+
     const [runs, total] = await Promise.all([
       prisma.syncRun.findMany({
         orderBy: { startedAt: 'desc' },

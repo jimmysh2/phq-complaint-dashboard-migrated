@@ -870,7 +870,14 @@ export const CCTNSPage = () => {
                   </span>
                   <span style={{ color: 'var(--text-muted)' }}>
                     Sync interval: <strong>4h</strong> | Last updated:{' '}
-                    {new Date().toLocaleTimeString('en-IN')}
+                    <strong>
+                      {liveData.length > 0
+                        ? new Date(liveData[0].updatedAt).toLocaleString('en-IN', {
+                            day: '2-digit', month: 'short', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit', second: '2-digit'
+                          })
+                        : new Date().toLocaleTimeString('en-IN')}
+                    </strong>
                   </span>
                 </div>
                 <DataTable title="Latest CCTNS Records" data={liveData} columns={recordCols} maxHeight="calc(100vh - 320px)" />

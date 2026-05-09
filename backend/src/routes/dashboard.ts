@@ -132,7 +132,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
 
     // Last successful sync time — shown in the dashboard header (PR #4)
     const lastSyncRun = await prisma.syncRun.findFirst({
-      where: { status: 'success', endedAt: { not: null } },
+      where: { status: { in: ['success', 'partial'] }, endedAt: { not: null } },
       orderBy: { endedAt: 'desc' },
       select: { endedAt: true },
     });
