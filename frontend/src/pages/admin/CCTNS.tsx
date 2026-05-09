@@ -65,7 +65,7 @@ export const CCTNSPage = () => {
 
   // Sync job state (persist in localStorage so navigation doesn't kill it)
   const [activeJobId, setActiveJobId] = useState<string | null>(() => localStorage.getItem('cctnsActiveJobId'));
-  const [jobStatus, setJobStatus] = useState<string>('');
+  const [jobStatus, setJobStatus] = useState<string>(() => localStorage.getItem('cctnsActiveJobId') ? 'pending' : '');
   
   useEffect(() => {
     if (activeJobId) {
@@ -121,6 +121,7 @@ export const CCTNSPage = () => {
       if (status === 'success' || status === 'error') return false;
       return 2000; // Poll every 2 seconds
     },
+    retry: 1, // Don't retry too many times if it's a 404
   });
 
   useEffect(() => {
@@ -137,8 +138,17 @@ export const CCTNSPage = () => {
           setJobStatus('');
         }, 5000);
       }
+    } else if (jobQuery.isError) {
+      const error: any = jobQuery.error;
+      // If the backend restarted and the job is gone, clear it
+      if (error?.response?.status === 404) {
+        setActiveJobId(null);
+        setJobStatus('');
+      } else {
+        setJobStatus('error');
+      }
     }
-  }, [jobQuery.data, queryClient]);
+  }, [jobQuery.data, jobQuery.isError, jobQuery.error, queryClient]);
 
   // —— Sync filter state when URL ?statusGroup or ?search param changes ——
   // This handles the case where the component is reused (not remounted) when
@@ -703,11 +713,11 @@ export const CCTNSPage = () => {
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
               <strong>
-                {jobStatus === 'pending' && 'Starting sync job...'}
+                {(!jobStatus || jobStatus === 'pending') && 'Starting sync job...'}
                 {jobStatus === 'running' &&
                   `Syncing: ${jobQuery.data?.data?.progress || 'Processing...'}`}
                 {jobStatus === 'success' && 'Sync completed successfully'}
-                {jobStatus === 'error' && `Sync failed: ${jobQuery.data?.data?.error || 'Unknown error'}`}
+                {jobStatus === 'error' && `Sync failed: ${jobQuery.data?.data?.error || (jobQuery.error as any)?.message || 'Unknown error'}`}
               </strong>
               {jobQuery.data?.data?.result && (
                 <span style={{ color: 'var(--text-muted)' }}>
@@ -720,13 +730,13 @@ export const CCTNSPage = () => {
             </div>
             
             {/* Progress Bar */}
-            {(jobStatus === 'pending' || jobStatus === 'running') && (
+            {(!jobStatus || jobStatus === 'pending' || jobStatus === 'running') && (
               <div style={{ width: '100%', background: 'rgba(0,0,0,0.1)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
                 <div 
                   style={{ 
                     height: '100%', 
                     background: '#3b82f6', 
-                    width: `${jobQuery.data?.data?.progressPercentage || 0}%`,
+                    width: `${jobQuery.data?.data?.progressPercentage || (jobStatus === 'running' ? 5 : 0)}%`,
                     transition: 'width 0.3s ease-in-out'
                   }} 
                 />
@@ -851,6 +861,8 @@ export const CCTNSPage = () => {
                     display: 'flex',
                     justifyContent: 'space-between',
                     alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: 8,
                   }}
                 >
                   <span>
