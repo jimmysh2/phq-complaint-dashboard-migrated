@@ -2,14 +2,20 @@
 export const getDistrictBarOptions = (data: { district: string; total: number; pending: number; disposed: number; unknown?: number }[]): any => {
   return {
     tooltip: {
-      trigger: 'item',
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
       backgroundColor: '#1e293b',
       borderColor: '#334155',
       textStyle: { color: '#e2e8f0', fontSize: 12 },
-      formatter: (params: any) => {
-        const item = data[params.dataIndex];
-        const pct = item.total > 0 ? Math.round((params.value / item.total) * 100) : 0;
-        return `<div style="font-weight:600;margin-bottom:4px">${params.name}</div><div style="color:${params.color}">${params.seriesName}: <b>${params.value}</b> (${pct}%)</div>`;
+      formatter: (params: any[]) => {
+        const item = data[params[0].dataIndex];
+        let res = `<div style="font-weight:600;margin-bottom:4px">${params[0].name}</div>`;
+        res += `<div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Total: <b>${item.total}</b></div>`;
+        params.forEach(p => {
+          const pct = item.total > 0 ? Math.round((p.value / item.total) * 100) : 0;
+          res += `<div style="color:${p.color}">${p.seriesName}: <b>${p.value}</b> (${pct}%)</div>`;
+        });
+        return res;
       },
     },
     legend: {
@@ -72,6 +78,7 @@ export const getDurationLineOptions = (data: { duration?: string; month?: string
       formatter: (params: any[]) => {
         const item = data[params[0].dataIndex];
         let res = `<div style="font-weight:600;margin-bottom:4px">${params[0].name}</div>`;
+        res += `<div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Total: <b>${item.total}</b></div>`;
         params.forEach(p => {
           const pct = item.total > 0 ? Math.round((p.value / item.total) * 100) : 0;
           res += `<div style="color:${p.color}">${p.seriesName}: <b>${p.value}</b> (${pct}%)</div>`;
@@ -175,14 +182,20 @@ export const getPieOptions = (data: { name: string; value: number }[]): any => {
 export const getStackedBarOptions = (data: { category: string; total: number; pending: number; disposed: number; unknown?: number }[]): any => {
   return {
     tooltip: {
-      trigger: 'item',
+      trigger: 'axis',
+      axisPointer: { type: 'shadow' },
       backgroundColor: '#1e293b',
       borderColor: '#334155',
       textStyle: { color: '#e2e8f0', fontSize: 12 },
-      formatter: (params: any) => {
-        const item = data[params.dataIndex];
-        const pct = item.total > 0 ? Math.round((params.value / item.total) * 100) : 0;
-        return `<div style="font-weight:600;margin-bottom:4px">${params.name}</div><div style="color:${params.color}">${params.seriesName}: <b>${params.value}</b> (${pct}%)</div>`;
+      formatter: (params: any[]) => {
+        const item = data[params[0].dataIndex];
+        let res = `<div style="font-weight:600;margin-bottom:4px">${params[0].name}</div>`;
+        res += `<div style="font-size:11px;color:#94a3b8;margin-bottom:4px">Total: <b>${item.total}</b></div>`;
+        params.forEach(p => {
+          const pct = item.total > 0 ? Math.round((p.value / item.total) * 100) : 0;
+          res += `<div style="color:${p.color}">${p.seriesName}: <b>${p.value}</b> (${pct}%)</div>`;
+        });
+        return res;
       },
     },
     legend: {
