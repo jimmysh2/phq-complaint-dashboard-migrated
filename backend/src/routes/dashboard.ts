@@ -56,6 +56,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     });
 
     // SQL AVG instead of findMany+loop — transfers 1 row instead of 80,000
+    // Apply same global filters as the disposal matrix
+    const filterWhereAvg = buildRawWhereClause(request.query);
     const avgResult = await prisma.$queryRaw<[{ avg_days: number }]>`
       SELECT COALESCE(
         AVG(GREATEST(0, EXTRACT(EPOCH FROM ("disposalDate" - "complRegDt")) / 86400)),
@@ -67,6 +69,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         AND "complRegDt" IS NOT NULL
         AND "disposalDate" IS NOT NULL
         AND "disposalDate" >= "complRegDt"
+        AND ${filterWhereAvg}
     `;
     const avgDisposalTime = Math.round(Number(avgResult[0]?.avg_days ?? 0));
 
@@ -321,43 +324,40 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     const data = await cached(`disposal-matrix:${q}`, 5 * 60 * 1000, async () => {
       // Build dynamic filter clause so ALL global filters are respected
       const filterWhere = buildRawWhereClause(request.query);
-      const [rows, missingDates] = await Promise.all([
+      const [rows] = await Promise.all([
         prisma.$queryRaw<Array<{
           districtMasterId: bigint | null;
           disposed: bigint;
+          missingDates: bigint;
           u7: bigint; u15: bigint; u30: bigint; o30: bigint; o60: bigint;
         }>>`
           SELECT
             "districtMasterId",
-            COUNT(*) as disposed,
-            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" < INTERVAL '7 days')   AS u7,
-            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '7 days'  AND "disposalDate" - "complRegDt" < INTERVAL '15 days') AS u15,
-            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '15 days' AND "disposalDate" - "complRegDt" < INTERVAL '30 days') AS u30,
-            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '30 days' AND "disposalDate" - "complRegDt" < INTERVAL '60 days') AS o30,
-            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '60 days')                                                        AS o60
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = false) as disposed,
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = true) as "missingDates",
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = false AND "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" < INTERVAL '7 days')   AS u7,
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = false AND "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '7 days'  AND "disposalDate" - "complRegDt" < INTERVAL '15 days') AS u15,
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = false AND "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '15 days' AND "disposalDate" - "complRegDt" < INTERVAL '30 days') AS u30,
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = false AND "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '30 days' AND "disposalDate" - "complRegDt" < INTERVAL '60 days') AS o30,
+            COUNT(*) FILTER (WHERE "isDisposedMissingDate" = false AND "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '60 days')                                                        AS o60
           FROM "Complaint"
           WHERE "statusGroup" = 'disposed'
-            AND "isDisposedMissingDate" = false
-
             AND ${filterWhere}
           GROUP BY "districtMasterId"
         `,
-        prisma.complaint.count({
-          where: withAnd(buildPrismaWhereClause(request.query), { statusGroup: 'disposed', isDisposedMissingDate: true }),
-        }),
       ]);
       const districtMapById = await getDistrictNameByIdMap();
       return {
         rows: rows.map(r => ({
           district: r.districtMasterId ? (districtMapById.get(r.districtMasterId.toString()) || UNMAPPED) : UNMAPPED,
-          disposed: Number(r.disposed),
+          total: Number(r.disposed),
+          missingDates: Number(r.missingDates),
           u7:  Number(r.u7),
           u15: Number(r.u15),
           u30: Number(r.u30),
           o30: Number(r.o30),
           o60: Number(r.o60),
         })),
-        missingDisposalDates: missingDates,
       };
     });
     return sendCached(reply, data);
@@ -368,25 +368,25 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   }, async (request, reply) => {
     const q = JSON.stringify({ ...(request.query as any), district: request.params.district });
     const data = await cached(`district-analysis:${q}`, 5 * 60 * 1000, async () => {
-      const districtParam = decodeURIComponent(request.params.district || '').trim();
-      const baseWhere = buildPrismaWhereClause(request.query);
+        const districtParam = decodeURIComponent(request.params.district || '').trim();
+        const baseWhere = buildPrismaWhereClause(request.query);
 
-    let districtFilter: any;
-    if (!districtParam || districtParam.toLowerCase() === UNMAPPED.toLowerCase()) {
-      districtFilter = { districtMasterId: null };
-    } else {
-      const district = await prisma.district.findFirst({ where: { name: { equals: districtParam, mode: 'insensitive' } } });
-      if (!district) {
-        return { district: districtParam, policeStations: [], categories: [] };
-      }
-      districtFilter = { districtMasterId: district.id };
-    }
+        let districtFilter: any;
+        if (!districtParam || districtParam.toLowerCase() === UNMAPPED.toLowerCase()) {
+          districtFilter = { districtMasterId: null };
+        } else {
+          const district = await prisma.district.findFirst({ where: { name: { equals: districtParam, mode: 'insensitive' } } });
+          if (!district) {
+            return { district: districtParam, policeStations: [], categories: [] };
+          }
+          districtFilter = { districtMasterId: district.id };
+        }
 
-    const [stationMapById, complaints] = await Promise.all([
-      getPoliceStationNameByIdMap(),
-      prisma.complaint.findMany({
-        where: withAnd(baseWhere, districtFilter),
-        select: {
+        const [stationMapById, complaints] = await Promise.all([
+          getPoliceStationNameByIdMap(),
+          prisma.complaint.findMany({
+            where: withAnd(baseWhere, districtFilter),
+            select: {
           policeStationMasterId: true,
           statusGroup: true,
           complRegDt: true,
@@ -399,6 +399,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
 
     const now = Date.now();
     const psMap = new Map<string, {
+      psIds: Set<bigint>;
       total: number; pending: number; disposed: number; unknown: number; missingDates: number;
       u7: number; u15: number; u30: number; o30: number; o60: number;
       du7: number; du15: number; du30: number; do30: number; do60: number; totalDisposalDays: number;
@@ -409,11 +410,15 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       const ps = getPoliceStationLabel(comp.policeStationMasterId, stationMapById);
       const category = comp.classOfIncident || UNMAPPED;
       const stats = psMap.get(ps) || {
+        psIds: new Set<bigint>(),
         total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0,
         u7: 0, u15: 0, u30: 0, o30: 0, o60: 0,
         du7: 0, du15: 0, du30: 0, do30: 0, do60: 0,
         totalDisposalDays: 0,
       };
+      if (comp.policeStationMasterId != null) {
+        stats.psIds.add(comp.policeStationMasterId);
+      }
       const catStats = categoryMap.get(category) || { total: 0, pending: 0, disposed: 0, unknown: 0, missingDates: 0 };
 
       stats.total++;
@@ -436,23 +441,20 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         if (comp.isDisposedMissingDate) {
           stats.missingDates++;
           catStats.missingDates++;
-        } else if (comp.complRegDt && comp.disposalDate) {
-          const rawDays = (comp.disposalDate.getTime() - comp.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
-          // Skip data entry errors (disposal before registration = negative days)
-          if (rawDays >= 0) {
-            const days = rawDays;
-            stats.totalDisposalDays += days;
-            if (days < 7) stats.du7++;
-            else if (days < 15) stats.du15++;
-            else if (days < 30) stats.du30++;
-            else if (days < 60) stats.do30++;  // 1-2 Months
-            else stats.do60++;                 // Over 2 Months
+        } else {
+          if (comp.complRegDt && comp.disposalDate) {
+            const rawDays = (comp.disposalDate.getTime() - comp.complRegDt.getTime()) / (1000 * 60 * 60 * 24);
+            if (rawDays >= 0) {
+              stats.totalDisposalDays += rawDays;
+              if (rawDays < 7) stats.du7++;
+              else if (rawDays < 15) stats.du15++;
+              else if (rawDays < 30) stats.du30++;
+              else if (rawDays < 60) stats.do30++;
+              else stats.do60++;
+            }
           }
         }
       } else {
-        // status not found in this record
-        stats.unknown++;
-        catStats.unknown++;
       }
 
       psMap.set(ps, stats);
@@ -461,6 +463,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
 
     const policeStations = Array.from(psMap.entries()).map(([ps, stats]) => ({
       ps,
+      psId: stats.psIds.size > 0 ? Array.from(stats.psIds).join(',') : null,
       total: stats.total,
       pending: stats.pending,
       disposed: stats.disposed,
@@ -488,10 +491,10 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       policeStations,
       categories,
     };
-  });
+    });
 
-  return sendCached(reply, data);
-});
+    return sendCached(reply, data);
+  });
 
   fastify.get('/dashboard/category-wise', {
     preHandler: [authenticate],

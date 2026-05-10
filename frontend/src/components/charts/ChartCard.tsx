@@ -4,14 +4,16 @@ import type { EChartsOption } from 'echarts';
 
 interface ChartCardProps {
   title: string;
-  option: EChartsOption;
+  option?: EChartsOption;
   fullOption?: EChartsOption;
   height?: string;
   expandedHeight?: string;
   actions?: React.ReactNode;
+  children?: React.ReactNode;
+  noExpand?: boolean;
 }
 
-export const ChartCard = ({ title, option, fullOption, height = '280px', expandedHeight = 'calc(100vh - 120px)', actions }: ChartCardProps) => {
+export const ChartCard = ({ title, option, fullOption, height = '280px', expandedHeight = 'calc(100vh - 120px)', actions, children, noExpand }: ChartCardProps) => {
   const [expanded, setExpanded] = useState(false);
 
   if (expanded) {
@@ -30,7 +32,10 @@ export const ChartCard = ({ title, option, fullOption, height = '280px', expande
           </div>
         </div>
         <div className="chart-overlay-body" style={{ overflowY: 'auto' }}>
-          <BaseChart option={fullOption || option} height={expandedHeight} />
+          {children
+            ? <div style={{ padding: '16px' }}>{children}</div>
+            : <BaseChart option={fullOption || option || {}} height={expandedHeight} />
+          }
         </div>
       </div>
     );
@@ -42,17 +47,19 @@ export const ChartCard = ({ title, option, fullOption, height = '280px', expande
         <span className="chart-card-title">{title}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {actions && <div>{actions}</div>}
-          <button className="chart-expand-btn" onClick={() => setExpanded(true)}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
-              <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
-            </svg>
-            Expand
-          </button>
+          {!noExpand && (
+            <button className="chart-expand-btn" onClick={() => setExpanded(true)}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
+                <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+              </svg>
+              Expand
+            </button>
+          )}
         </div>
       </div>
       <div className="chart-card-body">
-        <BaseChart option={option} height={height} />
+        {children ?? (option ? <BaseChart option={option} height={height} /> : null)}
       </div>
     </div>
   );

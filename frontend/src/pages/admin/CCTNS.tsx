@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
 import { DataTable, Column } from '@/components/data/DataTable';
@@ -40,18 +40,24 @@ function formatDateTime(d: string | Date | null): string {
 export const CCTNSPage = () => {
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   // Read ?statusGroup and global filters from URL (set by dashboard card clicks)
   const urlStatusGroup    = searchParams.get('statusGroup')      || '';
   const urlDistrictIds    = searchParams.get('districtIds')      || '';
+  const urlDistrict       = searchParams.get('district')         || '';
   const urlPsIds          = searchParams.get('policeStationIds') || '';
   const urlOfficeIds      = searchParams.get('officeIds')        || '';
   const urlClassOfInc     = searchParams.get('classOfIncident')  || '';
   const urlFromDate       = searchParams.get('fromDate')         || '';
   const urlToDate         = searchParams.get('toDate')           || '';
+  const urlPendencyAge    = searchParams.get('pendencyAge')      || '';
+  const urlDisposalAge    = searchParams.get('disposalAge')      || '';
+  const urlUnmappedPs     = searchParams.get('unmappedPs')       || '';
+  const urlPsName         = searchParams.get('psName')           || '';
 
   // Derived: any global filter is active
-  const hasGlobalFilters = !!(urlDistrictIds || urlPsIds || urlOfficeIds || urlClassOfInc || urlFromDate || urlToDate);
+  const hasGlobalFilters = !!(urlDistrict || urlDistrictIds || urlPsIds || urlOfficeIds || urlClassOfInc || urlFromDate || urlToDate || urlPendencyAge || urlDisposalAge || urlUnmappedPs || urlPsName);
 
   // Map special values: 'all' -> no status filter, 'disposed_missing_date' -> handled separately
   const resolvedInitialStatus = urlStatusGroup === 'all' ? '' :
@@ -195,7 +201,7 @@ export const CCTNSPage = () => {
       sortBy,
       sortOrder,
       // Global filters come from URL directly — include in key so query re-runs on navigation
-      urlDistrictIds, urlPsIds, urlOfficeIds, urlClassOfInc, urlFromDate, urlToDate,
+      urlDistrictIds, urlDistrict, urlPsIds, urlOfficeIds, urlClassOfInc, urlFromDate, urlToDate, urlPendencyAge, urlDisposalAge, urlUnmappedPs, urlPsName,
     ],
     queryFn: () =>
       cctnsApi.listPaginated({
@@ -210,12 +216,17 @@ export const CCTNSPage = () => {
         sortBy,
         sortOrder,
         // Forward global dashboard filters unchanged — backend applies them via buildPrismaWhereClause
+        district:         (filterDistrict || urlDistrict) || undefined,
         districtIds:      urlDistrictIds || undefined,
         policeStationIds: urlPsIds       || undefined,
         officeIds:        urlOfficeIds   || undefined,
         classOfIncident:  urlClassOfInc  || undefined,
         fromDate:         urlFromDate    || undefined,
         toDate:           urlToDate      || undefined,
+        pendencyAge:      urlPendencyAge || undefined,
+        disposalAge:      urlDisposalAge || undefined,
+        unmappedPs:       urlUnmappedPs  || undefined,
+        psName:           urlPsName      || undefined,
       }),
     enabled: activeTab === 'synced',
     staleTime: 0,
@@ -593,15 +604,19 @@ export const CCTNSPage = () => {
   }, [fetchMutation.isError, fetchMutation.error]);
 
   const resetFilters = () => {
-    setSearchQuery('');
-    setFilterDistrict('');
-    setFilterStatus('');
-    setFilterMissingDateOnly(false);
-    setFilterDateFrom('');
-    setFilterDateTo('');
-    setSortBy('id');
-    setSortOrder('desc');
-    setPage(1);
+    if (hasGlobalFilters) {
+      navigate('/admin/cctns?tab=synced');
+    } else {
+      setSearchQuery('');
+      setFilterDistrict('');
+      setFilterStatus('');
+      setFilterMissingDateOnly(false);
+      setFilterDateFrom('');
+      setFilterDateTo('');
+      setSortBy('id');
+      setSortOrder('desc');
+      setPage(1);
+    }
   };
 
   return (
@@ -890,7 +905,7 @@ export const CCTNSPage = () => {
         {isConfigured && activeTab === 'synced' && (
           <>
             {/* Active filter banner when coming from dashboard */}
-            {urlStatusGroup && (
+            {hasGlobalFilters && (
               <div style={{
                 marginBottom: 10,
                 padding: '8px 14px',
@@ -905,32 +920,37 @@ export const CCTNSPage = () => {
               }}>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span>
-                    <strong>📊 Dashboard Filter Active:</strong>{' '}
-                    {urlStatusGroup === 'all'                   && 'Showing all complaints'}
-                    {urlStatusGroup === 'pending'               && 'Showing pending complaints only'}
-                    {urlStatusGroup === 'disposed'              && 'Showing disposed complaints only'}
-                    {urlStatusGroup === 'unknown'               && 'Showing complaints with unknown/missing status'}
-                    {urlStatusGroup === 'disposed_missing_date' && 'Showing disposed complaints with no disposal date'}
+                    <strong>📊 Dashboard Filter Active</strong>
+                    {urlStatusGroup === 'pending'               && ' — Showing pending complaints only'}
+                    {urlStatusGroup === 'disposed'              && ' — Showing disposed complaints only'}
+                    {urlStatusGroup === 'unknown'               && ' — Showing complaints with unknown/missing status'}
+                    {urlStatusGroup === 'disposed_missing_date' && ' — Showing disposed complaints with no disposal date'}
                   </span>
-                  {hasGlobalFilters && (
-                    <span style={{ fontSize: 12, opacity: 0.8 }}>
-                      Global filters applied:{' '}
-                      {[
-                        urlDistrictIds    && `District IDs: ${urlDistrictIds}`,
-                        urlPsIds          && `PS IDs: ${urlPsIds}`,
-                        urlOfficeIds      && `Office IDs: ${urlOfficeIds}`,
-                        urlClassOfInc     && `Class: ${urlClassOfInc}`,
-                        urlFromDate       && `From: ${urlFromDate}`,
-                        urlToDate         && `To: ${urlToDate}`,
-                      ].filter(Boolean).join(' | ')}
-                    </span>
-                  )}
+                  <span style={{ fontSize: 12, opacity: 0.8 }}>
+                    Applied filters:{' '}
+                    {[
+                      urlStatusGroup && `Status: ${urlStatusGroup === 'pending' ? 'Pending' : urlStatusGroup === 'disposed' ? 'Disposed' : urlStatusGroup === 'unknown' ? 'Unknown' : urlStatusGroup === 'all' ? 'All' : urlStatusGroup}`,
+                      urlDistrict       && `District: ${urlDistrict}`,
+                      (urlPsIds || urlPsName) && `Police Station: ${urlPsName || `ID: ${urlPsIds}`}`,
+                      urlPendencyAge && (urlPendencyAge === 'u7' ? 'Pendency: < 7 Days' :
+                                         urlPendencyAge === 'u15' ? 'Pendency: 7 - 15 Days' :
+                                         urlPendencyAge === 'u30' ? 'Pendency: 15 - 30 Days' :
+                                         urlPendencyAge === 'o30' ? 'Pendency: 1 - 2 Months' :
+                                         urlPendencyAge === 'o60' ? 'Pendency: Over 2 Months' : `Pendency: ${urlPendencyAge}`),
+                      urlDisposalAge && (urlDisposalAge === 'u7' ? 'Disposal: < 7 Days' :
+                                         urlDisposalAge === 'u15' ? 'Disposal: 7 - 15 Days' :
+                                         urlDisposalAge === 'u30' ? 'Disposal: 15 - 30 Days' :
+                                         urlDisposalAge === 'o30' ? 'Disposal: 1 - 2 Months' :
+                                         urlDisposalAge === 'o60' ? 'Disposal: Over 2 Months' : `Disposal: ${urlDisposalAge}`),
+                      urlUnmappedPs      && 'Unmapped PS',
+                    ].filter(Boolean).join(' | ')}
+                  </span>
                 </span>
                 <button
                   onClick={resetFilters}
                   style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#60a5fa', fontSize: 12, textDecoration: 'underline', whiteSpace: 'nowrap' }}
                 >
-                  Clear Filter
+                  Clear Dashboard Filters
                 </button>
               </div>
             )}
@@ -947,6 +967,8 @@ export const CCTNSPage = () => {
                 borderRadius: 8,
                 border: '1px solid var(--border)',
                 alignItems: 'center',
+                opacity: hasGlobalFilters ? 0.6 : 1,
+                pointerEvents: hasGlobalFilters ? 'none' : 'auto',
               }}
             >
               <input
@@ -956,6 +978,7 @@ export const CCTNSPage = () => {
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 200, fontSize: 13 }}
+                disabled={hasGlobalFilters}
               />
               <input
                 type="text"
@@ -964,24 +987,27 @@ export const CCTNSPage = () => {
                 onChange={(e) => { setFilterDistrict(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 150, fontSize: 13 }}
+                disabled={hasGlobalFilters}
               />
               <select
                 value={filterStatus}
                 onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 140, fontSize: 13 }}
+                disabled={hasGlobalFilters}
               >
                 <option value="">All Status</option>
                 <option value="pending">Pending</option>
                 <option value="disposed">Disposed</option>
                 <option value="unknown">Unknown</option>
               </select>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: hasGlobalFilters ? 'default' : 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={filterMissingDateOnly}
                   onChange={(e) => { setFilterMissingDateOnly(e.target.checked); setPage(1); }}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: hasGlobalFilters ? 'default' : 'pointer' }}
+                  disabled={hasGlobalFilters}
                 />
                 Missing Disposal Date
               </label>
@@ -991,6 +1017,7 @@ export const CCTNSPage = () => {
                 onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 150, fontSize: 13 }}
+                disabled={hasGlobalFilters}
               />
               <input
                 type="date"
@@ -998,6 +1025,7 @@ export const CCTNSPage = () => {
                 onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 150, fontSize: 13 }}
+                disabled={hasGlobalFilters}
               />
               <select
                 value={`${sortBy}:${sortOrder}`}
@@ -1009,6 +1037,7 @@ export const CCTNSPage = () => {
                 }}
                 className="form-input"
                 style={{ width: 160, fontSize: 13 }}
+                disabled={hasGlobalFilters}
               >
                 <option value="id:desc">Newest First</option>
                 <option value="id:asc">Oldest First</option>
@@ -1017,9 +1046,14 @@ export const CCTNSPage = () => {
                 <option value="districtName:asc">District A-Z</option>
                 <option value="statusOfComplaint:asc">Status A-Z</option>
               </select>
-              <Button variant="secondary" onClick={resetFilters}>
-                Reset
-              </Button>
+            </div>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+              {hasGlobalFilters && (
+                <Button variant="outline" onClick={() => window.history.back()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+                  Back to Dashboard
+                </Button>
+              )}
             </div>
 
             {syncedQuery.isLoading ? (

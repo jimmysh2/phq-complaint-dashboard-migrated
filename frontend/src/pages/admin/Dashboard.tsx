@@ -291,66 +291,66 @@ export const DashboardPage = () => {
     return row[col.key];
   };
 
-  // Disposal Time Matrix — cumulative buckets (PR #4)
-  const cumulativeDisposalMatrix = disposalMatrix.map((row: any) => {
-    const total = row.disposed ?? ((row.u7 || 0) + (row.u15 || 0) + (row.u30 || 0) + (row.o30 || 0) + (row.o60 || 0));
+  const disposalMatrixWithPct = disposalMatrix.map((row: any) => {
+    const withDate    = row.total || 0;
+    const withoutDate = row.missingDates || 0;
+    const totalDisposed = withDate + withoutDate;
     return {
       ...row,
-      total,
-      within7:  row.u7,
-      within15: row.u7 + row.u15,
-      within30: row.u7 + row.u15 + row.u30,
-      above30:  row.o30 + (row.o60 || 0),
-    };
-  });
-
-  const disposalMatrixWithPct = cumulativeDisposalMatrix.map((row: any) => {
-    const total = row.total || 1;
-    return {
-      ...row,
-      pct_within7:  Math.round(row.within7  * 100 / total),
-      pct_within15: Math.round(row.within15 * 100 / total),
-      pct_within30: Math.round(row.within30 * 100 / total),
-      pct_above30:  Math.round(row.above30  * 100 / total),
-      pct_total: 100,
+      total: withDate,
+      pct_total:   totalDisposed > 0 ? Math.round(withDate    * 100 / totalDisposed) : 0,
+      pct_missing: totalDisposed > 0 ? Math.round(withoutDate * 100 / totalDisposed) : 0,
+      pct_u7:  withDate > 0 ? Math.round((row.u7  || 0) * 100 / withDate) : 0,
+      pct_u15: withDate > 0 ? Math.round((row.u15 || 0) * 100 / withDate) : 0,
+      pct_u30: withDate > 0 ? Math.round((row.u30 || 0) * 100 / withDate) : 0,
+      pct_o30: withDate > 0 ? Math.round((row.o30 || 0) * 100 / withDate) : 0,
+      pct_o60: withDate > 0 ? Math.round((row.o60 || 0) * 100 / withDate) : 0,
     };
   });
 
   const disposalCols: Column<any>[] = [
-    { key: 'district',  label: 'District',        sortable: true },
-    { key: 'total',     label: 'Total',           sortable: true, align: 'center' },
-    { key: 'within7',  label: 'Within 7 Days',   sortable: true, align: 'center' },
-    { key: 'within15', label: 'Within 15 Days',  sortable: true, align: 'center' },
-    { key: 'within30', label: 'Within 30 Days',  sortable: true, align: 'center' },
-    { key: 'above30',  label: 'Above 30 Days',   sortable: true, align: 'center' },
+    { key: 'district',  label: 'District',          sortable: true },
+    { key: 'total',     label: 'With Date',         sortable: true, align: 'center' },
+    { key: 'missingDates', label: 'Date Not Found', sortable: true, align: 'center' },
+    { key: 'u7',        label: '<7 Days',           sortable: true, align: 'center' },
+    { key: 'u15',       label: '7-15 Days',         sortable: true, align: 'center' },
+    { key: 'u30',       label: '15-30 Days',        sortable: true, align: 'center' },
+    { key: 'o30',       label: '1-2 Months',        sortable: true, align: 'center' },
+    { key: 'o60',       label: 'Over 2 Months',     sortable: true, align: 'center' },
   ];
 
   const renderDisposalDays = (col: any, row: any) => {
-    if (col.key === 'district')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'total')    return <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{row.total}</span>;
-    if (col.key === 'within7')  return <span style={{ color: '#4ade80' }}>{row.within7}</span>;
-    if (col.key === 'within15') return <span style={{ color: '#a3e635' }}>{row.within15}</span>;
-    if (col.key === 'within30') return <span style={{ color: '#eab308' }}>{row.within30}</span>;
-    if (col.key === 'above30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.above30}</span>;
+    if (col.key === 'district')    return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'total')       return <span style={{ fontWeight: 600, color: '#4ade80' }}>{row.total}</span>;
+    if (col.key === 'missingDates') return <span style={{ fontWeight: 600, color: '#fbbf24' }}>{row.missingDates || 0}</span>;
+    if (col.key === 'u7')  return <span style={{ color: '#4ade80' }}>{row.u7}</span>;
+    if (col.key === 'u15') return <span style={{ color: '#a3e635' }}>{row.u15}</span>;
+    if (col.key === 'u30') return <span style={{ color: '#eab308' }}>{row.u30}</span>;
+    if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
+    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
     return row[col.key];
   };
 
   const disposalPctCols: Column<any>[] = [
-    { key: 'district',      label: 'District',        sortable: true },
-    { key: 'pct_total',     label: 'Total',           sortable: true, align: 'center' },
-    { key: 'pct_within7',  label: 'Within 7 Days',   sortable: true, align: 'center' },
-    { key: 'pct_within15', label: 'Within 15 Days',  sortable: true, align: 'center' },
-    { key: 'pct_within30', label: 'Within 30 Days',  sortable: true, align: 'center' },
-    { key: 'pct_above30',  label: 'Above 30 Days',   sortable: true, align: 'center' },
+    { key: 'district',    label: 'District',          sortable: true },
+    { key: 'pct_total',   label: 'With Date',        sortable: true, align: 'center' },
+    { key: 'pct_missing', label: 'Date Not Found',   sortable: true, align: 'center' },
+    { key: 'pct_u7',      label: '<7 Days',         sortable: true, align: 'center' },
+    { key: 'pct_u15',     label: '7-15 Days',       sortable: true, align: 'center' },
+    { key: 'pct_u30',     label: '15-30 Days',       sortable: true, align: 'center' },
+    { key: 'pct_o30',     label: '1-2 Months',        sortable: true, align: 'center' },
+    { key: 'pct_o60',     label: 'Over 2 Months',    sortable: true, align: 'center' },
   ];
 
   const renderDisposalPct = (col: any, row: any) => {
-    if (col.key === 'district')      return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
-    if (col.key === 'pct_total')    return <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{row.pct_total}%</span>;
-    if (col.key === 'pct_within7')  return <span style={{ color: '#4ade80' }}>{row.pct_within7}%</span>;
-    if (col.key === 'pct_within15') return <span style={{ color: '#a3e635' }}>{row.pct_within15}%</span>;
-    if (col.key === 'pct_within30') return <span style={{ color: '#eab308' }}>{row.pct_within30}%</span>;
-    if (col.key === 'pct_above30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_above30}%</span>;
+    if (col.key === 'district')    return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'pct_total')   return <span style={{ fontWeight: 600, color: '#4ade80' }}>{row.pct_total}%</span>;
+    if (col.key === 'pct_missing') return <span style={{ fontWeight: 600, color: '#fbbf24' }}>{row.pct_missing || 0}%</span>;
+    if (col.key === 'pct_u7')  return <span style={{ color: '#4ade80' }}>{row.pct_u7}%</span>;
+    if (col.key === 'pct_u15') return <span style={{ color: '#a3e635' }}>{row.pct_u15}%</span>;
+    if (col.key === 'pct_u30') return <span style={{ color: '#eab308' }}>{row.pct_u30}%</span>;
+    if (col.key === 'pct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
+    if (col.key === 'pct_o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.pct_o60 || 0}%</span>;
     return row[col.key];
   };
 
@@ -553,7 +553,7 @@ export const DashboardPage = () => {
             <StatCard
               label="Disposal Date Not Found"
               value={(s?.disposedMissingDateCount || 0).toLocaleString()}
-              subValue="Marked disposed but date not found"
+              subValue={`${Math.round(((s?.disposedMissingDateCount || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
               colorClass="purple"
               onClick={() => navigate(buildCctnsUrl('disposed_missing_date'))}
             />
@@ -568,6 +568,32 @@ export const DashboardPage = () => {
             height="320px"
           />
           {districtViewType === 'graph' ? (
+            <ChartCard
+              title="Top District Pendency"
+              option={getDistrictBarOptions(sortedDistricts.slice(0, 7).reverse())}
+              fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
+              height="320px"
+              actions={
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
+                  <SortDropdown 
+                    value={districtSort}
+                    onChange={setDistrictSort}
+                    options={[
+                      { value: 'total', label: 'Total Reg' },
+                      { value: 'pending', label: 'Total Pending' },
+                      { value: 'disposed', label: 'Total Disposed' },
+                      { value: 'total_pct_state', label: 'Total % (from state total)' },
+                      { value: 'pending_pct', label: 'Pending % (from district total)' },
+                      { value: 'disposed_pct', label: 'Disposed % (from district total)' },
+                      { value: 'az', label: 'A → Z' },
+                      { value: 'za', label: 'Z → A' },
+                    ]}
+                  />
+                </div>
+              }
+            />
+          ) : (
             <ChartCard
               title="Top District Pendency"
               actions={
@@ -589,46 +615,19 @@ export const DashboardPage = () => {
                   />
                 </div>
               }
-              option={getDistrictBarOptions(sortedDistricts.slice(0, 7).reverse())}
-              fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
-              height="320px"
-            />
-          ) : (
-            <div className="chart-card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div className="chart-card-header">
-                <span className="chart-card-title">Top District Pendency</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
-                  <SortDropdown 
-                    value={districtSort}
-                    onChange={setDistrictSort}
-                    options={[
-                      { value: 'total', label: 'Total Reg' },
-                      { value: 'pending', label: 'Total Pending' },
-                      { value: 'disposed', label: 'Total Disposed' },
-                      { value: 'total_pct_state', label: 'Total % (from state total)' },
-                      { value: 'pending_pct', label: 'Pending % (from district total)' },
-                      { value: 'disposed_pct', label: 'Disposed % (from district total)' },
-                      { value: 'az', label: 'A → Z' },
-                      { value: 'za', label: 'Z → A' },
-                    ]}
-                  />
-                </div>
-              </div>
-              <div className="chart-card-body" style={{ padding: '0 16px 16px', overflow: 'auto' }}>
-                <DataTable
-                  data={sortedDistricts}
-                  columns={[
-                    { key: 'district', label: 'District', sortable: true },
-                    { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
-                    { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
-                    { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
-                  ]}
-                  maxHeight="300px"
-                  onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
-                />
-              </div>
-            </div>
+            >
+              <DataTable
+                data={sortedDistricts}
+                columns={[
+                  { key: 'district', label: 'District', sortable: true },
+                  { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
+                  { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
+                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
+                ]}
+                maxHeight="300px"
+                onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
+              />
+            </ChartCard>
           )}
           {categoryViewType === 'graph' ? (
             <ChartCard
@@ -636,7 +635,7 @@ export const DashboardPage = () => {
               actions={
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
-                  <SortDropdown 
+                  <SortDropdown
                     value={categorySort}
                     onChange={setCategorySort}
                     options={[
@@ -657,12 +656,12 @@ export const DashboardPage = () => {
               height="320px"
             />
           ) : (
-            <div className="chart-card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-              <div className="chart-card-header">
-                <span className="chart-card-title">Top Classes of Incident</span>
+            <ChartCard
+              title="Top Classes of Incident"
+              actions={
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
-                  <SortDropdown 
+                  <SortDropdown
                     value={categorySort}
                     onChange={setCategorySort}
                     options={[
@@ -677,20 +676,19 @@ export const DashboardPage = () => {
                     ]}
                   />
                 </div>
-              </div>
-              <div className="chart-card-body" style={{ padding: '0 16px 16px', overflow: 'auto' }}>
-                <DataTable
-                  data={sortedCategories}
-                  columns={[
-                    { key: 'category', label: 'Category', sortable: true },
-                    { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
-                    { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
-                    { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
-                  ]}
-                  maxHeight="300px"
-                />
-              </div>
-            </div>
+              }
+            >
+              <DataTable
+                data={sortedCategories}
+                columns={[
+                  { key: 'category', label: 'Class of Incident', sortable: true },
+                  { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
+                  { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
+                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
+                ]}
+                maxHeight="300px"
+              />
+            </ChartCard>
           )}
         </div>
 
@@ -777,7 +775,7 @@ export const DashboardPage = () => {
             ) : disposalView === 'numbers' ? (
               <DataTable
                 title="Disposal Time Matrix"
-                data={cumulativeDisposalMatrix}
+                data={disposalMatrixWithPct}
                 columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
                 maxHeight="400px"

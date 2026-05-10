@@ -322,6 +322,10 @@ export const cctnsApi = {
     classOfIncident?: string;
     fromDate?: string;
     toDate?: string;
+    pendencyAge?: string;
+    disposalAge?: string;
+    unmappedPs?: string;
+    psName?: string;
   }) => {
     const response = await api.get('/api/cctns', { params });
     return response.data;

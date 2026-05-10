@@ -303,6 +303,9 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
       toDate = '',
       pendencyAge = '',
       disposalAge = '',
+      unmappedPs = '',
+      // PS name fallback when policeStationMasterId not available
+      psName = '',
     } = request.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page, 10));
@@ -312,6 +315,39 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
 
     // Build where clause using AND so multiple filters never overwrite each other
     const andConditions: any[] = [];
+
+    // ── District filter from drill-down navigation ───────────────────────────
+    // Only apply district name filter when districtIds (global filter) is NOT set.
+    // When districtIds is set, we already have the precise district IDs — adding
+    // district name filter would create a double-district constraint and break the count.
+if (district && !districtIds) {
+      const districtRecord = await prisma.district.findFirst({
+        where: { name: { equals: district, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (districtRecord) {
+        andConditions.push({ districtMasterId: districtRecord.id });
+      } else {
+        // Fallback: text search on districtName field
+        andConditions.push({
+          OR: [
+            { districtName:    { contains: district, mode: 'insensitive' } },
+            { addressDistrict: { contains: district, mode: 'insensitive' } },
+          ],
+        });
+      }
+    }
+
+    // ── PS name filter fallback (when policeStationMasterId is not available) ─
+    // This handles cases where PS data doesn't have master IDs mapped.
+    if (psName && !policeStationIds) {
+      andConditions.push({
+        OR: [
+          { addressPs: { contains: psName, mode: 'insensitive' } },
+          { submitPsCd: { contains: psName, mode: 'insensitive' } },
+        ],
+      });
+    }
 
     // ── Global dashboard filters (district IDs, PS IDs, office IDs, class, date range)
     // These mirror what buildPrismaWhereClause does in the dashboard summary route,
@@ -328,6 +364,7 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     for (const [key, val] of Object.entries(globalWhere)) {
       andConditions.push({ [key]: val });
     }
+    console.log('[cctns] after globalWhere, andConditions count:', andConditions.length);
 
     if (search) {
       andConditions.push({
@@ -339,16 +376,6 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
           { complDesc:     { contains: search, mode: 'insensitive' } },
           { districtName:  { contains: search, mode: 'insensitive' } },
           { addressPs:     { contains: search, mode: 'insensitive' } },
-        ],
-      });
-    }
-
-    if (district) {
-      // Separate AND block — never overwrites the search OR block
-      andConditions.push({
-        OR: [
-          { districtName:    { contains: district, mode: 'insensitive' } },
-          { addressDistrict: { contains: district, mode: 'insensitive' } },
         ],
       });
     }
@@ -368,61 +395,59 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
       andConditions.push({ complRegDt: dateFilter });
     }
 
+    if (unmappedPs === 'true') {
+      andConditions.push({ policeStationMasterId: null });
+    }
+
     if (pendencyAge) {
       const now = new Date();
       if (pendencyAge === 'u7') {
         const d = new Date(now); d.setDate(d.getDate() - 7);
-        andConditions.push({ complRegDt: { gte: d } });
+        andConditions.push({ complRegDt: { gt: d } });
       } else if (pendencyAge === 'u15') {
         const d15 = new Date(now); d15.setDate(d15.getDate() - 15);
         const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
-        andConditions.push({ complRegDt: { gte: d15, lt: d7 } });
+        andConditions.push({ complRegDt: { gt: d15, lte: d7 } });
       } else if (pendencyAge === 'u30') {
         const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
         const d15 = new Date(now); d15.setDate(d15.getDate() - 15);
-        andConditions.push({ complRegDt: { gte: d30, lt: d15 } });
+        andConditions.push({ complRegDt: { gt: d30, lte: d15 } });
       } else if (pendencyAge === 'o30') {
         const d60 = new Date(now); d60.setDate(d60.getDate() - 60);
         const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
-        andConditions.push({ complRegDt: { gte: d60, lt: d30 } });
+        andConditions.push({ complRegDt: { gt: d60, lte: d30 } });
       } else if (pendencyAge === 'o60') {
         const d60 = new Date(now); d60.setDate(d60.getDate() - 60);
-        andConditions.push({ complRegDt: { lt: d60 } });
+        andConditions.push({ complRegDt: { lte: d60 } });
       }
     }
 
-    if (disposalAge) {
-      // Calculate matching IDs by retrieving dates and computing difference in JS.
-      // This is fast enough since we only select required fields and it runs only when drilled down.
-      const disposedRecords = await prisma.complaint.findMany({
-        where: { 
-          AND: [
-            ...andConditions, 
-            { statusGroup: 'disposed' },
-            { isDisposedMissingDate: false },
-            { complRegDt: { not: null } },
-            { disposalDate: { not: null } }
-          ]
-        },
-        select: { id: true, complRegDt: true, disposalDate: true }
-      });
-
-      const matchingIds = disposedRecords.filter(r => {
-        if (!r.disposalDate || !r.complRegDt) return false;
-        const diffDays = (r.disposalDate.getTime() - r.complRegDt.getTime()) / (1000 * 3600 * 24);
-        if (disposalAge === 'u7') return diffDays < 7;
-        if (disposalAge === 'u15') return diffDays >= 7 && diffDays < 15;
-        if (disposalAge === 'u30') return diffDays >= 15 && diffDays < 30;
-        if (disposalAge === 'o30') return diffDays >= 30 && diffDays < 60;
-        if (disposalAge === 'o60') return diffDays >= 60;
-        return false;
-      }).map(r => r.id);
-
-      // If no matching IDs are found, ensure the query returns empty
-      if (matchingIds.length === 0) {
-        andConditions.push({ id: { in: [] } });
-      } else {
-        andConditions.push({ id: { in: matchingIds } });
+if (disposalAge) {
+      if (disposalAge === 'u7') {
+        andConditions.push({
+          disposalDate: { gte: new Date(Date.now() - 7 * 86400000), not: null },
+          statusGroup: 'disposed', isDisposedMissingDate: false,
+        });
+      } else if (disposalAge === 'u15') {
+        andConditions.push({
+          disposalDate: { lte: new Date(Date.now() - 7 * 86400000), gte: new Date(Date.now() - 15 * 86400000), not: null },
+          statusGroup: 'disposed', isDisposedMissingDate: false,
+        });
+      } else if (disposalAge === 'u30') {
+        andConditions.push({
+          disposalDate: { lte: new Date(Date.now() - 15 * 86400000), gte: new Date(Date.now() - 30 * 86400000), not: null },
+          statusGroup: 'disposed', isDisposedMissingDate: false,
+        });
+      } else if (disposalAge === 'o30') {
+        andConditions.push({
+          disposalDate: { lte: new Date(Date.now() - 30 * 86400000), gte: new Date(Date.now() - 60 * 86400000), not: null },
+          statusGroup: 'disposed', isDisposedMissingDate: false,
+        });
+      } else if (disposalAge === 'o60') {
+        andConditions.push({
+          disposalDate: { lte: new Date(Date.now() - 60 * 86400000), not: null },
+          statusGroup: 'disposed', isDisposedMissingDate: false,
+        });
       }
     }
 
