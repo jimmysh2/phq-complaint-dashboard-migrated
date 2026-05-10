@@ -6,6 +6,7 @@ import { Layout } from '@/components/layout/Layout';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { getStackedBarOptions } from '@/components/charts/Charts';
 import { DataTable, Column } from '@/components/data/DataTable';
+import { useFilters } from '@/contexts/FilterContext';
 
 // ─── Mini sort dropdown ─────────────────────────────────────────────────────
 const CAT_SORTS = [
@@ -59,11 +60,16 @@ export const DistrictDetail = () => {
   const { district } = useParams<{ district: string }>();
   const navigate = useNavigate();
   const [catSort, setCatSort] = useState<string>('pending');
+  const [pendencyViewType, setPendencyViewType] = useState<'number' | 'percent'>('number');
+  const [disposalViewType, setDisposalViewType] = useState<'number' | 'percent'>('number');
+  const { filters } = useFilters();
+  const activeFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''));
 
   const { data, isLoading } = useQuery({
-    queryKey: ['district-analysis', district],
+    queryKey: ['district-analysis', district, activeFilters],
     queryFn: async () => {
-      const r = await fetch(`/api/dashboard/district-analysis/${district}`, { 
+      const params = new URLSearchParams(activeFilters as Record<string, string>);
+      const r = await fetch(`/api/dashboard/district-analysis/${district}?${params.toString()}`, { 
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
       });
       return r.json();
@@ -124,6 +130,7 @@ export const DistrictDetail = () => {
   // ── Pendency Ageing Matrix (Days) ─────────────────────────────────────────
   const pendencyCols: Column<any>[] = [
     { key: 'ps',   label: 'Police Station', sortable: true },
+    { key: 'pending', label: 'Total',       sortable: true, align: 'center' },
     { key: 'u7',   label: '< 7 Days',       sortable: true, align: 'center' },
     { key: 'u15',  label: '7-15 Days',      sortable: true, align: 'center' },
     { key: 'u30',  label: '15-30 Days',     sortable: true, align: 'center' },
@@ -133,6 +140,7 @@ export const DistrictDetail = () => {
 
   const renderPendencyDays = (col: Column<any>, row: any) => {
     if (col.key === 'ps')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'pending') return <span style={{ color: '#60a5fa' }}>{row.pending}</span>;
     if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
     if (col.key === 'u15') return <span style={{ color: '#eab308' }}>{row.u15}</span>;
     if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
@@ -156,6 +164,7 @@ export const DistrictDetail = () => {
 
   const pendencyPctCols: Column<any>[] = [
     { key: 'ps',       label: 'Police Station', sortable: true },
+    { key: 'pending',  label: 'Total',          sortable: true, align: 'center' },
     { key: 'pct_u7',   label: '< 7 Days',       sortable: true, align: 'center' },
     { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
     { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
@@ -165,6 +174,7 @@ export const DistrictDetail = () => {
 
   const renderPendencyPct = (col: Column<any>, row: any) => {
     if (col.key === 'ps')       return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'pending')  return <span style={{ color: '#60a5fa' }}>{row.pending}</span>;
     if (col.key === 'pct_u7')   return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
     if (col.key === 'pct_u15')  return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
     if (col.key === 'pct_u30')  return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
@@ -176,6 +186,7 @@ export const DistrictDetail = () => {
   // ── Disposal Time Matrix (Days) ───────────────────────────────────────────
   const disposalCols: Column<any>[] = [
     { key: 'ps',    label: 'Police Station', sortable: true },
+    { key: 'disposed', label: 'Total',       sortable: true, align: 'center' },
     { key: 'du7',   label: '< 7 Days',       sortable: true, align: 'center' },
     { key: 'du15',  label: '7-15 Days',      sortable: true, align: 'center' },
     { key: 'du30',  label: '15-30 Days',     sortable: true, align: 'center' },
@@ -185,6 +196,7 @@ export const DistrictDetail = () => {
 
   const renderDisposalDays = (col: Column<any>, row: any) => {
     if (col.key === 'ps')   return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'disposed') return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
     if (col.key === 'du7')  return <span style={{ color: '#4ade80' }}>{row.du7}</span>;
     if (col.key === 'du15') return <span style={{ color: '#a3e635' }}>{row.du15}</span>;
     if (col.key === 'du30') return <span style={{ color: '#eab308' }}>{row.du30}</span>;
@@ -208,6 +220,7 @@ export const DistrictDetail = () => {
 
   const disposalPctCols: Column<any>[] = [
     { key: 'ps',       label: 'Police Station', sortable: true },
+    { key: 'disposed', label: 'Total',          sortable: true, align: 'center' },
     { key: 'dpct_u7',  label: '< 7 Days',       sortable: true, align: 'center' },
     { key: 'dpct_u15', label: '7-15 Days',      sortable: true, align: 'center' },
     { key: 'dpct_u30', label: '15-30 Days',     sortable: true, align: 'center' },
@@ -217,6 +230,7 @@ export const DistrictDetail = () => {
 
   const renderDisposalPct = (col: Column<any>, row: any) => {
     if (col.key === 'ps')        return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'disposed')  return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
     if (col.key === 'dpct_u7')  return <span style={{ color: '#4ade80' }}>{row.dpct_u7}%</span>;
     if (col.key === 'dpct_u15') return <span style={{ color: '#a3e635' }}>{row.dpct_u15}%</span>;
     if (col.key === 'dpct_u30') return <span style={{ color: '#eab308' }}>{row.dpct_u30}%</span>;
@@ -430,47 +444,93 @@ export const DistrictDetail = () => {
               </div>
             </div>
 
-            {/* Pendency Ageing Matrices */}
+            {/* Pendency Ageing Matrix */}
             <div className="dashboard-matrices-grid">
-              <div style={matrixCardStyle}>
-                <h2 className="text-lg font-bold text-slate-100 mb-4">Pendency Ageing Matrix (Total)</h2>
-                <DataTable
-                  title="Pendency Ageing Matrix (Total)"
-                  data={policeStations}
-                  columns={pendencyCols.map(c => ({ ...c, render: (row) => renderPendencyDays(c, row) }))}
-                  maxHeight="350px"
-                />
+              <div style={{ ...matrixCardStyle, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h2 className="text-lg font-bold text-slate-100">Pendency Ageing Matrix</h2>
+                  <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155', flexShrink: 0 }}>
+                    {(['number', 'percent'] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setPendencyViewType(v)}
+                        style={{
+                          padding: '4px 14px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.18s',
+                          backgroundColor: pendencyViewType === v ? '#3b82f6' : 'transparent',
+                          color: pendencyViewType === v ? '#fff' : '#94a3b8',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {v === 'number' ? '# Numbers' : '% Percent'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {pendencyViewType === 'number' ? (
+                  <DataTable
+                    title="Pendency Ageing Matrix (Total)"
+                    data={policeStations}
+                    columns={pendencyCols.map(c => ({ ...c, render: (row) => renderPendencyDays(c, row) }))}
+                    maxHeight="350px"
+                  />
+                ) : (
+                  <DataTable
+                    title="Pendency Ageing Matrix (%)"
+                    data={pendingWithPct}
+                    columns={pendencyPctCols.map(c => ({ ...c, render: (row) => renderPendencyPct(c, row) }))}
+                    maxHeight="350px"
+                  />
+                )}
               </div>
-              <div style={matrixCardStyle}>
-                <h2 className="text-lg font-bold text-slate-100 mb-4">Pendency Ageing Matrix (%)</h2>
-                <DataTable
-                  title="Pendency Ageing Matrix (%)"
-                  data={pendingWithPct}
-                  columns={pendencyPctCols.map(c => ({ ...c, render: (row) => renderPendencyPct(c, row) }))}
-                  maxHeight="350px"
-                />
-              </div>
-            </div>
 
-            {/* Disposal Time Matrices */}
-            <div className="dashboard-matrices-grid">
-              <div style={matrixCardStyle}>
-                <h2 className="text-lg font-bold text-slate-100 mb-4">Disposal Time Matrix (Total)</h2>
-                <DataTable
-                  title="Disposal Time Matrix (Total)"
-                  data={policeStations}
-                  columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
-                  maxHeight="350px"
-                />
-              </div>
-              <div style={matrixCardStyle}>
-                <h2 className="text-lg font-bold text-slate-100 mb-4">Disposal Time Matrix (%)</h2>
-                <DataTable
-                  title="Disposal Time Matrix (%)"
-                  data={disposalWithPct}
-                  columns={disposalPctCols.map(c => ({ ...c, render: (row) => renderDisposalPct(c, row) }))}
-                  maxHeight="350px"
-                />
+              {/* Disposal Time Matrix */}
+              <div style={{ ...matrixCardStyle, minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
+                  <h2 className="text-lg font-bold text-slate-100">Disposal Time Matrix</h2>
+                  <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155', flexShrink: 0 }}>
+                    {(['number', 'percent'] as const).map((v) => (
+                      <button
+                        key={v}
+                        onClick={() => setDisposalViewType(v)}
+                        style={{
+                          padding: '4px 14px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: 600,
+                          border: 'none',
+                          cursor: 'pointer',
+                          transition: 'all 0.18s',
+                          backgroundColor: disposalViewType === v ? '#3b82f6' : 'transparent',
+                          color: disposalViewType === v ? '#fff' : '#94a3b8',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {v === 'number' ? '# Numbers' : '% Percent'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {disposalViewType === 'number' ? (
+                  <DataTable
+                    title="Disposal Time Matrix (Total)"
+                    data={policeStations}
+                    columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
+                    maxHeight="350px"
+                  />
+                ) : (
+                  <DataTable
+                    title="Disposal Time Matrix (%)"
+                    data={disposalWithPct}
+                    columns={disposalPctCols.map(c => ({ ...c, render: (row) => renderDisposalPct(c, row) }))}
+                    maxHeight="350px"
+                  />
+                )}
               </div>
             </div>
           </>

@@ -63,7 +63,7 @@ const buildRawWhereClause = (query: any): Prisma.Sql => {
   if (toDate) {
     // include the full last day
     const end = new Date(toDate as string);
-    end.setHours(23, 59, 59, 999);
+    end.setUTCHours(23, 59, 59, 999);
     parts.push(Prisma.sql`"complRegDt" <= ${end}`);
   }
 
