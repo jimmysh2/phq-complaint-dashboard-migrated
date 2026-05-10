@@ -302,30 +302,30 @@ export function DataTable<T extends Record<string, unknown>>({
             ref={exportBtnRef}
             onClick={handleExportExcel}
             disabled={exporting !== null}
-            title={onFetchAllForExport && pagination && pagination.total > data.length
+            title={onFetchAllForExport && pagination
               ? `Export all ${pagination.total} records to Excel`
-              : 'Export current view to Excel'}
+              : `Export ${data.length} records to Excel`}
             style={{ padding: '6px 12px', fontSize: '12px', background: exporting === 'excel' ? '#059669' : '#10b981', color: '#fff', border: 'none', borderRadius: '6px', cursor: exporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: exporting && exporting !== 'excel' ? 0.6 : 1, transition: 'background 0.2s' }}
           >
             {exporting === 'excel' ? (
               <><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Exporting…</>
             ) : (
-              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> Excel{pagination && pagination.total > data.length ? ` (All ${pagination.total})` : ''}</>
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg> Excel (All {pagination ? pagination.total : data.length})</>
             )}
           </button>
 
           <button
             onClick={handleExportPDF}
             disabled={exporting !== null}
-            title={onFetchAllForExport && pagination && pagination.total > data.length
+            title={onFetchAllForExport && pagination
               ? `Export all ${pagination.total} records to PDF`
-              : 'Export current view to PDF'}
+              : `Export ${data.length} records to PDF`}
             style={{ padding: '6px 12px', fontSize: '12px', background: exporting === 'pdf' ? '#2563eb' : '#3b82f6', color: '#fff', border: 'none', borderRadius: '6px', cursor: exporting ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: '6px', opacity: exporting && exporting !== 'pdf' ? 0.6 : 1, transition: 'background 0.2s' }}
           >
             {exporting === 'pdf' ? (
               <><span style={{ display: 'inline-block', width: 12, height: 12, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} /> Generating…</>
             ) : (
-              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> PDF{pagination && pagination.total > data.length ? ` (All ${pagination.total})` : ''}</>
+              <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg> PDF (All {pagination ? pagination.total : data.length})</>
             )}
           </button>
 

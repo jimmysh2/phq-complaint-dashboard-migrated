@@ -62,7 +62,9 @@ export const buildPrismaWhereClause = (query: any) => {
       where.complRegDt.gte = new Date(fromDate as string);
     }
     if (toDate) {
-      where.complRegDt.lte = new Date(toDate as string);
+      const endOfDay = new Date(toDate as string);
+      endOfDay.setUTCHours(23, 59, 59, 999);
+      where.complRegDt.lte = endOfDay;
     }
   }
 

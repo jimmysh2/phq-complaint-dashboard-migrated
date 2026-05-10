@@ -1,21 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { DataTable } from '@/components/data/DataTable';
 import { useFilters } from '@/contexts/FilterContext';
 
 const tabs = [
-  { id: 'all',      label: 'All Pending' },
-  { id: '15-30',    label: '15-30 Days' },
-  { id: '30-60',    label: '1-2 Months' },
-  { id: 'over-60',  label: 'Over 2 Months' },
-  { id: 'branch',   label: 'By Branch' },
+  { id: 'all',           label: 'All Pending' },
+  { id: 'under-7-days',  label: '< 7 Days' },
+  { id: '7-14-days',     label: '7-14 Days' },
+  { id: '15-30-days',    label: '15-30 Days' },
+  { id: '30-60-days',    label: '1-2 Months' },
+  { id: 'over-60-days',  label: 'Over 2 Months' },
+  { id: 'branch',        label: 'By Branch' },
 ];
 
 
 export const PendingPage = () => {
-  const [sp] = useSearchParams();
+  const [sp, setSp] = useSearchParams();
   const type = sp.get('type') || 'all';
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(50);
@@ -31,6 +33,17 @@ export const PendingPage = () => {
 
   // Reset page when tab changes
   useEffect(() => { setPage(1); }, [type, branch]);
+
+  const hasDateFilter = Boolean(activeFilters.fromDate || activeFilters.toDate);
+
+  // If global date filters are applied, force 'all' tab (since temporal tabs conflict)
+  useEffect(() => {
+    if (hasDateFilter && type !== 'all' && type !== 'branch') {
+      const newSp = new URLSearchParams(sp);
+      newSp.set('type', 'all');
+      setSp(newSp, { replace: true });
+    }
+  }, [hasDateFilter, type, sp, setSp]);
 
   const { data: branchesData } = useQuery({
     queryKey: ['pending', 'branches'],
@@ -131,9 +144,26 @@ export const PendingPage = () => {
       <div className="page-content">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <div className="tab-list" style={{ marginBottom: 0 }}>
-            {tabs.map(t => (
-              <Link key={t.id} to={`?type=${t.id}`} className={`tab-item ${type === t.id ? 'active' : ''}`}>{t.label}</Link>
-            ))}
+            {tabs.map(t => {
+              const isDisabled = hasDateFilter && t.id !== 'all' && t.id !== 'branch';
+              return (
+                <button 
+                  key={t.id} 
+                  onClick={() => {
+                    if (isDisabled) return;
+                    const newSp = new URLSearchParams(sp);
+                    newSp.set('type', t.id);
+                    setSp(newSp);
+                  }}
+                  className={`tab-item ${type === t.id ? 'active' : ''}`}
+                  disabled={isDisabled}
+                  title={isDisabled ? "Clear Global Date Range to use duration tabs" : ""}
+                  style={isDisabled ? { background: 'none', border: 'none', cursor: 'not-allowed', opacity: 0.5, fontFamily: 'inherit', fontSize: 'inherit' } : { background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit' }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
