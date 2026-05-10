@@ -12,13 +12,10 @@ const tabs = [
   { id: 'district', label: 'District' },
   { id: 'mode-receipt', label: 'Receipt Mode' },
   { id: 'complaint-source', label: 'Complaint Source' },
-  { id: 'nature-incident', label: 'Incident Type' },
   { id: 'type-complaint', label: 'Class of Incident' },
   { id: 'type-against', label: 'Type Against' },
   { id: 'status', label: 'Status' },
   { id: 'branch-wise', label: 'Branch' },
-  { id: 'date-wise', label: 'Date Wise' },
-  { id: 'action-taken', label: 'Action Taken' },
   { id: 'oldest-pending', label: 'Oldest Pending' },
 ];
 
@@ -26,13 +23,10 @@ const apiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>
   'district':         (p) => reportsApi.district(p),
   'mode-receipt':     (p) => reportsApi.modeReceipt(p),
   'complaint-source': (p) => reportsApi.complaintsSource(p),
-  'nature-incident':  (p) => reportsApi.natureIncident(p),
   'type-complaint':   (p) => reportsApi.typeComplaint(p),
   'type-against':     (p) => reportsApi.typeAgainst(p),
   'status':           (p) => reportsApi.status(p),
   'branch-wise':      (p) => reportsApi.branchWise(p),
-  'date-wise':        (p) => reportsApi.dateWise(p),
-  'action-taken':     (p) => reportsApi.actionTaken(p),
   'oldest-pending':   (p) => reportsApi.oldestPending(p),
 };
 
@@ -163,7 +157,7 @@ export const ReportsPage = () => {
   const chartRows = tableData.slice(0, 25).reverse();
 
   const chartOption = useMemo(() => {
-    if (type === 'district' || type === 'branch-wise' || type === 'date-wise')
+    if (type === 'district' || type === 'branch-wise')
       return getDistrictBarOptions(chartRows.map(d => ({ ...d, district: d.name })));
     if (type === 'mode-receipt' || type === 'status') {
       return getPieOptions(chartRows.map(d => ({
@@ -182,7 +176,7 @@ export const ReportsPage = () => {
 
   const fullChartOption = useMemo(() => {
     const allRowsRev = [...tableData].reverse();
-    if (type === 'district' || type === 'branch-wise' || type === 'date-wise')
+    if (type === 'district' || type === 'branch-wise')
       return getDistrictBarOptions(allRowsRev.map(d => ({ ...d, district: d.name })));
     if (type === 'mode-receipt' || type === 'status') {
       return getPieOptions(allRowsRev.map(d => ({

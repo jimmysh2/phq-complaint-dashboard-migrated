@@ -150,10 +150,7 @@ export const reportsApi = {
     const response = await api.get('/api/reports/mode-receipt', { params });
     return response.data;
   },
-  natureIncident: async (params?: Record<string, string>) => {
-    const response = await api.get('/api/reports/nature-incident', { params });
-    return response.data;
-  },
+
   typeAgainst: async (params?: Record<string, string>) => {
     const response = await api.get('/api/reports/type-against', { params });
     return response.data;
@@ -178,14 +175,7 @@ export const reportsApi = {
     const response = await api.get('/api/reports/type-complaint', { params });
     return response.data;
   },
-  dateWise: async (params?: Record<string, string>) => {
-    const response = await api.get('/api/reports/date-wise', { params });
-    return response.data;
-  },
-  actionTaken: async (params?: Record<string, string>) => {
-    const response = await api.get('/api/reports/action-taken', { params });
-    return response.data;
-  },
+
   oldestPending: async (params?: Record<string, string>) => {
     const response = await api.get('/api/reports/oldest-pending', { params });
     return response.data;

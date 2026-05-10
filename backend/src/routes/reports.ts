@@ -58,24 +58,6 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     return sendSuccess(reply, Array.from(map.entries()).map(([mode, stats]) => ({ mode, count: stats.total, ...stats })));
   });
 
-  fastify.get('/reports/nature-incident', {
-    preHandler: [authenticate],
-  }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
-      where,
-      select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
-    });
-    const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      if (!comp.classOfIncident) continue;
-      const key = comp.classOfIncident;
-      const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
-      map.set(key, stats);
-    }
-    return sendSuccess(reply, Array.from(map.entries()).map(([natureOfIncident, stats]) => ({ natureOfIncident, ...stats })));
-  });
 
   fastify.get('/reports/type-against', {
     preHandler: [authenticate],
@@ -190,45 +172,6 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     return sendSuccess(reply, data);
   });
 
-  fastify.get('/reports/date-wise', {
-    preHandler: [authenticate],
-  }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
-    const [districtMapById, complaints] = await Promise.all([
-      getDistrictNameByIdMap(),
-      prisma.complaint.findMany({
-        where,
-        select: { districtMasterId: true, statusGroup: true, isDisposedMissingDate: true },
-      }),
-    ]);
-    const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      const key = comp.districtMasterId ? districtMapById.get(comp.districtMasterId.toString()) || 'Unmapped' : 'Unmapped';
-      const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
-      map.set(key, stats);
-    }
-    return sendSuccess(reply, Array.from(map.entries()).map(([district, stats]) => ({ district, ...stats })));
-  });
-
-  fastify.get('/reports/action-taken', {
-    preHandler: [authenticate],
-  }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
-      where,
-      select: { actionTaken: true, statusGroup: true, isDisposedMissingDate: true },
-    });
-    const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      if (!comp.actionTaken) continue;
-      const key = comp.actionTaken;
-      const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
-      map.set(key, stats);
-    }
-    return sendSuccess(reply, Array.from(map.entries()).map(([actionTaken, stats]) => ({ actionTaken, ...stats })));
-  });
 
   fastify.get('/reports/oldest-pending', {
     preHandler: [authenticate],
