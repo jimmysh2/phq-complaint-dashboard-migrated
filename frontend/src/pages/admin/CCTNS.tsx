@@ -208,17 +208,15 @@ export const CCTNSPage = () => {
         page,
         limit,
         search: searchQuery || undefined,
-        district: filterDistrict || undefined,
-        statusGroup: filterStatus || undefined,
+        district:         (urlDistrict || filterDistrict) || undefined,
+        statusGroup:      filterStatus || undefined,
         isDisposedMissingDate: filterMissingDateOnly ? 'true' : undefined,
         dateFrom: filterDateFrom || undefined,
         dateTo: filterDateTo || undefined,
         sortBy,
         sortOrder,
         // Forward global dashboard filters unchanged — backend applies them via buildPrismaWhereClause
-        district:         (filterDistrict || urlDistrict) || undefined,
         districtIds:      urlDistrictIds || undefined,
-        policeStationIds: urlPsIds       || undefined,
         officeIds:        urlOfficeIds   || undefined,
         classOfIncident:  urlClassOfInc  || undefined,
         fromDate:         urlFromDate    || undefined,
@@ -623,11 +621,33 @@ export const CCTNSPage = () => {
     <Layout>
       <div className="page-content">
         {/* —— Header —— */}
-        <div style={{ marginBottom: 20 }}>
-          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>CCTNS Integration</h2>
-          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
-            Unified Complaint Data from Haryana Police CCTNS API
-          </p>
+        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
+          {hasGlobalFilters && (
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                background: 'rgba(255,255,255,0.05)',
+                border: '1px solid var(--border)',
+                borderRadius: 6,
+                color: 'var(--text-main)',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+              Back
+            </button>
+          )}
+          <div>
+            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>CCTNS Integration</h2>
+            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+              Unified Complaint Data from Haryana Police CCTNS API
+            </p>
+          </div>
         </div>
 
         {/* —— Tabs at the top —— */}

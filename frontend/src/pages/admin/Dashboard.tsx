@@ -471,13 +471,16 @@ export const DashboardPage = () => {
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(matrixSummary), 'Pendency Ageing Matrix');
 
-                // Sheet 6: Disposal Time Matrix (cumulative)
-                const dispMatrix = cumulativeDisposalMatrix.map((d: any) => ({
+                // Sheet 6: Disposal Time Matrix
+                const dispMatrix = disposalMatrix.map((d: any) => ({
                   'District': d.district,
-                  'Within 7 Days (Disposed)': d.within7,
-                  'Within 15 Days (Disposed)': d.within15,
-                  'Within 30 Days (Disposed)': d.within30,
-                  'Above 30 Days (Disposed)': d.above30,
+                  'With Date': d.total || 0,
+                  'Date Not Found': d.missingDates || 0,
+                  '< 7 Days': d.u7,
+                  '7-15 Days': d.u15,
+                  '15-30 Days': d.u30,
+                  '1-2 Months': d.o30,
+                  'Over 2 Months': d.o60,
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dispMatrix), 'Disposal Time Matrix');
                 

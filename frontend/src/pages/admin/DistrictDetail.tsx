@@ -224,7 +224,6 @@ if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url=
   const renderDisposalDays = (col: Column<any>, row: any) => {
     const disposedWithDate = row.disposed || 0;
     const disposedNoDate   = row.missingDates || 0;
-    const totalDisposed    = disposedWithDate + disposedNoDate;
     const denominator      = disposedWithDate || 1;
     if (col.key === 'ps')           return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
     if (col.key === 'disposed')     return <ClickableCell value={disposedWithDate} url={buildCellUrl(row.ps, row.psId, 'disposed')} color="#4ade80" />;
