@@ -270,24 +270,26 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     const { fromDate, toDate } = request.query as Record<string, string>;
     if (!fromDate || !toDate) return sendError(reply, 'fromDate and toDate are required');
 
-    const [districtMapById, complaints] = await Promise.all([
+    const [districtMapById, grouped] = await Promise.all([
       getDistrictNameByIdMap(),
-      prisma.complaint.findMany({
+      prisma.complaint.groupBy({
+        by: ['districtMasterId', 'statusGroup'],
         where: {
           ...buildPrismaWhereClause(request.query),
           complRegDt: { gte: new Date(fromDate), lte: new Date(toDate) },
         },
-        select: { districtMasterId: true, statusGroup: true },
+        _count: { _all: true },
       }),
     ]);
 
     const districtMap = new Map<string, { total: number; pending: number; disposed: number }>();
-    for (const comp of complaints) {
-      const district = getDistrictLabel(comp.districtMasterId, districtMapById);
+    for (const g of grouped) {
+      const district = getDistrictLabel(g.districtMasterId, districtMapById);
       const stats = districtMap.get(district) || { total: 0, pending: 0, disposed: 0 };
-      stats.total++;
-      if (comp.statusGroup === 'pending') stats.pending++;
-      if (comp.statusGroup === 'disposed') stats.disposed++;
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      if (g.statusGroup === 'disposed') stats.disposed += count;
       districtMap.set(district, stats);
     }
 
@@ -305,30 +307,27 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/dashboard/month-wise', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const complaints = await prisma.complaint.findMany({
-      where: buildPrismaWhereClause(request.query),
-      select: { complRegDt: true, statusGroup: true },
-      orderBy: { complRegDt: 'asc' },
-    });
-
-    const monthMap = new Map<string, { total: number; pending: number }>();
-    for (const comp of complaints) {
-      if (!comp.complRegDt) continue;
-      const key = `${comp.complRegDt.getFullYear()}-${String(comp.complRegDt.getMonth() + 1).padStart(2, '0')}`;
-      const stats = monthMap.get(key) || { total: 0, pending: 0 };
-      stats.total++;
-      if (comp.statusGroup === 'pending') stats.pending++;
-      monthMap.set(key, stats);
-    }
+    const { whereClause, params } = buildRawWhereClause(request.query);
+    const sql = `
+      SELECT 
+        to_char("compl_reg_dt" AT TIME ZONE 'UTC', 'YYYY-MM') as month,
+        COUNT(*) as total,
+        SUM(CASE WHEN "status_group" = 'pending' THEN 1 ELSE 0 END) as pending
+      FROM "Complaint"
+      ${whereClause}
+      GROUP BY 1
+      ORDER BY 1 ASC
+    `;
+    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
     return sendSuccess(
       reply,
-      Array.from(monthMap.entries()).map(([month, stats]) => ({
-        month,
-        year: Number(month.split('-')[0]),
-        monthNum: Number(month.split('-')[1]),
-        total: stats.total,
-        pending: stats.pending,
+      rows.filter(r => r.month).map(row => ({
+        month: row.month,
+        year: Number(row.month.split('-')[0]),
+        monthNum: Number(row.month.split('-')[1]),
+        total: Number(row.total),
+        pending: Number(row.pending),
       }))
     );
   });

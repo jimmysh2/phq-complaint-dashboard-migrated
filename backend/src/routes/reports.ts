@@ -22,18 +22,24 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const [districtMapById, complaints] = await Promise.all([
+    const [districtMapById, grouped] = await Promise.all([
       getDistrictNameByIdMap(),
-      prisma.complaint.findMany({
+      prisma.complaint.groupBy({
+        by: ['districtMasterId', 'statusGroup', 'isDisposedMissingDate'],
         where,
-        select: { districtMasterId: true, statusGroup: true, isDisposedMissingDate: true },
+        _count: { _all: true },
       }),
     ]);
     const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      const key = comp.districtMasterId ? districtMapById.get(comp.districtMasterId.toString()) || 'Unmapped' : 'Unmapped';
+    for (const g of grouped) {
+      const key = g.districtMasterId ? districtMapById.get(g.districtMasterId.toString()) || 'Unmapped' : 'Unmapped';
       const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      else if (g.statusGroup === 'disposed') stats.disposed += count;
+      else stats.unknown += count;
+      if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([district, stats]) => ({ district, ...stats })));
@@ -43,16 +49,22 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
+    const grouped = await prisma.complaint.groupBy({
+      by: ['receptionMode', 'statusGroup', 'isDisposedMissingDate'],
       where,
-      select: { receptionMode: true, statusGroup: true, isDisposedMissingDate: true },
+      _count: { _all: true },
     });
     const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      if (!comp.receptionMode) continue;
-      const key = comp.receptionMode;
+    for (const g of grouped) {
+      if (!g.receptionMode) continue;
+      const key = g.receptionMode;
       const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      else if (g.statusGroup === 'disposed') stats.disposed += count;
+      else stats.unknown += count;
+      if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([mode, stats]) => ({ mode, count: stats.total, ...stats })));
@@ -63,16 +75,22 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
+    const grouped = await prisma.complaint.groupBy({
+      by: ['respondentCategories', 'statusGroup', 'isDisposedMissingDate'],
       where,
-      select: { respondentCategories: true, statusGroup: true, isDisposedMissingDate: true },
+      _count: { _all: true },
     });
     const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      if (!comp.respondentCategories) continue;
-      const key = comp.respondentCategories;
+    for (const g of grouped) {
+      if (!g.respondentCategories) continue;
+      const key = g.respondentCategories;
       const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      else if (g.statusGroup === 'disposed') stats.disposed += count;
+      else stats.unknown += count;
+      if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([typeAgainst, stats]) => ({ typeAgainst, ...stats })));
@@ -82,15 +100,21 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
+    const grouped = await prisma.complaint.groupBy({
+      by: ['statusRaw', 'statusGroup', 'isDisposedMissingDate'],
       where,
-      select: { statusRaw: true, statusGroup: true, isDisposedMissingDate: true },
+      _count: { _all: true },
     });
     const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      const key = comp.statusRaw || 'Unknown';
+    for (const g of grouped) {
+      const key = g.statusRaw || 'Unknown';
       const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      else if (g.statusGroup === 'disposed') stats.disposed += count;
+      else stats.unknown += count;
+      if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([status, stats]) => ({ status, count: stats.total, ...stats })));
@@ -100,16 +124,22 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
+    const grouped = await prisma.complaint.groupBy({
+      by: ['complaintSource', 'statusGroup', 'isDisposedMissingDate'],
       where,
-      select: { complaintSource: true, statusGroup: true, isDisposedMissingDate: true },
+      _count: { _all: true },
     });
     const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      if (!comp.complaintSource) continue;
-      const key = comp.complaintSource;
+    for (const g of grouped) {
+      if (!g.complaintSource) continue;
+      const key = g.complaintSource;
       const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      else if (g.statusGroup === 'disposed') stats.disposed += count;
+      else stats.unknown += count;
+      if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([complaintSource, stats]) => ({ complaintSource, ...stats })));
@@ -119,16 +149,22 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
+    const grouped = await prisma.complaint.groupBy({
+      by: ['classOfIncident', 'statusGroup', 'isDisposedMissingDate'],
       where,
-      select: { classOfIncident: true, statusGroup: true, isDisposedMissingDate: true },
+      _count: { _all: true },
     });
     const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      if (!comp.classOfIncident) continue;
-      const key = comp.classOfIncident;
+    for (const g of grouped) {
+      if (!g.classOfIncident) continue;
+      const key = g.classOfIncident;
       const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      else if (g.statusGroup === 'disposed') stats.disposed += count;
+      else stats.unknown += count;
+      if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([typeOfComplaint, stats]) => ({ typeOfComplaint, ...stats })));
@@ -138,16 +174,22 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
+    const grouped = await prisma.complaint.groupBy({
+      by: ['branch', 'statusGroup', 'isDisposedMissingDate'],
       where,
-      select: { branch: true, statusGroup: true, isDisposedMissingDate: true },
+      _count: { _all: true },
     });
     const map = new Map<string, BucketStats>();
-    for (const comp of complaints) {
-      if (!comp.branch) continue;
-      const key = comp.branch;
+    for (const g of grouped) {
+      if (!g.branch) continue;
+      const key = g.branch;
       const stats = map.get(key) || toStats();
-      updateStats(stats, comp.statusGroup, comp.isDisposedMissingDate);
+      const count = g._count._all;
+      stats.total += count;
+      if (g.statusGroup === 'pending') stats.pending += count;
+      else if (g.statusGroup === 'disposed') stats.disposed += count;
+      else stats.unknown += count;
+      if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
     return sendSuccess(reply, Array.from(map.entries()).map(([branch, stats]) => ({ branch, ...stats })));
@@ -157,18 +199,15 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const where = buildPrismaWhereClause(request.query);
-    const complaints = await prisma.complaint.findMany({
+    const grouped = await prisma.complaint.groupBy({
+      by: ['classOfIncident'],
       where,
-      select: { classOfIncident: true },
+      _count: { _all: true },
     });
-    const map = new Map<string, number>();
-    for (const comp of complaints) {
-      if (!comp.classOfIncident) continue;
-      map.set(comp.classOfIncident, (map.get(comp.classOfIncident) || 0) + 1);
-    }
-    const data = Array.from(map.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([category, count]) => ({ category, count }));
+    const data = grouped
+      .filter(g => g.classOfIncident)
+      .map(g => ({ category: g.classOfIncident, count: g._count._all }))
+      .sort((a, b) => b.count - a.count);
     return sendSuccess(reply, data);
   });
 
