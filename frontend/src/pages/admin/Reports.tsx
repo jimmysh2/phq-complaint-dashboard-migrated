@@ -4,7 +4,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ChartCard } from '@/components/charts/ChartCard';
 import { DataTable, Column } from '@/components/data/DataTable';
-import { getPieOptions, getStackedBarOptions, getDistrictBarOptions } from '@/components/charts/Charts';
+import { getStackedBarOptions, getDistrictBarOptions } from '@/components/charts/Charts';
 import { reportsApi } from '@/services/api';
 import { useFilters } from '@/contexts/FilterContext';
 
@@ -76,6 +76,7 @@ export const ReportsPage = () => {
   const [sp] = useSearchParams();
   const type = sp.get('type') || 'district';
   const [chartSort, setChartSort] = useState<string>('total');
+  const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
 
   // Same pattern as Dashboard — read global filters, strip empty values
   const { filters } = useFilters();
@@ -159,14 +160,8 @@ export const ReportsPage = () => {
   const chartOption = useMemo(() => {
     if (type === 'district' || type === 'branch-wise')
       return getDistrictBarOptions(chartRows.map(d => ({ ...d, district: d.name })));
-    if (type === 'mode-receipt' || type === 'status') {
-      return getPieOptions(chartRows.map(d => ({
-        name: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status (No Value from API)' : d.name,
-        value: d.total,
-      })));
-    }
     return getStackedBarOptions(chartRows.map(d => ({
-      category: d.name,
+      category: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status' : d.name,
       total:    d.total,
       pending:  d.pending,
       disposed: d.disposed,
@@ -178,14 +173,8 @@ export const ReportsPage = () => {
     const allRowsRev = [...tableData].reverse();
     if (type === 'district' || type === 'branch-wise')
       return getDistrictBarOptions(allRowsRev.map(d => ({ ...d, district: d.name })));
-    if (type === 'mode-receipt' || type === 'status') {
-      return getPieOptions(allRowsRev.map(d => ({
-        name: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status (No Value from API)' : d.name,
-        value: d.total,
-      })));
-    }
     return getStackedBarOptions(allRowsRev.map(d => ({
-      category: d.name,
+      category: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status' : d.name,
       total:    d.total,
       pending:  d.pending,
       disposed: d.disposed,
@@ -283,38 +272,92 @@ export const ReportsPage = () => {
               </div>
             </div>
 
-            <ChartCard
-              title={tabs.find(t => t.id === type)?.label || 'Report'}
-              option={chartOption}
-              fullOption={fullChartOption}
-              height="280px"
-              actions={
-                <ChartSortDropdown
-                  value={chartSort}
-                  onChange={v => setChartSort(v)}
-                />
-              }
-            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#f8fafc' }}>
+                {tabs.find(t => t.id === type)?.label || 'Report'}
+              </h2>
+              <div style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '8px', padding: '4px' }}>
+                <button
+                  onClick={() => setViewMode('chart')}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    backgroundColor: viewMode === 'chart' ? '#3b82f6' : 'transparent',
+                    color: viewMode === 'chart' ? '#fff' : '#94a3b8',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  Chart
+                </button>
+                <button
+                  onClick={() => setViewMode('table')}
+                  style={{
+                    padding: '6px 16px',
+                    borderRadius: '6px',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                    backgroundColor: viewMode === 'table' ? '#3b82f6' : 'transparent',
+                    color: viewMode === 'table' ? '#fff' : '#94a3b8',
+                    transition: 'all 0.2s ease',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}
+                >
+                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  Table
+                </button>
+              </div>
+            </div>
 
-            <DataTable
-              title={tabs.find(t => t.id === type)?.label || 'Report'}
-              data={tableData}
-              columns={columns.map(c => ({
-                ...c,
-                render: (row) => {
-                  if (c.key === 'name')     return <span style={{ fontWeight: 500 }}>{String(row.name)}</span>;
-                  if (c.key === 'total')    return <span style={{ fontWeight: 600 }}>{String(row.total)}</span>;
-                  if (c.key === 'pending')  return <span style={{ color: '#fbbf24' }}>{String(row.pending)}</span>;
-                  if (c.key === 'disposed') return <span style={{ color: '#34d399' }}>{String(row.disposed)}</span>;
-                  if (c.key === 'unknown')  return <span style={{ color: '#94a3b8' }}>{String(row.unknown)}</span>;
-                  if (c.key === 'pendPct')  return <span style={{ color: '#fbbf24' }}>{String(row.pendPct)}</span>;
-                  if (c.key === 'dispPct')  return <span style={{ color: '#34d399' }}>{String(row.dispPct)}</span>;
-                  if (c.key === 'unknPct')  return <span style={{ color: '#94a3b8' }}>{String(row.unknPct)}</span>;
-                  return String(row[c.key as keyof typeof row] ?? '-');
-                },
-              }))}
-              maxHeight="calc(100vh - 440px)"
-            />
+            {viewMode === 'chart' ? (
+              <ChartCard
+                title="" // Title is now shown above the toggle
+                option={chartOption}
+                fullOption={fullChartOption}
+                height="400px" // Increased height since it has the whole space
+                actions={
+                  <ChartSortDropdown
+                    value={chartSort}
+                    onChange={v => setChartSort(v)}
+                  />
+                }
+              />
+            ) : (
+              <DataTable
+                title="" // Title is now shown above the toggle
+                data={tableData}
+                columns={columns.map(c => ({
+                  ...c,
+                  render: (row) => {
+                    if (c.key === 'name')     return <span style={{ fontWeight: 500 }}>{String(row.name)}</span>;
+                    if (c.key === 'total')    return <span style={{ fontWeight: 600 }}>{String(row.total)}</span>;
+                    if (c.key === 'pending')  return <span style={{ color: '#fbbf24' }}>{String(row.pending)}</span>;
+                    if (c.key === 'disposed') return <span style={{ color: '#34d399' }}>{String(row.disposed)}</span>;
+                    if (c.key === 'unknown')  return <span style={{ color: '#94a3b8' }}>{String(row.unknown)}</span>;
+                    if (c.key === 'pendPct')  return <span style={{ color: '#fbbf24' }}>{String(row.pendPct)}</span>;
+                    if (c.key === 'dispPct')  return <span style={{ color: '#34d399' }}>{String(row.dispPct)}</span>;
+                    if (c.key === 'unknPct')  return <span style={{ color: '#94a3b8' }}>{String(row.unknPct)}</span>;
+                    return String(row[c.key as keyof typeof row] ?? '-');
+                  },
+                }))}
+                maxHeight="calc(100vh - 350px)"
+              />
+            )}
           </>
         )}
       </div>
