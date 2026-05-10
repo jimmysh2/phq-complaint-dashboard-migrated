@@ -101,6 +101,30 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
   );
 };
 
+const ViewToggle = ({ value, onChange }: { value: 'graph' | 'table', onChange: (val: 'graph' | 'table') => void }) => (
+  <div style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '4px', border: '1px solid #334155', overflow: 'hidden' }}>
+    <button 
+      onClick={() => onChange('graph')}
+      style={{
+        padding: '4px 8px', fontSize: '11px', fontWeight: value === 'graph' ? 600 : 400,
+        backgroundColor: value === 'graph' ? '#334155' : 'transparent', color: value === 'graph' ? '#fff' : '#94a3b8'
+      }}
+    >
+      Graph
+    </button>
+    <button 
+      onClick={() => onChange('table')}
+      style={{
+        padding: '4px 8px', fontSize: '11px', fontWeight: value === 'table' ? 600 : 400,
+        backgroundColor: value === 'table' ? '#334155' : 'transparent', color: value === 'table' ? '#fff' : '#94a3b8',
+        borderLeft: '1px solid #334155'
+      }}
+    >
+      Table
+    </button>
+  </div>
+);
+
 export const DashboardPage = () => {
   const navigate = useNavigate();
   const { filters } = useFilters();
@@ -164,6 +188,8 @@ export const DashboardPage = () => {
 
   const [districtSort, setDistrictSort] = useState<string>('total');
   const [categorySort, setCategorySort] = useState<string>('total');
+  const [districtViewType, setDistrictViewType] = useState<'graph' | 'table'>('graph');
+  const [categoryViewType, setCategoryViewType] = useState<'graph' | 'table'>('graph');
   const [pendencyView, setPendencyView] = useState<'numbers' | 'pct'>('numbers');
   const [disposalView, setDisposalView] = useState<'numbers' | 'pct'>('numbers');
 
@@ -204,20 +230,27 @@ export const DashboardPage = () => {
   const sortedDistricts = sortData(districts, districtSort);
   const sortedCategories = sortData(categories, categorySort);
 
-  const matrixWithPct = matrix.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
+  const matrixWithTotal = matrix.map((row: any) => {
+    const total = (row.u7 || 0) + (row.u15 || 0) + (row.u30 || 0) + (row.o30 || 0) + (row.o60 || 0);
+    return { ...row, total };
+  });
+
+  const matrixWithPct = matrixWithTotal.map((row: any) => {
+    const total = row.total || 1;
     return {
       ...row,
-      pct_u7:  Math.round(row.u7  * 100 / total),
-      pct_u15: Math.round(row.u15 * 100 / total),
-      pct_u30: Math.round(row.u30 * 100 / total),
-      pct_o30: Math.round(row.o30 * 100 / total),
+      pct_u7:  Math.round((row.u7 || 0)  * 100 / total),
+      pct_u15: Math.round((row.u15 || 0) * 100 / total),
+      pct_u30: Math.round((row.u30 || 0) * 100 / total),
+      pct_o30: Math.round((row.o30 || 0) * 100 / total),
       pct_o60: Math.round((row.o60 || 0) * 100 / total),
+      pct_total: 100,
     };
   });
 
   const matrixCols: Column<any>[] = [
     { key: 'district', label: 'District',      sortable: true },
+    { key: 'total',    label: 'Total',         sortable: true, align: 'center' },
     { key: 'u7',       label: '<7 Days',        sortable: true, align: 'center' },
     { key: 'u15',      label: '7-15 Days',      sortable: true, align: 'center' },
     { key: 'u30',      label: '15-30 Days',     sortable: true, align: 'center' },
@@ -227,6 +260,7 @@ export const DashboardPage = () => {
 
   const renderMatrixDays = (col: any, row: any) => {
     if (col.key === 'district') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'total') return <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{row.total}</span>;
     if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
     if (col.key === 'u15') return <span style={{ color: '#eab308' }}>{row.u15}</span>;
     if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
@@ -237,6 +271,7 @@ export const DashboardPage = () => {
 
   const matrixPctCols: Column<any>[] = [
     { key: 'district', label: 'District',      sortable: true },
+    { key: 'pct_total',label: 'Total',         sortable: true, align: 'center' },
     { key: 'pct_u7',   label: '<7 Days',        sortable: true, align: 'center' },
     { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
     { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
@@ -246,6 +281,7 @@ export const DashboardPage = () => {
 
   const renderMatrixPct = (col: any, row: any) => {
     if (col.key === 'district')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'pct_total') return <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{row.pct_total}%</span>;
     if (col.key === 'pct_u7')   return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
     if (col.key === 'pct_u15')  return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
     if (col.key === 'pct_u30')  return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
@@ -255,27 +291,33 @@ export const DashboardPage = () => {
   };
 
   // Disposal Time Matrix — cumulative buckets (PR #4)
-  const cumulativeDisposalMatrix = disposalMatrix.map((row: any) => ({
-    ...row,
-    within7:  row.u7,
-    within15: row.u7 + row.u15,
-    within30: row.u7 + row.u15 + row.u30,
-    above30:  row.o30 + (row.o60 || 0),
-  }));
+  const cumulativeDisposalMatrix = disposalMatrix.map((row: any) => {
+    const total = (row.u7 || 0) + (row.u15 || 0) + (row.u30 || 0) + (row.o30 || 0) + (row.o60 || 0);
+    return {
+      ...row,
+      total,
+      within7:  row.u7,
+      within15: row.u7 + row.u15,
+      within30: row.u7 + row.u15 + row.u30,
+      above30:  row.o30 + (row.o60 || 0),
+    };
+  });
 
   const disposalMatrixWithPct = cumulativeDisposalMatrix.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
+    const total = row.total || 1;
     return {
       ...row,
       pct_within7:  Math.round(row.within7  * 100 / total),
       pct_within15: Math.round(row.within15 * 100 / total),
       pct_within30: Math.round(row.within30 * 100 / total),
       pct_above30:  Math.round(row.above30  * 100 / total),
+      pct_total: 100,
     };
   });
 
   const disposalCols: Column<any>[] = [
     { key: 'district',  label: 'District',        sortable: true },
+    { key: 'total',     label: 'Total',           sortable: true, align: 'center' },
     { key: 'within7',  label: 'Within 7 Days',   sortable: true, align: 'center' },
     { key: 'within15', label: 'Within 15 Days',  sortable: true, align: 'center' },
     { key: 'within30', label: 'Within 30 Days',  sortable: true, align: 'center' },
@@ -284,6 +326,7 @@ export const DashboardPage = () => {
 
   const renderDisposalDays = (col: any, row: any) => {
     if (col.key === 'district')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'total')    return <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{row.total}</span>;
     if (col.key === 'within7')  return <span style={{ color: '#4ade80' }}>{row.within7}</span>;
     if (col.key === 'within15') return <span style={{ color: '#a3e635' }}>{row.within15}</span>;
     if (col.key === 'within30') return <span style={{ color: '#eab308' }}>{row.within30}</span>;
@@ -293,6 +336,7 @@ export const DashboardPage = () => {
 
   const disposalPctCols: Column<any>[] = [
     { key: 'district',      label: 'District',        sortable: true },
+    { key: 'pct_total',     label: 'Total',           sortable: true, align: 'center' },
     { key: 'pct_within7',  label: 'Within 7 Days',   sortable: true, align: 'center' },
     { key: 'pct_within15', label: 'Within 15 Days',  sortable: true, align: 'center' },
     { key: 'pct_within30', label: 'Within 30 Days',  sortable: true, align: 'center' },
@@ -301,6 +345,7 @@ export const DashboardPage = () => {
 
   const renderDisposalPct = (col: any, row: any) => {
     if (col.key === 'district')      return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.district}</span>;
+    if (col.key === 'pct_total')    return <span style={{ fontWeight: 600, color: '#e2e8f0' }}>{row.pct_total}%</span>;
     if (col.key === 'pct_within7')  return <span style={{ color: '#4ade80' }}>{row.pct_within7}%</span>;
     if (col.key === 'pct_within15') return <span style={{ color: '#a3e635' }}>{row.pct_within15}%</span>;
     if (col.key === 'pct_within30') return <span style={{ color: '#eab308' }}>{row.pct_within30}%</span>;
@@ -521,50 +566,131 @@ export const DashboardPage = () => {
             fullOption={getDurationLineOptions(durations)}
             height="320px"
           />
-          <ChartCard
-            title="Top District Pendency"
-            actions={
-              <SortDropdown 
-                value={districtSort}
-                onChange={setDistrictSort}
-                options={[
-                  { value: 'total', label: 'Total Reg' },
-                  { value: 'pending', label: 'Total Pending' },
-                  { value: 'disposed', label: 'Total Disposed' },
-                  { value: 'total_pct_state', label: 'Total % (from state total)' },
-                  { value: 'pending_pct', label: 'Pending % (from district total)' },
-                  { value: 'disposed_pct', label: 'Disposed % (from district total)' },
-                  { value: 'az', label: 'A → Z' },
-                  { value: 'za', label: 'Z → A' },
-                ]}
-              />
-            }
-            option={getDistrictBarOptions(sortedDistricts.slice(0, 7).reverse())}
-            fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
-            height="320px"
-          />
-          <ChartCard
-            title="Top Classes of Incident"
-            actions={
-              <SortDropdown 
-                value={categorySort}
-                onChange={setCategorySort}
-                options={[
-                  { value: 'total', label: 'Total Reg' },
-                  { value: 'pending', label: 'Total Pending' },
-                  { value: 'disposed', label: 'Total Disposed' },
-                  { value: 'total_pct_state', label: 'Total % (from state total)' },
-                  { value: 'pending_pct', label: 'Pending % (from category total)' },
-                  { value: 'disposed_pct', label: 'Disposed % (from category total)' },
-                  { value: 'az', label: 'A → Z' },
-                  { value: 'za', label: 'Z → A' },
-                ]}
-              />
-            }
-            option={getStackedBarOptions(sortedCategories.slice(0, 5).reverse())}
-            fullOption={getStackedBarOptions([...sortedCategories].reverse())}
-            height="320px"
-          />
+          {districtViewType === 'graph' ? (
+            <ChartCard
+              title="Top District Pendency"
+              actions={
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
+                  <SortDropdown 
+                    value={districtSort}
+                    onChange={setDistrictSort}
+                    options={[
+                      { value: 'total', label: 'Total Reg' },
+                      { value: 'pending', label: 'Total Pending' },
+                      { value: 'disposed', label: 'Total Disposed' },
+                      { value: 'total_pct_state', label: 'Total % (from state total)' },
+                      { value: 'pending_pct', label: 'Pending % (from district total)' },
+                      { value: 'disposed_pct', label: 'Disposed % (from district total)' },
+                      { value: 'az', label: 'A → Z' },
+                      { value: 'za', label: 'Z → A' },
+                    ]}
+                  />
+                </div>
+              }
+              option={getDistrictBarOptions(sortedDistricts.slice(0, 7).reverse())}
+              fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
+              height="320px"
+            />
+          ) : (
+            <div className="chart-card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="chart-card-header">
+                <span className="chart-card-title">Top District Pendency</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
+                  <SortDropdown 
+                    value={districtSort}
+                    onChange={setDistrictSort}
+                    options={[
+                      { value: 'total', label: 'Total Reg' },
+                      { value: 'pending', label: 'Total Pending' },
+                      { value: 'disposed', label: 'Total Disposed' },
+                      { value: 'total_pct_state', label: 'Total % (from state total)' },
+                      { value: 'pending_pct', label: 'Pending % (from district total)' },
+                      { value: 'disposed_pct', label: 'Disposed % (from district total)' },
+                      { value: 'az', label: 'A → Z' },
+                      { value: 'za', label: 'Z → A' },
+                    ]}
+                  />
+                </div>
+              </div>
+              <div className="chart-card-body" style={{ padding: '0 16px 16px', overflow: 'auto' }}>
+                <DataTable
+                  data={sortedDistricts}
+                  columns={[
+                    { key: 'district', label: 'District', sortable: true },
+                    { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
+                    { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
+                    { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
+                  ]}
+                  maxHeight="300px"
+                  onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
+                />
+              </div>
+            </div>
+          )}
+          {categoryViewType === 'graph' ? (
+            <ChartCard
+              title="Top Classes of Incident"
+              actions={
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
+                  <SortDropdown 
+                    value={categorySort}
+                    onChange={setCategorySort}
+                    options={[
+                      { value: 'total', label: 'Total Reg' },
+                      { value: 'pending', label: 'Total Pending' },
+                      { value: 'disposed', label: 'Total Disposed' },
+                      { value: 'total_pct_state', label: 'Total % (from state total)' },
+                      { value: 'pending_pct', label: 'Pending % (from category total)' },
+                      { value: 'disposed_pct', label: 'Disposed % (from category total)' },
+                      { value: 'az', label: 'A → Z' },
+                      { value: 'za', label: 'Z → A' },
+                    ]}
+                  />
+                </div>
+              }
+              option={getStackedBarOptions(sortedCategories.slice(0, 5).reverse())}
+              fullOption={getStackedBarOptions([...sortedCategories].reverse())}
+              height="320px"
+            />
+          ) : (
+            <div className="chart-card" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+              <div className="chart-card-header">
+                <span className="chart-card-title">Top Classes of Incident</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
+                  <SortDropdown 
+                    value={categorySort}
+                    onChange={setCategorySort}
+                    options={[
+                      { value: 'total', label: 'Total Reg' },
+                      { value: 'pending', label: 'Total Pending' },
+                      { value: 'disposed', label: 'Total Disposed' },
+                      { value: 'total_pct_state', label: 'Total % (from state total)' },
+                      { value: 'pending_pct', label: 'Pending % (from category total)' },
+                      { value: 'disposed_pct', label: 'Disposed % (from category total)' },
+                      { value: 'az', label: 'A → Z' },
+                      { value: 'za', label: 'Z → A' },
+                    ]}
+                  />
+                </div>
+              </div>
+              <div className="chart-card-body" style={{ padding: '0 16px 16px', overflow: 'auto' }}>
+                <DataTable
+                  data={sortedCategories}
+                  columns={[
+                    { key: 'category', label: 'Category', sortable: true },
+                    { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
+                    { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
+                    { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
+                  ]}
+                  maxHeight="300px"
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Matrix cards: Pendency + Disposal side by side ─────────────────── */}
@@ -602,7 +728,7 @@ export const DashboardPage = () => {
             ) : pendencyView === 'numbers' ? (
               <DataTable
                 title="Pendency Ageing Matrix"
-                data={matrix}
+                data={matrixWithTotal}
                 columns={matrixCols.map(c => ({ ...c, render: (row) => renderMatrixDays(c, row) }))}
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
                 maxHeight="400px"
