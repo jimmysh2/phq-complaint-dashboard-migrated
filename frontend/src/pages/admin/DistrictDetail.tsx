@@ -60,9 +60,7 @@ export const DistrictDetail = () => {
   const { district } = useParams<{ district: string }>();
   const navigate = useNavigate();
   const [catSort, setCatSort] = useState<string>('pending');
-  const [pendencyViewType, setPendencyViewType] = useState<'number' | 'percent'>('number');
-  const [disposalViewType, setDisposalViewType] = useState<'number' | 'percent'>('number');
-  const { filters } = useFilters();
+      const { filters } = useFilters();
   const activeFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''));
 
   const { data, isLoading } = useQuery({
@@ -112,17 +110,41 @@ export const DistrictDetail = () => {
     { key: 'avgDisposalDays', label: 'Avg. Disposal (Days)', sortable: true, align: 'center' },
   ];
 
+  const buildCellUrl = (psName: string, statusGroup: string, extraParams: Record<string, string> = {}) => {
+    const p = new URLSearchParams(activeFilters as Record<string, string>);
+    p.set('tab', 'synced');
+    if (district) p.set('district', district);
+    if (psName && psName !== 'Unmapped') p.set('search', psName);
+    if (statusGroup !== 'all') p.set('statusGroup', statusGroup);
+    Object.entries(extraParams).forEach(([k, v]) => p.set(k, v));
+    return `/admin/cctns?${p.toString()}`;
+  };
+
+  const ClickableCell = ({ value, url, color, fw }: { value: any, url: string, color?: string, fw?: any }) => (
+    (typeof value === 'number' && value > 0) || (typeof value === 'string' && value !== '0' && value !== '0%') ? (
+      <span
+        onClick={(e) => { e.stopPropagation(); navigate(url); }}
+        className="hover:underline cursor-pointer"
+        style={{ color, fontWeight: fw }}
+      >
+        {value}
+      </span>
+    ) : (
+      <span style={{ color, fontWeight: fw }}>{value}</span>
+    )
+  );
+
   const renderPsCell = (col: Column<any>, row: any) => {
     if (col.key === 'ps')              return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'total')           return <span style={{ color: '#60a5fa' }}>{row.total}</span>;
-    if (col.key === 'disposed')        return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
-    if (col.key === 'pending')         return <span style={{ color: '#fbbf24' }}>{row.pending}</span>;
-    if (col.key === 'unknown')         return <span style={{ color: '#94a3b8' }}>{row.unknown ?? 0}</span>;
-    if (col.key === 'u7')              return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
-    if (col.key === 'u15')             return <span style={{ color: '#eab308' }}>{row.u15}</span>;
-    if (col.key === 'u30')             return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
-    if (col.key === 'o30')             return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
-    if (col.key === 'o60')             return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
+    if (col.key === 'total')           return <ClickableCell value={row.total} url={buildCellUrl(row.ps, 'all')} color="#60a5fa" />;
+    if (col.key === 'disposed')        return <ClickableCell value={row.disposed} url={buildCellUrl(row.ps, 'disposed')} color="#4ade80" />;
+    if (col.key === 'pending')         return <ClickableCell value={row.pending} url={buildCellUrl(row.ps, 'pending')} color="#fbbf24" />;
+    if (col.key === 'unknown')         return <ClickableCell value={row.unknown ?? 0} url={buildCellUrl(row.ps, 'unknown')} color="#94a3b8" />;
+    if (col.key === 'u7')              return <ClickableCell value={row.u7} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'u7' })} color="var(--text-muted)" />;
+    if (col.key === 'u15')             return <ClickableCell value={row.u15} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'u15' })} color="#eab308" />;
+    if (col.key === 'u30')             return <ClickableCell value={row.u30} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'u30' })} color="#fb923c" fw={500} />;
+    if (col.key === 'o30')             return <ClickableCell value={row.o30} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'o30' })} color="#ef4444" fw="bold" />;
+    if (col.key === 'o60')             return <ClickableCell value={row.o60 || 0} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'o60' })} color="#b91c1c" fw="bold" />;
     if (col.key === 'avgDisposalDays') return <span style={{ color: '#c084fc' }}>{row.avgDisposalDays}d</span>;
     return row[col.key];
   };
@@ -139,47 +161,14 @@ export const DistrictDetail = () => {
   ];
 
   const renderPendencyDays = (col: Column<any>, row: any) => {
+    const total = row.pending || 1;
     if (col.key === 'ps')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'pending') return <span style={{ color: '#60a5fa' }}>{row.pending}</span>;
-    if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}>{row.u7}</span>;
-    if (col.key === 'u15') return <span style={{ color: '#eab308' }}>{row.u15}</span>;
-    if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.u30}</span>;
-    if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.o30}</span>;
-    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.o60 || 0}</span>;
-    return row[col.key];
-  };
-
-  // ── Pendency Ageing Matrix (%) ────────────────────────────────────────────
-  const pendingWithPct = policeStations.map((row: any) => {
-    const total = (row.u7 + row.u15 + row.u30 + row.o30 + (row.o60 || 0)) || 1;
-    return {
-      ...row,
-      pct_u7:  Math.round(row.u7  * 100 / total),
-      pct_u15: Math.round(row.u15 * 100 / total),
-      pct_u30: Math.round(row.u30 * 100 / total),
-      pct_o30: Math.round(row.o30 * 100 / total),
-      pct_o60: Math.round((row.o60 || 0) * 100 / total),
-    };
-  });
-
-  const pendencyPctCols: Column<any>[] = [
-    { key: 'ps',       label: 'Police Station', sortable: true },
-    { key: 'pending',  label: 'Total',          sortable: true, align: 'center' },
-    { key: 'pct_u7',   label: '< 7 Days',       sortable: true, align: 'center' },
-    { key: 'pct_u15',  label: '7-15 Days',      sortable: true, align: 'center' },
-    { key: 'pct_u30',  label: '15-30 Days',     sortable: true, align: 'center' },
-    { key: 'pct_o30',  label: '1-2 Months',     sortable: true, align: 'center' },
-    { key: 'pct_o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
-  ];
-
-  const renderPendencyPct = (col: Column<any>, row: any) => {
-    if (col.key === 'ps')       return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'pending')  return <span style={{ color: '#60a5fa' }}>{row.pending}</span>;
-    if (col.key === 'pct_u7')   return <span style={{ color: 'var(--text-muted)' }}>{row.pct_u7}%</span>;
-    if (col.key === 'pct_u15')  return <span style={{ color: '#eab308' }}>{row.pct_u15}%</span>;
-    if (col.key === 'pct_u30')  return <span style={{ color: '#fb923c', fontWeight: 500 }}>{row.pct_u30}%</span>;
-    if (col.key === 'pct_o30')  return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.pct_o30}%</span>;
-    if (col.key === 'pct_o60')  return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.pct_o60 || 0}%</span>;
+    if (col.key === 'pending') return <ClickableCell value={row.pending} url={buildCellUrl(row.ps, 'pending')} color="#60a5fa" />;
+    if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}><ClickableCell value={row.u7} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'u7' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.u7 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'u15') return <span style={{ color: '#eab308' }}><ClickableCell value={row.u15} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'u15' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.u15 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}><ClickableCell value={row.u30} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'u30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.u30 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}><ClickableCell value={row.o30} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'o30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.o30 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}><ClickableCell value={row.o60 || 0} url={buildCellUrl(row.ps, 'pending', { pendencyAge: 'o60' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.o60 || 0) * 100 / total)}%)</span></span>;
     return row[col.key];
   };
 
@@ -195,47 +184,14 @@ export const DistrictDetail = () => {
   ];
 
   const renderDisposalDays = (col: Column<any>, row: any) => {
+    const total = row.disposed || 1;
     if (col.key === 'ps')   return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'disposed') return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
-    if (col.key === 'du7')  return <span style={{ color: '#4ade80' }}>{row.du7}</span>;
-    if (col.key === 'du15') return <span style={{ color: '#a3e635' }}>{row.du15}</span>;
-    if (col.key === 'du30') return <span style={{ color: '#eab308' }}>{row.du30}</span>;
-    if (col.key === 'do30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.do30}</span>;
-    if (col.key === 'do60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.do60 || 0}</span>;
-    return row[col.key];
-  };
-
-  // ── Disposal Time Matrix (%) ──────────────────────────────────────────────
-  const disposalWithPct = policeStations.map((row: any) => {
-    const total = (row.du7 + row.du15 + row.du30 + row.do30 + (row.do60 || 0)) || 1;
-    return {
-      ...row,
-      dpct_u7:  Math.round(row.du7  * 100 / total),
-      dpct_u15: Math.round(row.du15 * 100 / total),
-      dpct_u30: Math.round(row.du30 * 100 / total),
-      dpct_o30: Math.round(row.do30 * 100 / total),
-      dpct_o60: Math.round((row.do60 || 0) * 100 / total),
-    };
-  });
-
-  const disposalPctCols: Column<any>[] = [
-    { key: 'ps',       label: 'Police Station', sortable: true },
-    { key: 'disposed', label: 'Total',          sortable: true, align: 'center' },
-    { key: 'dpct_u7',  label: '< 7 Days',       sortable: true, align: 'center' },
-    { key: 'dpct_u15', label: '7-15 Days',      sortable: true, align: 'center' },
-    { key: 'dpct_u30', label: '15-30 Days',     sortable: true, align: 'center' },
-    { key: 'dpct_o30', label: '1-2 Months',     sortable: true, align: 'center' },
-    { key: 'dpct_o60', label: 'Over 2 Months',  sortable: true, align: 'center' },
-  ];
-
-  const renderDisposalPct = (col: Column<any>, row: any) => {
-    if (col.key === 'ps')        return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'disposed')  return <span style={{ color: '#4ade80' }}>{row.disposed}</span>;
-    if (col.key === 'dpct_u7')  return <span style={{ color: '#4ade80' }}>{row.dpct_u7}%</span>;
-    if (col.key === 'dpct_u15') return <span style={{ color: '#a3e635' }}>{row.dpct_u15}%</span>;
-    if (col.key === 'dpct_u30') return <span style={{ color: '#eab308' }}>{row.dpct_u30}%</span>;
-    if (col.key === 'dpct_o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}>{row.dpct_o30}%</span>;
-    if (col.key === 'dpct_o60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}>{row.dpct_o60 || 0}%</span>;
+    if (col.key === 'disposed') return <ClickableCell value={row.disposed} url={buildCellUrl(row.ps, 'disposed')} color="#4ade80" />;
+    if (col.key === 'du7')  return <span style={{ color: '#4ade80' }}><ClickableCell value={row.du7} url={buildCellUrl(row.ps, 'disposed', { disposalAge: 'u7' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.du7 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'du15') return <span style={{ color: '#a3e635' }}><ClickableCell value={row.du15} url={buildCellUrl(row.ps, 'disposed', { disposalAge: 'u15' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.du15 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'du30') return <span style={{ color: '#eab308' }}><ClickableCell value={row.du30} url={buildCellUrl(row.ps, 'disposed', { disposalAge: 'u30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.du30 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'do30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}><ClickableCell value={row.do30} url={buildCellUrl(row.ps, 'disposed', { disposalAge: 'o30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.do30 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'do60') return <span style={{ color: '#b91c1c', fontWeight: 'bold' }}><ClickableCell value={row.do60 || 0} url={buildCellUrl(row.ps, 'disposed', { disposalAge: 'o60' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.do60 || 0) * 100 / total)}%)</span></span>;
     return row[col.key];
   };
 
@@ -449,88 +405,26 @@ export const DistrictDetail = () => {
               <div style={{ ...matrixCardStyle, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
                   <h2 className="text-lg font-bold text-slate-100">Pendency Ageing Matrix</h2>
-                  <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155', flexShrink: 0 }}>
-                    {(['number', 'percent'] as const).map((v) => (
-                      <button
-                        key={v}
-                        onClick={() => setPendencyViewType(v)}
-                        style={{
-                          padding: '4px 14px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          border: 'none',
-                          cursor: 'pointer',
-                          transition: 'all 0.18s',
-                          backgroundColor: pendencyViewType === v ? '#3b82f6' : 'transparent',
-                          color: pendencyViewType === v ? '#fff' : '#94a3b8',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {v === 'number' ? '# Numbers' : '% Percent'}
-                      </button>
-                    ))}
-                  </div>
                 </div>
-                {pendencyViewType === 'number' ? (
-                  <DataTable
-                    title="Pendency Ageing Matrix (Total)"
-                    data={policeStations}
-                    columns={pendencyCols.map(c => ({ ...c, render: (row) => renderPendencyDays(c, row) }))}
-                    maxHeight="350px"
-                  />
-                ) : (
-                  <DataTable
-                    title="Pendency Ageing Matrix (%)"
-                    data={pendingWithPct}
-                    columns={pendencyPctCols.map(c => ({ ...c, render: (row) => renderPendencyPct(c, row) }))}
-                    maxHeight="350px"
-                  />
-                )}
+                <DataTable
+                  title="Pendency Ageing Matrix"
+                  data={policeStations}
+                  columns={pendencyCols.map(c => ({ ...c, render: (row) => renderPendencyDays(c, row) }))}
+                  maxHeight="350px"
+                />
               </div>
 
               {/* Disposal Time Matrix */}
               <div style={{ ...matrixCardStyle, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
                   <h2 className="text-lg font-bold text-slate-100">Disposal Time Matrix</h2>
-                  <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155', flexShrink: 0 }}>
-                    {(['number', 'percent'] as const).map((v) => (
-                      <button
-                        key={v}
-                        onClick={() => setDisposalViewType(v)}
-                        style={{
-                          padding: '4px 14px',
-                          borderRadius: '6px',
-                          fontSize: '12px',
-                          fontWeight: 600,
-                          border: 'none',
-                          cursor: 'pointer',
-                          transition: 'all 0.18s',
-                          backgroundColor: disposalViewType === v ? '#3b82f6' : 'transparent',
-                          color: disposalViewType === v ? '#fff' : '#94a3b8',
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        {v === 'number' ? '# Numbers' : '% Percent'}
-                      </button>
-                    ))}
-                  </div>
                 </div>
-                {disposalViewType === 'number' ? (
-                  <DataTable
-                    title="Disposal Time Matrix (Total)"
-                    data={policeStations}
-                    columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
-                    maxHeight="350px"
-                  />
-                ) : (
-                  <DataTable
-                    title="Disposal Time Matrix (%)"
-                    data={disposalWithPct}
-                    columns={disposalPctCols.map(c => ({ ...c, render: (row) => renderDisposalPct(c, row) }))}
-                    maxHeight="350px"
-                  />
-                )}
+                <DataTable
+                  title="Disposal Time Matrix"
+                  data={policeStations}
+                  columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
+                  maxHeight="350px"
+                />
               </div>
             </div>
           </>

@@ -3,72 +3,12 @@ import { prisma } from '../config/database.js';
 import { Prisma } from '@prisma/client';
 import { sendSuccess, sendCached, sendError } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
-import { buildPrismaWhereClause } from '../utils/filters.js';
+import { buildPrismaWhereClause, buildRawWhereClause } from '../utils/filters.js';
 import { cached } from '../utils/cache.js';
 import {
   getDistrictNameByIdMap,
   getPoliceStationNameByIdMap,
 } from '../services/master-mapping.js';
-
-/**
- * Build a dynamic SQL WHERE fragment + Prisma.sql params from the request query.
- * Returns a Prisma.Sql object that can be embedded in a template literal with ${}
- */
-const buildRawWhereClause = (query: any): Prisma.Sql => {
-  const parts: Prisma.Sql[] = [Prisma.sql`"statusGroup" IS NOT NULL`];
-
-  const parseCsv = (v: unknown) =>
-    String(v ?? '').split(',').map(s => s.trim()).filter(Boolean);
-
-  const districtIds = parseCsv(query.districtIds)
-    .filter(v => /^-?\d+$/.test(v))
-    .map(v => BigInt(v));
-  if (districtIds.length > 0) {
-    parts.push(Prisma.sql`"districtMasterId" IN (${Prisma.join(districtIds)})`);
-  }
-
-  const policeStationIds = parseCsv(query.policeStationIds)
-    .filter(v => /^-?\d+$/.test(v))
-    .map(v => BigInt(v));
-  if (policeStationIds.length > 0) {
-    parts.push(Prisma.sql`"policeStationMasterId" IN (${Prisma.join(policeStationIds)})`);
-  }
-
-  const officeIds = parseCsv(query.officeIds)
-    .filter(v => /^-?\d+$/.test(v))
-    .map(v => BigInt(v));
-  if (officeIds.length > 0) {
-    parts.push(Prisma.sql`"officeMasterId" IN (${Prisma.join(officeIds)})`);
-  }
-
-  const classOfIncident = parseCsv(query.classOfIncident);
-  if (classOfIncident.length > 0) {
-    if (classOfIncident.includes(UNMAPPED)) {
-      const nonUnmapped = classOfIncident.filter(c => c !== UNMAPPED);
-      if (nonUnmapped.length > 0) {
-        parts.push(Prisma.sql`(COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') IN (${Prisma.join(nonUnmapped)}) OR COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') = 'Unmapped')`);
-      } else {
-        parts.push(Prisma.sql`COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') = 'Unmapped'`);
-      }
-    } else {
-      parts.push(Prisma.sql`COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped') IN (${Prisma.join(classOfIncident)})`);
-    }
-  }
-
-  const fromDate = query.from_date || query.fromDate;
-  const toDate   = query.to_date   || query.toDate;
-  if (fromDate) {
-    parts.push(Prisma.sql`"complRegDt" >= ${new Date(fromDate as string)}`);
-  }
-  if (toDate) {
-    // include the full last day
-    const end = new Date(toDate as string);
-    end.setUTCHours(23, 59, 59, 999);
-    parts.push(Prisma.sql`"complRegDt" <= ${end}`);
-  }
-
-  return Prisma.join(parts, ' AND ');
-};
 
 const UNMAPPED = 'Unmapped';
 
@@ -307,18 +247,17 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/dashboard/month-wise', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const { whereClause, params } = buildRawWhereClause(request.query);
-    const sql = `
+    const filterWhere = buildRawWhereClause(request.query);
+    const rows = await prisma.$queryRaw<Array<{ month: string, total: bigint, pending: bigint }>>`
       SELECT 
-        to_char("compl_reg_dt" AT TIME ZONE 'UTC', 'YYYY-MM') as month,
+        to_char("complRegDt" AT TIME ZONE 'UTC', 'YYYY-MM') as month,
         COUNT(*) as total,
-        SUM(CASE WHEN "status_group" = 'pending' THEN 1 ELSE 0 END) as pending
+        SUM(CASE WHEN "statusGroup" = 'pending' THEN 1 ELSE 0 END) as pending
       FROM "Complaint"
-      ${whereClause}
+      WHERE ${filterWhere}
       GROUP BY 1
       ORDER BY 1 ASC
     `;
-    const rows = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
     return sendSuccess(
       reply,
@@ -341,24 +280,30 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       const filterWhere = buildRawWhereClause(request.query);
       const rows = await prisma.$queryRaw<Array<{
         districtMasterId: bigint | null;
+        pending: bigint;
+        missingDates: bigint;
         u7: bigint; u15: bigint; u30: bigint; o30: bigint; o60: bigint;
       }>>`
         SELECT
           "districtMasterId",
-          COUNT(*) FILTER (WHERE NOW() - "complRegDt" < INTERVAL '7 days')   AS u7,
-          COUNT(*) FILTER (WHERE NOW() - "complRegDt" >= INTERVAL '7 days'  AND NOW() - "complRegDt" < INTERVAL '15 days') AS u15,
-          COUNT(*) FILTER (WHERE NOW() - "complRegDt" >= INTERVAL '15 days' AND NOW() - "complRegDt" < INTERVAL '30 days') AS u30,
-          COUNT(*) FILTER (WHERE NOW() - "complRegDt" >= INTERVAL '30 days' AND NOW() - "complRegDt" < INTERVAL '60 days') AS o30,
-          COUNT(*) FILTER (WHERE NOW() - "complRegDt" >= INTERVAL '60 days')                                               AS o60
+          COUNT(*) as pending,
+          COUNT(*) FILTER (WHERE "complRegDt" IS NULL) AS "missingDates",
+          COUNT(*) FILTER (WHERE "complRegDt" IS NOT NULL AND NOW() - "complRegDt" < INTERVAL '7 days')   AS u7,
+          COUNT(*) FILTER (WHERE "complRegDt" IS NOT NULL AND NOW() - "complRegDt" >= INTERVAL '7 days'  AND NOW() - "complRegDt" < INTERVAL '15 days') AS u15,
+          COUNT(*) FILTER (WHERE "complRegDt" IS NOT NULL AND NOW() - "complRegDt" >= INTERVAL '15 days' AND NOW() - "complRegDt" < INTERVAL '30 days') AS u30,
+          COUNT(*) FILTER (WHERE "complRegDt" IS NOT NULL AND NOW() - "complRegDt" >= INTERVAL '30 days' AND NOW() - "complRegDt" < INTERVAL '60 days') AS o30,
+          COUNT(*) FILTER (WHERE "complRegDt" IS NOT NULL AND NOW() - "complRegDt" >= INTERVAL '60 days')                                               AS o60
         FROM "Complaint"
         WHERE "statusGroup" = 'pending'
-          AND "complRegDt" IS NOT NULL
+
           AND ${filterWhere}
         GROUP BY "districtMasterId"
       `;
       const districtMapById = await getDistrictNameByIdMap();
       return rows.map(r => ({
         district: r.districtMasterId ? (districtMapById.get(r.districtMasterId.toString()) || UNMAPPED) : UNMAPPED,
+        pending: Number(r.pending),
+        missingDates: Number(r.missingDates),
         u7:  Number(r.u7),
         u15: Number(r.u15),
         u30: Number(r.u30),
@@ -379,21 +324,21 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       const [rows, missingDates] = await Promise.all([
         prisma.$queryRaw<Array<{
           districtMasterId: bigint | null;
+          disposed: bigint;
           u7: bigint; u15: bigint; u30: bigint; o30: bigint; o60: bigint;
         }>>`
           SELECT
             "districtMasterId",
-            COUNT(*) FILTER (WHERE "disposalDate" - "complRegDt" < INTERVAL '7 days')   AS u7,
-            COUNT(*) FILTER (WHERE "disposalDate" - "complRegDt" >= INTERVAL '7 days'  AND "disposalDate" - "complRegDt" < INTERVAL '15 days') AS u15,
-            COUNT(*) FILTER (WHERE "disposalDate" - "complRegDt" >= INTERVAL '15 days' AND "disposalDate" - "complRegDt" < INTERVAL '30 days') AS u30,
-            COUNT(*) FILTER (WHERE "disposalDate" - "complRegDt" >= INTERVAL '30 days' AND "disposalDate" - "complRegDt" < INTERVAL '60 days') AS o30,
-            COUNT(*) FILTER (WHERE "disposalDate" - "complRegDt" >= INTERVAL '60 days')                                                        AS o60
+            COUNT(*) as disposed,
+            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" < INTERVAL '7 days')   AS u7,
+            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '7 days'  AND "disposalDate" - "complRegDt" < INTERVAL '15 days') AS u15,
+            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '15 days' AND "disposalDate" - "complRegDt" < INTERVAL '30 days') AS u30,
+            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '30 days' AND "disposalDate" - "complRegDt" < INTERVAL '60 days') AS o30,
+            COUNT(*) FILTER (WHERE "disposalDate" >= "complRegDt" AND "disposalDate" - "complRegDt" >= INTERVAL '60 days')                                                        AS o60
           FROM "Complaint"
           WHERE "statusGroup" = 'disposed'
             AND "isDisposedMissingDate" = false
-            AND "complRegDt" IS NOT NULL
-            AND "disposalDate" IS NOT NULL
-            AND "disposalDate" >= "complRegDt"
+
             AND ${filterWhere}
           GROUP BY "districtMasterId"
         `,
@@ -405,6 +350,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       return {
         rows: rows.map(r => ({
           district: r.districtMasterId ? (districtMapById.get(r.districtMasterId.toString()) || UNMAPPED) : UNMAPPED,
+          disposed: Number(r.disposed),
           u7:  Number(r.u7),
           u15: Number(r.u15),
           u30: Number(r.u30),
@@ -420,8 +366,10 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
   fastify.get<{ Params: { district: string } }>('/dashboard/district-analysis/:district', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const districtParam = decodeURIComponent(request.params.district || '').trim();
-    const baseWhere = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify({ ...(request.query as any), district: request.params.district });
+    const data = await cached(`district-analysis:${q}`, 5 * 60 * 1000, async () => {
+      const districtParam = decodeURIComponent(request.params.district || '').trim();
+      const baseWhere = buildPrismaWhereClause(request.query);
 
     let districtFilter: any;
     if (!districtParam || districtParam.toLowerCase() === UNMAPPED.toLowerCase()) {
@@ -429,7 +377,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     } else {
       const district = await prisma.district.findFirst({ where: { name: { equals: districtParam, mode: 'insensitive' } } });
       if (!district) {
-        return sendSuccess(reply, { district: districtParam, policeStations: [], categories: [] });
+        return { district: districtParam, policeStations: [], categories: [] };
       }
       districtFilter = { districtMasterId: district.id };
     }
@@ -535,12 +483,15 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
 
     const categories = Array.from(categoryMap.entries()).map(([category, stats]) => ({ category, ...stats }));
 
-    return sendCached(reply, {
+    return {
       district: districtParam || UNMAPPED,
       policeStations,
       categories,
-    });
+    };
   });
+
+  return sendCached(reply, data);
+});
 
   fastify.get('/dashboard/category-wise', {
     preHandler: [authenticate],

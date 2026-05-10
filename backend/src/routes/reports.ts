@@ -1,9 +1,10 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database.js';
-import { sendSuccess } from '../utils/response.js';
+import { sendSuccess, sendCached } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { getDistrictNameByIdMap, getPoliceStationNameByIdMap } from '../services/master-mapping.js';
-import { buildPrismaWhereClause } from '../utils/filters.js';
+import { buildPrismaWhereClause, buildRawWhereClause } from '../utils/filters.js';
+import { cached } from '../utils/cache.js';
 
 type BucketStats = { total: number; pending: number; disposed: number; unknown: number; missingDates: number };
 
@@ -21,7 +22,9 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/reports/district', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-district:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const [districtMapById, grouped] = await Promise.all([
       getDistrictNameByIdMap(),
       prisma.complaint.groupBy({
@@ -42,13 +45,17 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
-    return sendSuccess(reply, Array.from(map.entries()).map(([district, stats]) => ({ district, ...stats })));
+      return Array.from(map.entries()).map(([district, stats]) => ({ district, ...stats }));
+    });
+    return sendCached(reply, data);
   });
 
   fastify.get('/reports/mode-receipt', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-mode-receipt:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const grouped = await prisma.complaint.groupBy({
       by: ['receptionMode', 'statusGroup', 'isDisposedMissingDate'],
       where,
@@ -67,14 +74,18 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
-    return sendSuccess(reply, Array.from(map.entries()).map(([mode, stats]) => ({ mode, count: stats.total, ...stats })));
+      return Array.from(map.entries()).map(([mode, stats]) => ({ mode, count: stats.total, ...stats }));
+    });
+    return sendCached(reply, data);
   });
 
 
   fastify.get('/reports/type-against', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-type-against:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const grouped = await prisma.complaint.groupBy({
       by: ['respondentCategories', 'statusGroup', 'isDisposedMissingDate'],
       where,
@@ -93,13 +104,17 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
-    return sendSuccess(reply, Array.from(map.entries()).map(([typeAgainst, stats]) => ({ typeAgainst, ...stats })));
+      return Array.from(map.entries()).map(([typeAgainst, stats]) => ({ typeAgainst, ...stats }));
+    });
+    return sendCached(reply, data);
   });
 
   fastify.get('/reports/status', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-status:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const grouped = await prisma.complaint.groupBy({
       by: ['statusRaw', 'statusGroup', 'isDisposedMissingDate'],
       where,
@@ -117,13 +132,17 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
-    return sendSuccess(reply, Array.from(map.entries()).map(([status, stats]) => ({ status, count: stats.total, ...stats })));
+      return Array.from(map.entries()).map(([status, stats]) => ({ status, count: stats.total, ...stats }));
+    });
+    return sendCached(reply, data);
   });
 
   fastify.get('/reports/complaint-source', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-complaint-source:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const grouped = await prisma.complaint.groupBy({
       by: ['complaintSource', 'statusGroup', 'isDisposedMissingDate'],
       where,
@@ -142,13 +161,17 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
-    return sendSuccess(reply, Array.from(map.entries()).map(([complaintSource, stats]) => ({ complaintSource, ...stats })));
+      return Array.from(map.entries()).map(([complaintSource, stats]) => ({ complaintSource, ...stats }));
+    });
+    return sendCached(reply, data);
   });
 
   fastify.get('/reports/type-complaint', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-type-complaint:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const grouped = await prisma.complaint.groupBy({
       by: ['classOfIncident', 'statusGroup', 'isDisposedMissingDate'],
       where,
@@ -167,13 +190,17 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
-    return sendSuccess(reply, Array.from(map.entries()).map(([typeOfComplaint, stats]) => ({ typeOfComplaint, ...stats })));
+      return Array.from(map.entries()).map(([typeOfComplaint, stats]) => ({ typeOfComplaint, ...stats }));
+    });
+    return sendCached(reply, data);
   });
 
   fastify.get('/reports/branch-wise', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-branch-wise:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const grouped = await prisma.complaint.groupBy({
       by: ['branch', 'statusGroup', 'isDisposedMissingDate'],
       where,
@@ -192,23 +219,28 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       if (g.isDisposedMissingDate) stats.missingDates += count;
       map.set(key, stats);
     }
-    return sendSuccess(reply, Array.from(map.entries()).map(([branch, stats]) => ({ branch, ...stats })));
+      return Array.from(map.entries()).map(([branch, stats]) => ({ branch, ...stats }));
+    });
+    return sendCached(reply, data);
   });
 
   fastify.get('/reports/highlights', {
     preHandler: [authenticate],
   }, async (request, reply) => {
-    const where = buildPrismaWhereClause(request.query);
+    const q = JSON.stringify(request.query);
+    const data = await cached(`report-highlights:${q}`, 5 * 60 * 1000, async () => {
+      const where = buildPrismaWhereClause(request.query);
     const grouped = await prisma.complaint.groupBy({
       by: ['classOfIncident'],
       where,
       _count: { _all: true },
     });
-    const data = grouped
-      .filter(g => g.classOfIncident)
-      .map(g => ({ category: g.classOfIncident, count: g._count._all }))
-      .sort((a, b) => b.count - a.count);
-    return sendSuccess(reply, data);
+      return grouped
+        .filter(g => g.classOfIncident)
+        .map(g => ({ category: g.classOfIncident, count: g._count._all }))
+        .sort((a, b) => b.count - a.count);
+    });
+    return sendCached(reply, data);
   });
 
 
@@ -216,68 +248,70 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     preHandler: [authenticate],
   }, async (request, reply) => {
     const query = request.query as any;
-    const where = buildPrismaWhereClause(query);
-    const targetDistrictId = query.districtMasterId;
+    const q = JSON.stringify(query);
+    const data = await cached(`report-oldest-pending:${q}`, 5 * 60 * 1000, async () => {
+      const filterWhere = buildRawWhereClause(query);
+      const targetDistrictId = query.districtMasterId;
 
     if (targetDistrictId) {
       // PS-wise for specific district
-      const psOldest = await prisma.complaint.findMany({
-        where: { ...where, statusGroup: 'pending', complRegDt: { not: null }, districtMasterId: BigInt(targetDistrictId) },
-        distinct: ['policeStationMasterId'],
-        orderBy: [
-          { policeStationMasterId: 'asc' },
-          { complRegDt: 'asc' }
-        ],
-        select: {
-          policeStationMasterId: true,
-          complRegDt: true,
-          complRegNum: true,
-        }
-      });
-
+      // Make sure we filter by the selected district as well.
+      // buildRawWhereClause handles districtMasterId if passed in query!
+      const psOldest = await prisma.$queryRaw<any[]>`
+        SELECT "policeStationMasterId" as police_station_master_id, "complRegDt" as compl_reg_dt, "complRegNum" as compl_reg_num
+        FROM (
+          SELECT 
+            "policeStationMasterId", "complRegDt", "complRegNum",
+            ROW_NUMBER() OVER(PARTITION BY "policeStationMasterId" ORDER BY "complRegDt" ASC) as rn
+          FROM "Complaint"
+          WHERE ${filterWhere}
+            AND "districtMasterId" = ${BigInt(targetDistrictId)}
+            AND "statusGroup" = 'pending' AND "complRegDt" IS NOT NULL
+        ) sub
+        WHERE rn = 1
+      `;
       const psMap = await getPoliceStationNameByIdMap();
       
       const results = psOldest.map(c => {
-        const psId = c.policeStationMasterId ? c.policeStationMasterId.toString() : null;
+        const psId = c.police_station_master_id ? c.police_station_master_id.toString() : null;
         return {
           id: psId,
           type: 'ps',
           name: psId && psMap.has(psId) ? psMap.get(psId) : 'Unmapped',
-          oldestDate: c.complRegDt,
-          complaintNumber: c.complRegNum
+          oldestDate: c.compl_reg_dt,
+          complaintNumber: c.compl_reg_num
         };
       });
-      return sendSuccess(reply, results);
-
-    } else {
+        return results;
+      } else {
       // District-wise for all districts
-      const districtOldest = await prisma.complaint.findMany({
-        where: { ...where, statusGroup: 'pending', complRegDt: { not: null } },
-        distinct: ['districtMasterId'],
-        orderBy: [
-          { districtMasterId: 'asc' },
-          { complRegDt: 'asc' }
-        ],
-        select: {
-          districtMasterId: true,
-          complRegDt: true,
-          complRegNum: true,
-        }
-      });
-
+      const districtOldest = await prisma.$queryRaw<any[]>`
+        SELECT "districtMasterId" as district_master_id, "complRegDt" as compl_reg_dt, "complRegNum" as compl_reg_num
+        FROM (
+          SELECT 
+            "districtMasterId", "complRegDt", "complRegNum",
+            ROW_NUMBER() OVER(PARTITION BY "districtMasterId" ORDER BY "complRegDt" ASC) as rn
+          FROM "Complaint"
+          WHERE ${filterWhere}
+            AND "statusGroup" = 'pending' AND "complRegDt" IS NOT NULL
+        ) sub
+        WHERE rn = 1
+      `;
       const districtMap = await getDistrictNameByIdMap();
       
       const results = districtOldest.map(c => {
-        const distId = c.districtMasterId ? c.districtMasterId.toString() : null;
+        const distId = c.district_master_id ? c.district_master_id.toString() : null;
         return {
           id: distId,
           type: 'district',
           name: distId && districtMap.has(distId) ? districtMap.get(distId) : 'Unmapped',
-          oldestDate: c.complRegDt,
-          complaintNumber: c.complRegNum
+          oldestDate: c.compl_reg_dt,
+          complaintNumber: c.compl_reg_num
         };
       });
-      return sendSuccess(reply, results);
-    }
+        return results;
+      }
+    });
+    return sendCached(reply, data);
   });
 };

@@ -231,7 +231,8 @@ export const DashboardPage = () => {
   const sortedCategories = sortData(categories, categorySort);
 
   const matrixWithTotal = matrix.map((row: any) => {
-    const total = (row.u7 || 0) + (row.u15 || 0) + (row.u30 || 0) + (row.o30 || 0) + (row.o60 || 0);
+    // API now returns row.pending with the actual total from DB including those with missing dates
+    const total = row.pending ?? ((row.u7 || 0) + (row.u15 || 0) + (row.u30 || 0) + (row.o30 || 0) + (row.o60 || 0));
     return { ...row, total };
   });
 
@@ -292,7 +293,7 @@ export const DashboardPage = () => {
 
   // Disposal Time Matrix — cumulative buckets (PR #4)
   const cumulativeDisposalMatrix = disposalMatrix.map((row: any) => {
-    const total = (row.u7 || 0) + (row.u15 || 0) + (row.u30 || 0) + (row.o30 || 0) + (row.o60 || 0);
+    const total = row.disposed ?? ((row.u7 || 0) + (row.u15 || 0) + (row.u30 || 0) + (row.o30 || 0) + (row.o60 || 0));
     return {
       ...row,
       total,

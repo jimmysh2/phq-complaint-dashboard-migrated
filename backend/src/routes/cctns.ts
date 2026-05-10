@@ -301,6 +301,8 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
       classOfIncident = '',
       fromDate = '',
       toDate = '',
+      pendencyAge = '',
+      disposalAge = '',
     } = request.query as Record<string, string>;
 
     const pageNum = Math.max(1, parseInt(page, 10));
@@ -366,8 +368,65 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
       andConditions.push({ complRegDt: dateFilter });
     }
 
-    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
+    if (pendencyAge) {
+      const now = new Date();
+      if (pendencyAge === 'u7') {
+        const d = new Date(now); d.setDate(d.getDate() - 7);
+        andConditions.push({ complRegDt: { gte: d } });
+      } else if (pendencyAge === 'u15') {
+        const d15 = new Date(now); d15.setDate(d15.getDate() - 15);
+        const d7 = new Date(now); d7.setDate(d7.getDate() - 7);
+        andConditions.push({ complRegDt: { gte: d15, lt: d7 } });
+      } else if (pendencyAge === 'u30') {
+        const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+        const d15 = new Date(now); d15.setDate(d15.getDate() - 15);
+        andConditions.push({ complRegDt: { gte: d30, lt: d15 } });
+      } else if (pendencyAge === 'o30') {
+        const d60 = new Date(now); d60.setDate(d60.getDate() - 60);
+        const d30 = new Date(now); d30.setDate(d30.getDate() - 30);
+        andConditions.push({ complRegDt: { gte: d60, lt: d30 } });
+      } else if (pendencyAge === 'o60') {
+        const d60 = new Date(now); d60.setDate(d60.getDate() - 60);
+        andConditions.push({ complRegDt: { lt: d60 } });
+      }
+    }
 
+    if (disposalAge) {
+      // Calculate matching IDs by retrieving dates and computing difference in JS.
+      // This is fast enough since we only select required fields and it runs only when drilled down.
+      const disposedRecords = await prisma.complaint.findMany({
+        where: { 
+          AND: [
+            ...andConditions, 
+            { statusGroup: 'disposed' },
+            { isDisposedMissingDate: false },
+            { complRegDt: { not: null } },
+            { disposalDate: { not: null } }
+          ]
+        },
+        select: { id: true, complRegDt: true, disposalDate: true }
+      });
+
+      const matchingIds = disposedRecords.filter(r => {
+        if (!r.disposalDate || !r.complRegDt) return false;
+        const diffDays = (r.disposalDate.getTime() - r.complRegDt.getTime()) / (1000 * 3600 * 24);
+        if (disposalAge === 'u7') return diffDays < 7;
+        if (disposalAge === 'u15') return diffDays >= 7 && diffDays < 15;
+        if (disposalAge === 'u30') return diffDays >= 15 && diffDays < 30;
+        if (disposalAge === 'o30') return diffDays >= 30 && diffDays < 60;
+        if (disposalAge === 'o60') return diffDays >= 60;
+        return false;
+      }).map(r => r.id);
+
+      // If no matching IDs are found, ensure the query returns empty
+      if (matchingIds.length === 0) {
+        andConditions.push({ id: { in: [] } });
+      } else {
+        andConditions.push({ id: { in: matchingIds } });
+      }
+    }
+
+    const where: any = andConditions.length > 0 ? { AND: andConditions } : {};
 
     // Validate sortBy to prevent injection
     const allowedSortFields = [
