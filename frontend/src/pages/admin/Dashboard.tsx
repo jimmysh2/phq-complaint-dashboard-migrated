@@ -37,7 +37,6 @@ const StatCard = ({ label, value, subValue, detail, colorClass, onClick }: { lab
 
 const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (val: string) => void, options: {label: string, value: string}[] }) => {
   const [open, setOpen] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   
@@ -52,7 +51,6 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
   }, []);
 
   const handleMouseLeave = () => {
-    setIsHovering(false);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
@@ -61,7 +59,6 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setIsHovering(true);
     setOpen(true);
   };
 
@@ -97,8 +94,8 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
             zIndex: 9999,
             padding: '4px 0',
           }}
-          onMouseEnter={() => { setIsHovering(true); if (timeoutRef.current) clearTimeout(timeoutRef.current); }}
-          onMouseLeave={() => { setIsHovering(false); }}
+          onMouseEnter={() => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }}
+          onMouseLeave={() => { }}
         >
           {options.map((opt: any) => (
             <div

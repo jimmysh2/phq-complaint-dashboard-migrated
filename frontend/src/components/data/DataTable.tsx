@@ -41,6 +41,8 @@ interface Props<T> {
   isCardExpanded?: boolean;
   /** Optional: hide the title bar completely (for use inside ChartCard) */
   hideTitleBar?: boolean;
+  /** Optional: hide the expand button - ChartCard already has one */
+  noExpand?: boolean;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────

@@ -18,7 +18,6 @@ const CAT_SORTS = [
 ];
 const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
   const [open, setOpen] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -28,7 +27,6 @@ const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: str
   }, []);
 
   const handleMouseLeave = () => {
-    setIsHovering(false);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
@@ -37,7 +35,6 @@ const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: str
 
   const handleMouseEnter = () => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    setIsHovering(true);
     setOpen(true);
   };
 
@@ -53,8 +50,8 @@ const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: str
       </button>
       {open && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 9999, minWidth: 180, padding: '4px 0' }}
-          onMouseEnter={() => { setIsHovering(true); if (timeoutRef.current) clearTimeout(timeoutRef.current); }}
-          onMouseLeave={() => { setIsHovering(false); }}
+          onMouseEnter={() => { if (timeoutRef.current) clearTimeout(timeoutRef.current); }}
+          onMouseLeave={() => { }}
         >
           {CAT_SORTS.map(opt => (
             <div key={opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}
