@@ -148,14 +148,23 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         `,
       ]);
       
-      return rows.map(r => ({
-        district: getDistrictLabel(r.districtMasterId, districtMapById),
-        total: Number(r.total),
-        pending: Number(r.pending),
-        disposed: Number(r.disposed),
-        unknown: Number(r.unknown),
-        missingDates: Number(r.missingDates),
-      }));
+      return rows.map(r => {
+        const total = Number(r.total);
+        const pending = Number(r.pending);
+        const disposed = Number(r.disposed);
+        const unknown = Number(r.unknown);
+        return {
+          district: getDistrictLabel(r.districtMasterId, districtMapById),
+          total,
+          pending,
+          disposed,
+          unknown,
+          missingDates: Number(r.missingDates),
+          pending_pct: total > 0 ? (pending / total) * 100 : 0,
+          disposed_pct: total > 0 ? (disposed / total) * 100 : 0,
+          unknown_pct: total > 0 ? (unknown / total) * 100 : 0,
+        };
+      });
     });
     return sendCached(reply, data);
   });
@@ -540,14 +549,23 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         GROUP BY COALESCE(NULLIF(TRIM("classOfIncident"), ''), 'Unmapped')
         ORDER BY total DESC
       `;
-      return rows.map(r => ({
-        category: r.category,
-        total: Number(r.total),
-        pending: Number(r.pending),
-        disposed: Number(r.disposed),
-        unknown: Number(r.unknown),
-        missingDates: Number(r.missingDates),
-      }));
+      return rows.map(r => {
+        const total = Number(r.total);
+        const pending = Number(r.pending);
+        const disposed = Number(r.disposed);
+        const unknown = Number(r.unknown);
+        return {
+          category: r.category,
+          total,
+          pending,
+          disposed,
+          unknown,
+          missingDates: Number(r.missingDates),
+          pending_pct: total > 0 ? (pending / total) * 100 : 0,
+          disposed_pct: total > 0 ? (disposed / total) * 100 : 0,
+          unknown_pct: total > 0 ? (unknown / total) * 100 : 0,
+        };
+      });
     });
     return sendCached(reply, data);
   });

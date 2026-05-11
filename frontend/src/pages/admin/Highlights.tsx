@@ -21,7 +21,9 @@ const SortDropdown = ({
   options: SortOption[];
 }) => {
   const [open, setOpen] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -31,22 +33,43 @@ const SortDropdown = ({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const current = options.find(o => o.value === value)?.label ?? 'Sort';
+  const handleMouseLeave = () => {
+    if (isMobile) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 100);
+  };
+
+  const handleMouseEnter = () => {
+    if (isMobile) return;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setOpen(true);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(prev => !prev);
+  };
 
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
+    <div 
+      ref={ref} 
+      style={{ position: 'relative' }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <button
-        onClick={() => setOpen(v => !v)}
         className="chart-expand-btn"
-        title="Sort chart"
-        style={{ display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap' }}
+        title="Sort Options"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px' }}
+        onClick={handleClick}
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6" />
           <line x1="8" y1="12" x2="16" y2="12" />
           <line x1="10" y1="18" x2="14" y2="18" />
         </svg>
-        {current}
       </button>
       {open && (
         <div style={{
@@ -233,11 +256,13 @@ export const HotspotsPage = () => {
                 fullOption={getDistrictBarOptions([...sortedDistrictRows].reverse())}
                 height="320px"
                 actions={
-                  <SortDropdown
-                    value={districtSort}
-                    onChange={v => setDistrictSort(v as SortKey)}
-                    options={SORT_OPTIONS}
-                  />
+                  <div className="chart-actions">
+                    <SortDropdown
+                      value={districtSort}
+                      onChange={v => setDistrictSort(v as SortKey)}
+                      options={SORT_OPTIONS}
+                    />
+                  </div>
                 }
               />
               <ChartCard
@@ -246,11 +271,13 @@ export const HotspotsPage = () => {
                 fullOption={getStackedBarOptions([...sortedCategoryRows].reverse())}
                 height="320px"
                 actions={
-                  <SortDropdown
-                    value={categorySort}
-                    onChange={v => setCategorySort(v as SortKey)}
-                    options={SORT_OPTIONS}
-                  />
+                  <div className="chart-actions">
+                    <SortDropdown
+                      value={categorySort}
+                      onChange={v => setCategorySort(v as SortKey)}
+                      options={SORT_OPTIONS}
+                    />
+                  </div>
                 }
               />
             </div>

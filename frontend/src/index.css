@@ -999,12 +999,11 @@ body {
     gap: 8px;
   }
 
-  .chart-overlay[style*="z-index: 9999"] .chart-overlay-body {
-    padding: 12px;
-  }
-
-  .chart-overlay[style*="z-index: 9999"] input[type="text"] {
-    width: 100% !important;
+  /* Ensure table cells show all content on mobile */
+  .data-table td {
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
   }
 }
 
@@ -1139,9 +1138,23 @@ body {
   border-bottom: 1px solid var(--border);
   white-space: normal;
   word-break: break-word;
-  min-width: 100px;
+  min-width: 60px;
   max-width: 300px;
   transition: background 0.2s ease;
+}
+
+/* Mobile responsive table cells - smaller min width */
+@media (max-width: 768px) {
+  .data-table td {
+    min-width: 50px;
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+  
+  .data-table th {
+    padding: 8px 6px;
+    font-size: 10px;
+  }
 }
 
 /* Table Expand Button */

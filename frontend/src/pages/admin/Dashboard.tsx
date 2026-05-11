@@ -39,6 +39,7 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
   
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -51,6 +52,7 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
   }, []);
 
   const handleMouseLeave = () => {
+    if (isMobile) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
@@ -58,8 +60,14 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
   };
 
   const handleMouseEnter = () => {
+    if (isMobile) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setOpen(true);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(prev => !prev);
   };
 
   return (
@@ -72,6 +80,7 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
       <button 
         className="chart-expand-btn"
         title="Sort Options"
+        onClick={handleClick}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6"></line>
@@ -696,8 +705,11 @@ export const DashboardPage = () => {
                   { key: 'district', label: 'District', sortable: true },
                   { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
                   { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
-                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
-                  { key: 'unknown', label: 'Status Not Found', sortable: true, align: 'center', render: (row) => <span style={{ color: '#94a3b8' }}>{row.unknown || 0}</span> },
+                  { key: 'pending_pct', label: 'Pending %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#dc2626', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.pending_pct?.toFixed(1)}%</span> },
+                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#16a34a' }}>{row.disposed}</span> },
+                  { key: 'disposed_pct', label: 'Disposed %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.disposed_pct?.toFixed(1)}%</span> },
+                  { key: 'unknown', label: 'Status NF', sortable: true, align: 'center', render: (row) => <span style={{ color: '#64748b' }}>{row.unknown || 0}</span> },
+                  { key: 'unknown_pct', label: 'Status NF %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#64748b', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.unknown_pct?.toFixed(1)}%</span> },
                 ]}
                 maxHeight="300px"
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
@@ -779,6 +791,7 @@ export const DashboardPage = () => {
                       return <span style={{ cursor: 'pointer', color: '#ef4444' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.pending}</span>;
                     }
                   },
+                  { key: 'pending_pct', label: 'Pending %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#dc2626', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.pending_pct?.toFixed(1)}%</span> },
                   { 
                     key: 'disposed', 
                     label: 'Disposed', 
@@ -786,19 +799,21 @@ export const DashboardPage = () => {
                     align: 'center', 
                     render: (row) => {
                       const url = buildCategoryCctnsUrl(row.category, 'disposed');
-                      return <span style={{ cursor: 'pointer', color: '#22c55e' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.disposed}</span>;
+                      return <span style={{ cursor: 'pointer', color: '#16a34a' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.disposed}</span>;
                     }
                   },
+                  { key: 'disposed_pct', label: 'Disposed %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.disposed_pct?.toFixed(1)}%</span> },
                   { 
                     key: 'unknown', 
-                    label: 'Status Not Found', 
+                    label: 'Status NF', 
                     sortable: true, 
                     align: 'center', 
                     render: (row) => {
                       const url = buildCategoryCctnsUrl(row.category, 'unknown');
-                      return <span style={{ cursor: 'pointer', color: '#94a3b8' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.unknown || 0}</span>;
+                      return <span style={{ cursor: 'pointer', color: '#64748b' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.unknown || 0}</span>;
                     }
                   },
+                  { key: 'unknown_pct', label: 'Status NF %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#64748b', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.unknown_pct?.toFixed(1)}%</span> },
                 ]}
                 maxHeight="300px"
                 onRowClick={(row) => navigate(buildCategoryCctnsUrl(row.category))}

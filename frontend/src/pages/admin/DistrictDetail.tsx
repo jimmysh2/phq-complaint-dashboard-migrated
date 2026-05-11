@@ -20,6 +20,8 @@ const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: str
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const isMobile = typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches;
+
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
     document.addEventListener('mousedown', h);
@@ -27,6 +29,7 @@ const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: str
   }, []);
 
   const handleMouseLeave = () => {
+    if (isMobile) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       setOpen(false);
@@ -34,8 +37,14 @@ const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: str
   };
 
   const handleMouseEnter = () => {
+    if (isMobile) return;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setOpen(true);
+  };
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(prev => !prev);
   };
 
   return (
@@ -43,7 +52,7 @@ const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: str
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <button className="chart-expand-btn" title="Sort Options">
+      <button className="chart-expand-btn" title="Sort Options" onClick={handleClick}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
         </svg>
