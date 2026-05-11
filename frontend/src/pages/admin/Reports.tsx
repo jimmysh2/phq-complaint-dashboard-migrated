@@ -272,11 +272,11 @@ export const ReportsPage = () => {
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div className="reports-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
               <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#f8fafc' }}>
                 {tabs.find(t => t.id === type)?.label || 'Report'}
               </h2>
-              <div style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '8px', padding: '4px' }}>
+              <div className="reports-view-toggle" style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '8px', padding: '4px' }}>
                 <button
                   onClick={() => setViewMode('chart')}
                   style={{

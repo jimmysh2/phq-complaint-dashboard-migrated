@@ -8,6 +8,8 @@ import { getDistrictBarOptions, getDurationLineOptions, getStackedBarOptions } f
 import { DataTable, Column } from '@/components/data/DataTable';
 import { dashboardApi } from '@/services/api';
 import { useFilters } from '@/contexts/FilterContext';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faCalendarAlt, faSyncAlt, faDatabase } from '@fortawesome/free-solid-svg-icons';
 
 const StatCard = ({ label, value, subValue, colorClass, onClick }: { label: string; value: string | number; subValue?: string; colorClass: string; onClick?: () => void }) => (
   <div
@@ -102,24 +104,26 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
 };
 
 const ViewToggle = ({ value, onChange }: { value: 'graph' | 'table', onChange: (val: 'graph' | 'table') => void }) => (
-  <div style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '4px', border: '1px solid #334155', overflow: 'hidden' }}>
+  <div className="view-toggle-container">
     <button 
+      className={`view-toggle-btn ${value === 'graph' ? 'active' : ''}`}
       onClick={() => onChange('graph')}
-      style={{
-        padding: '4px 8px', fontSize: '11px', fontWeight: value === 'graph' ? 600 : 400,
-        backgroundColor: value === 'graph' ? '#334155' : 'transparent', color: value === 'graph' ? '#fff' : '#94a3b8'
-      }}
     >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M18 20V10M12 20V4M6 20v-6" />
+      </svg>
       Graph
     </button>
     <button 
+      className={`view-toggle-btn ${value === 'table' ? 'active' : ''}`}
       onClick={() => onChange('table')}
-      style={{
-        padding: '4px 8px', fontSize: '11px', fontWeight: value === 'table' ? 600 : 400,
-        backgroundColor: value === 'table' ? '#334155' : 'transparent', color: value === 'table' ? '#fff' : '#94a3b8',
-        borderLeft: '1px solid #334155'
-      }}
     >
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <line x1="3" y1="9" x2="21" y2="9" />
+        <line x1="3" y1="15" x2="21" y2="15" />
+        <line x1="9" y1="3" x2="9" y2="21" />
+      </svg>
       Table
     </button>
   </div>
@@ -383,14 +387,9 @@ export const DashboardPage = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', marginBottom: '8px' }}>
           <div>
             <h1 className="text-2xl font-bold text-slate-100">Executive Overview</h1>
-            <div className="text-sm text-slate-300 mt-2 flex flex-wrap gap-3 items-center">
-              <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md shadow-sm">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                  <line x1="16" y1="2" x2="16" y2="6"></line>
-                  <line x1="8" y1="2" x2="8" y2="6"></line>
-                  <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
+            <div className="text-sm text-slate-300 mt-2 dashboard-info-items">
+              <div className="info-item">
+                <FontAwesomeIcon icon={faCalendarAlt} className="info-icon text-blue-400" />
                 <span className="font-medium text-slate-200">Period:</span>
                 <span>
                   {activeFilters.fromDate && activeFilters.toDate
@@ -406,12 +405,8 @@ export const DashboardPage = () => {
               </div>
               
               {s?.lastSyncTime && (
-                <div title="Last time CCTNS data was successfully synced to this database" className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md shadow-sm">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-400">
-                    <polyline points="1 4 1 10 7 10"></polyline>
-                    <polyline points="23 20 23 14 17 14"></polyline>
-                    <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path>
-                  </svg>
+                <div title="Last time CCTNS data was successfully synced to this database" className="info-item">
+                  <FontAwesomeIcon icon={faSyncAlt} className="info-icon text-green-400" />
                   <span className="font-medium text-slate-200">Last Sync:</span>
                   <span>
                     {new Date(s.lastSyncTime).toLocaleString('en-IN', {
@@ -422,11 +417,8 @@ export const DashboardPage = () => {
               )}
               
               {s?.dbMinDate && s?.dbMaxDate && (
-                <div title="Time period of data available in the database" className="flex items-center gap-2 bg-slate-800/80 border border-slate-700/50 px-3 py-1.5 rounded-md shadow-sm">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-purple-400">
-                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                    <polyline points="22,6 12,13 2,6"></polyline>
-                  </svg>
+                <div title="Time period of data available in the database" className="info-item">
+                  <FontAwesomeIcon icon={faDatabase} className="info-icon text-purple-400" />
                   <span className="font-medium text-slate-200">DB Data:</span>
                   <span>
                     {new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} to {new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
@@ -435,9 +427,9 @@ export const DashboardPage = () => {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="dashboard-export-buttons">
             <button 
-              className="btn-primary" 
+              className="btn-primary dashboard-export-btn" 
               onClick={() => {
                 const wb = XLSX.utils.book_new();
                 
@@ -531,7 +523,7 @@ export const DashboardPage = () => {
               Export Excel
             </button>
             <button 
-              className="btn-primary" 
+              className="btn-primary dashboard-export-btn" 
               onClick={() => window.print()}
               style={{ width: 'auto', margin: 0, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
             >
