@@ -141,6 +141,29 @@ export const DashboardPage = () => {
     if (filters.toDate)           params.set('toDate',           filters.toDate);
     return `/admin/cctns?${params.toString()}`;
   };
+
+  // Build URL for class of incident navigation to Database Gateway
+  const buildCategoryCctnsUrl = (category: string, statusGroupFilter?: string) => {
+    const params = new URLSearchParams();
+    // Only set statusGroup if specifically provided (for filtering by specific status)
+    if (statusGroupFilter) {
+      params.set('statusGroup', statusGroupFilter);
+      console.log('[Dashboard] Building URL with statusGroup:', statusGroupFilter, 'for category:', category);
+    } else {
+      console.log('[Dashboard] Building URL WITHOUT statusGroup for category:', category);
+    }
+    if (filters.districtIds)      params.set('districtIds',      filters.districtIds);
+    if (filters.policeStationIds) params.set('policeStationIds', filters.policeStationIds);
+    if (filters.officeIds)        params.set('officeIds',        filters.officeIds);
+    if (filters.fromDate)         params.set('fromDate',         filters.fromDate);
+    if (filters.toDate)           params.set('toDate',           filters.toDate);
+    // Set class of incident filter - handle 'Unmapped' specially
+    const classValue = category === 'Unmapped' ? 'Unmapped' : category;
+    params.set('classOfIncident', classValue);
+    const url = `/admin/cctns?${params.toString()}`;
+    console.log('[Dashboard] Generated URL:', url);
+    return url;
+  };
   
   // Clean empty filters before passing
   const activeFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''));
@@ -626,6 +649,7 @@ export const DashboardPage = () => {
                   { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
                   { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
                   { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
+                  { key: 'unknown', label: 'Status Not Found', sortable: true, align: 'center', render: (row) => <span style={{ color: '#94a3b8' }}>{row.unknown || 0}</span> },
                 ]}
                 maxHeight="300px"
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
@@ -685,11 +709,49 @@ export const DashboardPage = () => {
                 data={sortedCategories}
                 columns={[
                   { key: 'category', label: 'Class of Incident', sortable: true },
-                  { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600 }}>{row.total}</span> },
-                  { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ color: '#ef4444' }}>{row.pending}</span> },
-                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ color: '#22c55e' }}>{row.disposed}</span> },
+                  { 
+                    key: 'total', 
+                    label: 'Total Reg', 
+                    sortable: true, 
+                    align: 'center', 
+                    render: (row) => {
+                      const url = buildCategoryCctnsUrl(row.category);
+                      return <span style={{ fontWeight: 600, cursor: 'pointer', color: '#60a5fa' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.total}</span>;
+                    }
+                  },
+                  { 
+                    key: 'pending', 
+                    label: 'Pending', 
+                    sortable: true, 
+                    align: 'center', 
+                    render: (row) => {
+                      const url = buildCategoryCctnsUrl(row.category, 'pending');
+                      return <span style={{ cursor: 'pointer', color: '#ef4444' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.pending}</span>;
+                    }
+                  },
+                  { 
+                    key: 'disposed', 
+                    label: 'Disposed', 
+                    sortable: true, 
+                    align: 'center', 
+                    render: (row) => {
+                      const url = buildCategoryCctnsUrl(row.category, 'disposed');
+                      return <span style={{ cursor: 'pointer', color: '#22c55e' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.disposed}</span>;
+                    }
+                  },
+                  { 
+                    key: 'unknown', 
+                    label: 'Status Not Found', 
+                    sortable: true, 
+                    align: 'center', 
+                    render: (row) => {
+                      const url = buildCategoryCctnsUrl(row.category, 'unknown');
+                      return <span style={{ cursor: 'pointer', color: '#94a3b8' }} onClick={(e) => { e.stopPropagation(); navigate(url); }}>{row.unknown || 0}</span>;
+                    }
+                  },
                 ]}
                 maxHeight="300px"
+                onRowClick={(row) => navigate(buildCategoryCctnsUrl(row.category))}
               />
             </ChartCard>
           )}
