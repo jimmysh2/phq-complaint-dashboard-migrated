@@ -33,8 +33,14 @@ interface Props<T> {
   onFetchAllForExport?: () => Promise<Record<string, unknown>[]>;
   /** Optional: describe active filters as key-value pairs for export filename/sheet metadata */
   activeFilters?: Record<string, string>;
-  /** Optional: default number of rows to show. If set, shows a toggle to show all/limited rows */
+/** Optional: default number of rows to show. If set, shows a toggle to show all/limited rows */
   defaultLimit?: number;
+  /** Optional: when true, table expands to fill available space (used by ChartCard expand) */
+  forceFullHeight?: boolean;
+  /** Optional: true when parent ChartCard is in expanded mode */
+  isCardExpanded?: boolean;
+  /** Optional: hide the title bar completely (for use inside ChartCard) */
+  hideTitleBar?: boolean;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -80,7 +86,12 @@ export function DataTable<T extends Record<string, unknown>>({
   onFetchAllForExport,
   activeFilters,
   defaultLimit,
+  noExpand = false,
+  forceFullHeight = false,
+  isCardExpanded = false,
+  hideTitleBar = false,
 }: Props<T>) {
+  const effectiveMaxHeight = forceFullHeight || isCardExpanded ? 'calc(100vh - 140px)' : maxHeight;
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [expanded, setExpanded] = useState(false);
@@ -113,11 +124,12 @@ export function DataTable<T extends Record<string, unknown>>({
     });
   }, [filteredData, sortKey, sortDir]);
 
-  // Apply default limit if set
+  // Apply default limit if set (only when not in full height/expanded mode)
   const displayData = useMemo(() => {
-    if (!defaultLimit || showAllRows) return sorted;
-    return sorted.slice(0, defaultLimit);
-  }, [sorted, defaultLimit, showAllRows]);
+    if (forceFullHeight || isCardExpanded || expanded || showAllRows) return sorted;
+    if (defaultLimit) return sorted.slice(0, defaultLimit);
+    return sorted;
+  }, [sorted, defaultLimit, showAllRows, forceFullHeight, isCardExpanded, expanded]);
 
   // ─── Excel Export ────────────────────────────────────────────────────────
 
@@ -302,10 +314,12 @@ export function DataTable<T extends Record<string, unknown>>({
 
   // ─── Render ──────────────────────────────────────────────────────────────
 
-  const renderTable = (isExpanded: boolean) => (
+  const renderTable = (isExpanded: boolean) => {
+    const isFullHeight = isExpanded || forceFullHeight || isCardExpanded;
+    return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-      {/* Top Header Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: '10px' }}>
+      {/* Top Header Controls - hide when hideTitleBar is true in normal view */}
+      <div style={{ display: hideTitleBar && !isFullHeight ? 'none' : 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', background: 'var(--bg-card)', borderBottom: '1px solid var(--border)', flexWrap: 'wrap', gap: '10px' }}>
         {/* Export Buttons */}
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flex: 1 }}>
           <button
@@ -345,8 +359,8 @@ export function DataTable<T extends Record<string, unknown>>({
             </span>
           )}
           
-          {/* Toggle button for limited rows */}
-          {defaultLimit && data.length > defaultLimit && (
+          {/* Toggle button for limited rows - hide when in expanded view */}
+          {defaultLimit && data.length > defaultLimit && !isCardExpanded && (
             <button
               onClick={() => setShowAllRows(!showAllRows)}
               style={{
@@ -369,8 +383,8 @@ export function DataTable<T extends Record<string, unknown>>({
           )}
         </div>
 
-        {/* Table Title (Middle) */}
-        {title && !isExpanded && (
+        {/* Table Title (Middle) - hide when inside ChartCard or in expanded view */}
+        {title && !isFullHeight && !isCardExpanded && !hideTitleBar && (
           <div style={{ textAlign: 'center', fontSize: '15px', fontWeight: 600, color: '#e2e8f0', padding: '0 10px' }}>
             {title}
           </div>
@@ -421,8 +435,8 @@ export function DataTable<T extends Record<string, unknown>>({
       </div>
 
       {/* Table Scroll Area */}
-      <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: isExpanded ? 'calc(100vh - 160px)' : maxHeight }}>
-        <table className="data-table" style={isExpanded ? { fontSize: '15px' } : undefined}>
+      <div style={{ overflowX: 'auto', overflowY: 'auto', flex: 1, maxHeight: isFullHeight ? 'calc(100vh - 140px)' : effectiveMaxHeight, minHeight: isFullHeight ? '200px' : '120px' }}>
+        <table className="data-table" style={isFullHeight ? { fontSize: '15px' } : undefined}>
           <thead>
             <tr>
               {columns.map((col, colIdx) => (
@@ -432,8 +446,8 @@ export function DataTable<T extends Record<string, unknown>>({
                     width: col.width,
                     cursor: col.sortable ? 'pointer' : 'default',
                     textAlign: col.align,
-                    fontSize: isExpanded ? '13px' : undefined,
-                    padding: isExpanded ? '18px 24px' : undefined,
+                    fontSize: isFullHeight ? '13px' : undefined,
+                    padding: isFullHeight ? '18px 24px' : undefined,
                     ...(colIdx === 0 ? {
                       position: 'sticky',
                       left: 0,
@@ -466,7 +480,7 @@ export function DataTable<T extends Record<string, unknown>>({
                       onClick={() => onRowClick?.(row)}
                       style={{
                         textAlign: col.align,
-                        padding: isExpanded ? '18px 24px' : undefined,
+                        padding: isFullHeight ? '18px 24px' : undefined,
                         cursor: onRowClick ? 'pointer' : 'default',
                         ...(colIdx === 0 ? {
                           position: 'sticky',
@@ -494,6 +508,7 @@ export function DataTable<T extends Record<string, unknown>>({
       </div>
     </div>
   );
+  };
 
   const overlayContent = expanded ? (
     <div className="chart-overlay" style={{ zIndex: 9999 }}>
@@ -547,17 +562,19 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <>
-      <div className="card data-table-container" style={{ position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <button
-          onClick={() => setExpanded(true)}
-          className="table-expand-btn"
-          title="Expand Table"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
-            <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
-          </svg>
-        </button>
+      <div className="card data-table-container" style={{ position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100%', maxWidth: '100%' }}>
+        {!noExpand && (
+          <button
+            onClick={() => setExpanded(true)}
+            className="table-expand-btn"
+            title="Expand Table"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
+              <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+            </svg>
+          </button>
+        )}
         {renderTable(false)}
       </div>
       {expanded && typeof document !== 'undefined' && createPortal(overlayContent, document.body)}

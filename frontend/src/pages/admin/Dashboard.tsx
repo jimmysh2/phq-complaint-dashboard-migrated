@@ -24,7 +24,7 @@ const StatCard = ({ label, value, subValue, detail, colorClass, onClick }: { lab
     <div className="stat-card-value">{value}</div>
     {subValue && <div className="stat-card-sub">{subValue}</div>}
     {detail && <div className="stat-card-detail">{detail}</div>}
-    {onClick && (
+{onClick && (
       <div className="stat-card-click">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <path d="M9 18l6-6-6-6"/>
@@ -37,6 +37,8 @@ const StatCard = ({ label, value, subValue, detail, colorClass, onClick }: { lab
 
 const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (val: string) => void, options: {label: string, value: string}[] }) => {
   const [open, setOpen] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -49,34 +51,55 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleMouseLeave = () => {
+    setIsHovering(false);
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 200);
+  };
+
+  const handleMouseEnter = () => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsHovering(true);
+    setOpen(true);
+  };
+
   return (
-    <div style={{ position: 'relative' }} ref={ref}>
+    <div 
+      style={{ position: 'relative' }} 
+      ref={ref}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <button 
-        onClick={() => setOpen(!open)}
         className="chart-expand-btn"
         title="Sort Options"
       >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6"></line>
           <line x1="8" y1="12" x2="16" y2="12"></line>
           <line x1="10" y1="18" x2="14" y2="18"></line>
         </svg>
-        Sort By
       </button>
       {open && (
-        <div style={{
-          position: 'absolute',
-          top: '100%',
-          right: 0,
-          marginTop: '4px',
-          width: '200px',
-          backgroundColor: '#1e293b',
-          border: '1px solid #334155',
-          borderRadius: '6px',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-          zIndex: 9999,
-          padding: '4px 0',
-        }}>
+        <div 
+          style={{
+            position: 'absolute',
+            top: '100%',
+            right: 0,
+            marginTop: '4px',
+            width: '200px',
+            backgroundColor: '#1e293b',
+            border: '1px solid #334155',
+            borderRadius: '6px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            zIndex: 9999,
+            padding: '4px 0',
+          }}
+          onMouseEnter={() => { setIsHovering(true); if (timeoutRef.current) clearTimeout(timeoutRef.current); }}
+          onMouseLeave={() => { setIsHovering(false); }}
+        >
           {options.map((opt: any) => (
             <div
               key={opt.value}
@@ -600,7 +623,7 @@ export const DashboardPage = () => {
               fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
               height="320px"
               actions={
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="chart-actions">
                   <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
                   <SortDropdown 
                     value={districtSort}
@@ -623,7 +646,7 @@ export const DashboardPage = () => {
             <ChartCard
               title="Top District Pendency"
               actions={
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="chart-actions">
                   <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
                   <SortDropdown 
                     value={districtSort}
@@ -653,6 +676,8 @@ export const DashboardPage = () => {
                 ]}
                 maxHeight="300px"
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
+                noExpand={true}
+                hideTitleBar={true}
               />
             </ChartCard>
           )}
@@ -660,7 +685,7 @@ export const DashboardPage = () => {
             <ChartCard
               title="Top Classes of Incident"
               actions={
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="chart-actions">
                   <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
                   <SortDropdown
                     value={categorySort}
@@ -686,7 +711,7 @@ export const DashboardPage = () => {
             <ChartCard
               title="Top Classes of Incident"
               actions={
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="chart-actions">
                   <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
                   <SortDropdown
                     value={categorySort}
@@ -752,6 +777,8 @@ export const DashboardPage = () => {
                 ]}
                 maxHeight="300px"
                 onRowClick={(row) => navigate(buildCategoryCctnsUrl(row.category))}
+                noExpand={true}
+                hideTitleBar={true}
               />
             </ChartCard>
           )}
