@@ -33,6 +33,8 @@ interface Props<T> {
   onFetchAllForExport?: () => Promise<Record<string, unknown>[]>;
   /** Optional: describe active filters as key-value pairs for export filename/sheet metadata */
   activeFilters?: Record<string, string>;
+  /** Optional: default number of rows to show. If set, shows a toggle to show all/limited rows */
+  defaultLimit?: number;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -77,12 +79,14 @@ export function DataTable<T extends Record<string, unknown>>({
   pagination,
   onFetchAllForExport,
   activeFilters,
+  defaultLimit,
 }: Props<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
+  const [showAllRows, setShowAllRows] = useState(false);
   const exportBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleSort = (key: string) => {
@@ -108,6 +112,12 @@ export function DataTable<T extends Record<string, unknown>>({
       return sortDir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
     });
   }, [filteredData, sortKey, sortDir]);
+
+  // Apply default limit if set
+  const displayData = useMemo(() => {
+    if (!defaultLimit || showAllRows) return sorted;
+    return sorted.slice(0, defaultLimit);
+  }, [sorted, defaultLimit, showAllRows]);
 
   // ─── Excel Export ────────────────────────────────────────────────────────
 
@@ -334,6 +344,29 @@ export function DataTable<T extends Record<string, unknown>>({
               Fetching all records…
             </span>
           )}
+          
+          {/* Toggle button for limited rows */}
+          {defaultLimit && data.length > defaultLimit && (
+            <button
+              onClick={() => setShowAllRows(!showAllRows)}
+              style={{
+                padding: '5px 10px',
+                fontSize: '11px',
+                background: showAllRows ? '#6366f1' : '#475569',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                marginLeft: '8px',
+              }}
+              title={showAllRows ? `Show only ${defaultLimit} rows` : `Show all ${data.length} rows`}
+            >
+              {showAllRows ? `Show Top ${defaultLimit}` : `Show All (${data.length})`}
+            </button>
+          )}
         </div>
 
         {/* Table Title (Middle) */}
@@ -424,15 +457,17 @@ export function DataTable<T extends Record<string, unknown>>({
             </tr>
           </thead>
           <tbody>
-            {sorted.length > 0 ? (
-              sorted.map((row, i) => (
+            {displayData.length > 0 ? (
+              displayData.map((row, i) => (
                 <tr key={i} onClick={() => onRowClick?.(row)} style={{ cursor: onRowClick ? 'pointer' : 'default' }}>
                   {columns.map((col, colIdx) => (
                     <td
                       key={col.key}
+                      onClick={() => onRowClick?.(row)}
                       style={{
                         textAlign: col.align,
                         padding: isExpanded ? '18px 24px' : undefined,
+                        cursor: onRowClick ? 'pointer' : 'default',
                         ...(colIdx === 0 ? {
                           position: 'sticky',
                           left: 0,

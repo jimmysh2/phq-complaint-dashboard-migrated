@@ -55,9 +55,10 @@ export const CCTNSPage = () => {
   const urlDisposalAge    = searchParams.get('disposalAge')      || '';
   const urlUnmappedPs     = searchParams.get('unmappedPs')       || '';
   const urlPsName         = searchParams.get('psName')           || '';
+  const urlSearch         = searchParams.get('search')           || '';
 
   // Derived: any global filter is active
-  const hasGlobalFilters = !!(urlDistrict || urlDistrictIds || urlPsIds || urlOfficeIds || urlClassOfInc || urlFromDate || urlToDate || urlPendencyAge || urlDisposalAge || urlUnmappedPs || urlPsName);
+  const hasGlobalFilters = !!(urlStatusGroup || urlDistrict || urlDistrictIds || urlPsIds || urlOfficeIds || urlClassOfInc || urlFromDate || urlToDate || urlPendencyAge || urlDisposalAge || urlUnmappedPs || urlPsName || searchParams.get('search'));
 
   // Map special values: 'all' -> no status filter, 'disposed_missing_date' -> handled separately
   const resolvedInitialStatus = urlStatusGroup === 'all' ? '' :
@@ -940,15 +941,17 @@ export const CCTNSPage = () => {
               }}>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span>
-                    <strong>📊 Dashboard Filter Active</strong>
+                    <strong>📊 Filter Active</strong>
                     {urlStatusGroup === 'pending'               && ' — Showing pending complaints only'}
                     {urlStatusGroup === 'disposed'              && ' — Showing disposed complaints only'}
                     {urlStatusGroup === 'unknown'               && ' — Showing complaints with unknown/missing status'}
                     {urlStatusGroup === 'disposed_missing_date' && ' — Showing disposed complaints with no disposal date'}
+                    {urlSearch && ` — Search: "${urlSearch}"`}
                   </span>
                   <span style={{ fontSize: 12, opacity: 0.8 }}>
                     Applied filters:{' '}
                     {[
+                      urlSearch && `Search: "${urlSearch}"`,
                       urlStatusGroup && `Status: ${urlStatusGroup === 'pending' ? 'Pending' : urlStatusGroup === 'disposed' ? 'Disposed' : urlStatusGroup === 'unknown' ? 'Unknown' : urlStatusGroup === 'all' ? 'All' : urlStatusGroup}`,
                       urlDistrict       && `District: ${urlDistrict}`,
                       (urlPsIds || urlPsName) && `Police Station: ${urlPsName || `ID: ${urlPsIds}`}`,
@@ -1067,14 +1070,7 @@ export const CCTNSPage = () => {
                 <option value="statusOfComplaint:asc">Status A-Z</option>
               </select>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-              {hasGlobalFilters && (
-                <Button variant="outline" onClick={() => window.history.back()} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                  Back to Dashboard
-                </Button>
-              )}
-            </div>
+            <div style={{ display: 'flex', gap: 10, marginBottom: 12 }} />
 
             {syncedQuery.isLoading ? (
               <div className="loading-spinner">

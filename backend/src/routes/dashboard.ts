@@ -454,7 +454,9 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
             }
           }
         }
-      } else {
+      } else if (comp.statusGroup === 'unknown') {
+        stats.unknown++;
+        catStats.unknown++;
       }
 
       psMap.set(ps, stats);

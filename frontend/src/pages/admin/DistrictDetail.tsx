@@ -137,7 +137,7 @@ export const DistrictDetail = () => {
     if (filters.fromDate)         p.set('fromDate',         filters.fromDate);
     if (filters.toDate)           p.set('toDate',           filters.toDate);
 
-    if (!filters.districtIds && district) {
+    if (district) {
       p.set('district', district);
     }
 

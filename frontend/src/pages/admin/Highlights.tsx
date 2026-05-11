@@ -277,6 +277,7 @@ export const HotspotsPage = () => {
                     render: (row) => renderDistrictRow(c, row),
                   }))}
                   maxHeight="none"
+                  defaultLimit={5}
                 />
               </div>
 
@@ -299,6 +300,7 @@ export const HotspotsPage = () => {
                     render: (row) => renderCategoryRow(c, row),
                   }))}
                   maxHeight="none"
+                  defaultLimit={5}
                 />
               </div>
 

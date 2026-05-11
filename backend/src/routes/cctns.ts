@@ -17,6 +17,14 @@ import {
 } from '../services/master-mapping.js';
 import { syncDistricts, syncOffices, syncPoliceStationsByDistrict } from './government.js';
 import { buildPrismaWhereClause } from '../utils/filters.js';
+
+const parseBigIntCsv = (value: string): bigint[] =>
+  String(value ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => (/^-?\d+$/.test(item) ? BigInt(item) : null))
+    .filter((item): item is bigint => item !== null);
 import { runCctnsSync, runCctnsFullRollingSync } from '../jobs/cctns-sync-job.js';
 
 const processInBatches = async <T>(
@@ -316,11 +324,20 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
     // Build where clause using AND so multiple filters never overwrite each other
     const andConditions: any[] = [];
 
-    // ── District filter from drill-down navigation ───────────────────────────
-    // Only apply district name filter when districtIds (global filter) is NOT set.
-    // When districtIds is set, we already have the precise district IDs — adding
-    // district name filter would create a double-district constraint and break the count.
-if (district && !districtIds) {
+// ── District filter from drill-down navigation ───────────────────────────
+    // When district is passed from DistrictDetail page drill-down (and no global districtIds), 
+    // apply the district filter to maintain consistent counts. 
+    // HOWEVER: When policeStationIds is also passed (from clicking on a specific PS in the table),
+    // we should NOT also apply the district filter - we should ONLY apply the PS filter.
+    // 
+    // Reason: DistrictDetail counts records for a specific PS by querying with ONLY district filter
+    // (not filtering by PS). The PS counts in the table come from grouping by PS after the district query.
+    // So to match those counts exactly, we should use the same logic: filter by district only when
+    // navigating to view "all records in district", but filter by PS only when clicking on a specific PS.
+    //
+    // The double-filtering (district + PS) causes records to be excluded where a PS exists but
+    // has records with different/null district mappings in the database.
+    if (district && !districtIds && !policeStationIds) {
       const districtRecord = await prisma.district.findFirst({
         where: { name: { equals: district, mode: 'insensitive' } },
         select: { id: true },
@@ -340,21 +357,37 @@ if (district && !districtIds) {
 
     // ── PS name filter fallback (when policeStationMasterId is not available) ─
     // This handles cases where PS data doesn't have master IDs mapped.
+    // IMPORTANT: We need to look up the PS by name to get its master ID, then filter by that ID
+    // (matching exactly how DistrictDetail calculates the count - by PS master ID, not by text search)
     if (psName && !policeStationIds) {
-      andConditions.push({
-        OR: [
-          { addressPs: { contains: psName, mode: 'insensitive' } },
-          { submitPsCd: { contains: psName, mode: 'insensitive' } },
-        ],
+      // First, try to find the PS by name to get its master ID
+      const psRecord = await prisma.policeStation.findFirst({
+        where: { name: { equals: psName, mode: 'insensitive' } },
+        select: { id: true },
       });
+      
+      if (psRecord) {
+        // Found the PS by name - filter by master ID (exactly matching DistrictDetail's approach)
+        andConditions.push({ policeStationMasterId: psRecord.id });
+      } else {
+        // Fallback: if PS name not found in master table, try text search on address fields
+        andConditions.push({
+          OR: [
+            { addressPs: { contains: psName, mode: 'insensitive' } },
+            { submitPsCd: { contains: psName, mode: 'insensitive' } },
+          ],
+        });
+      }
     }
 
     // ── Global dashboard filters (district IDs, PS IDs, office IDs, class, date range)
     // These mirror what buildPrismaWhereClause does in the dashboard summary route,
     // ensuring the gateway shows exactly the same records the card counted.
+    // IMPORTANT: When navigating from DistrictDetail with a specific PS, we want to filter
+    // ONLY by that PS (matching how DistrictDetail counts records for that PS).
+    // So we pass PS filter separately and exclude it from globalWhere to avoid any conflicts.
     const globalWhere = buildPrismaWhereClause({
       districtIds,
-      policeStationIds,
       officeIds,
       classOfIncident,
       fromDate,
@@ -364,7 +397,16 @@ if (district && !districtIds) {
     for (const [key, val] of Object.entries(globalWhere)) {
       andConditions.push({ [key]: val });
     }
-    console.log('[cctns] after globalWhere, andConditions count:', andConditions.length);
+
+    // ── Explicit PS filter (from DistrictDetail navigation) ─────────────────────
+    // Apply PS filter explicitly to match exactly what DistrictDetail counts for this PS.
+    // This ensures we don't have any conflicts or duplicate filtering.
+    if (policeStationIds) {
+      const psIds = parseBigIntCsv(policeStationIds);
+      if (psIds.length > 0) {
+        andConditions.push({ policeStationMasterId: { in: psIds } });
+      }
+    }
 
     if (search) {
       andConditions.push({
