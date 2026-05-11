@@ -18,9 +18,10 @@
     }
   ],
   "crons": [
-    {
-      "path": "/api/cctns/cron-sync",
-      "schedule": "0 0 * * *"
-    }
+    // Disabled - to enable, uncomment below and deploy
+    // {
+    //   "path": "/api/cctns/cron-sync",
+    //   "schedule": "0 0 * * *"
+    // }
   ]
 }
