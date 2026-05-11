@@ -20,6 +20,8 @@ const MultiSelectDropdown = ({
   onToggleItem,
   disabled,
   disabledHint,
+  onMouseEnter,
+  onMouseLeave,
 }: {
   isOpen: boolean;
   toggle: () => void;
@@ -30,6 +32,8 @@ const MultiSelectDropdown = ({
   onToggleItem: (id: string) => void;
   disabled?: boolean;
   disabledHint?: string;
+  onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 }) => {
   const [searchText, setSearchText] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
@@ -69,6 +73,16 @@ const MultiSelectDropdown = ({
           e.preventDefault();
           toggle();
         }}
+        onMouseEnter={() => {
+          if (disabled) return;
+          toggle();
+        }}
+        onMouseLeave={() => {
+          // Delay hiding to allow moving to dropdown
+          setTimeout(() => {
+            // Only close if not hovering the dropdown
+          }, 200);
+        }}
         onMouseDown={(e) => e.preventDefault()}
         onChange={() => {}}
         style={{
@@ -83,18 +97,20 @@ const MultiSelectDropdown = ({
 
       {isOpen && !disabled && (
         <div
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
           style={{
             position: 'absolute',
             top: '100%',
             left: 0,
             right: 0,
-            marginTop: '2px',
+            marginTop: '4px',
             backgroundColor: '#0f172a',
             border: '1px solid #334155',
-            borderRadius: '4px',
-            boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+            borderRadius: '6px',
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
             zIndex: 9999,
-            minWidth: '220px',
+            minWidth: '240px',
           }}
         >
           {/* ── Sticky search box ── */}
@@ -316,69 +332,100 @@ export const GlobalFilterBar = () => {
             value={filters.fromDate}
             onChange={(e) => setFilter('fromDate', e.target.value)}
             onClick={(e) => 'showPicker' in HTMLInputElement.prototype && e.currentTarget.showPicker()}
-            className="filter-input"
+            onMouseEnter={(e) => {
+              if ('showPicker' in e.currentTarget) {
+                e.currentTarget.showPicker();
+              }
+            }}
+            className="filter-input date-input"
             style={{ cursor: 'pointer' }}
           />
-          <span style={{ color: '#94a3b8' }}>-</span>
+          <span style={{ color: '#94a3b8', alignSelf: 'center' }}>-</span>
           <input
             type="date"
             value={filters.toDate}
             onChange={(e) => setFilter('toDate', e.target.value)}
             onClick={(e) => 'showPicker' in HTMLInputElement.prototype && e.currentTarget.showPicker()}
-            className="filter-input"
+            onMouseEnter={(e) => {
+              if ('showPicker' in e.currentTarget) {
+                e.currentTarget.showPicker();
+              }
+            }}
+            className="filter-input date-input"
             style={{ cursor: 'pointer' }}
           />
         </div>
       </div>
 
       {/* District (always fully loaded) */}
-      <div className="filter-group" ref={districtRef} style={{ position: 'relative' }}>
+      <div 
+        className="filter-group" 
+        ref={districtRef} 
+        style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setDistrictDropdownOpen(true); }}
+        onMouseLeave={() => { /* Don't close on group leave, let dropdown handle it */ }}
+      >
         <label>District</label>
         <MultiSelectDropdown
           isOpen={districtDropdownOpen}
-          toggle={() => { closeAll(); setDistrictDropdownOpen((v) => !v); }}
+          toggle={() => { closeAll(); setDistrictDropdownOpen(true); }}
           allLabel="All Districts"
           selectedIds={selectedDistrictIds}
           items={districtOptions}
           onAllClick={() => {
             setFilter('districtIds', '');
-            // Clearing district cascades down: clear PS + Office too
             setFilter('policeStationIds', '');
             setFilter('officeIds', '');
           }}
           onToggleItem={(id) => setFilter('districtIds', toggleCsvValue(selectedDistrictIds, id).join(','))}
+          onMouseEnter={() => setDistrictDropdownOpen(true)}
+          onMouseLeave={() => setTimeout(() => setDistrictDropdownOpen(false), 500)}
         />
       </div>
 
       {/* Police Station (scoped to selected district) */}
-      <div className="filter-group" ref={stationRef} style={{ position: 'relative' }}>
+      <div 
+        className="filter-group" 
+        ref={stationRef} 
+        style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setStationDropdownOpen(true); }}
+        onMouseLeave={() => { /* Don't close on group leave */ }}
+      >
         <label>
           Police Station
           {psFetching && <span style={{ marginLeft: 4, color: '#64748b', fontSize: 10 }}>↻</span>}
         </label>
         <MultiSelectDropdown
           isOpen={stationDropdownOpen}
-          toggle={() => { closeAll(); setStationDropdownOpen((v) => !v); }}
+          toggle={() => { closeAll(); setStationDropdownOpen(true); }}
           allLabel={selectedDistrictIds.length === 0 ? 'All Stations' : 'All Stations in District'}
           selectedIds={selectedStationIds}
           items={stationOptions}
           onAllClick={() => {
             setFilter('policeStationIds', '');
-            setFilter('officeIds', '');   // cascade clear offices too
+            setFilter('officeIds', '');
           }}
           onToggleItem={(id) => setFilter('policeStationIds', toggleCsvValue(selectedStationIds, id).join(','))}
+          onMouseEnter={() => setStationDropdownOpen(true)}
+          onMouseLeave={() => setTimeout(() => setStationDropdownOpen(false), 500)}
         />
       </div>
 
       {/* Office (scoped to selected district + PS, derived from complaint data) */}
-      <div className="filter-group" ref={officeRef} style={{ position: 'relative' }}>
+      <div 
+        className="filter-group" 
+        ref={officeRef} 
+        style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setOfficeDropdownOpen(true); }}
+        onMouseLeave={() => { /* Don't close on group leave */ }}
+      >
         <label>
           Office
           {officeFetching && <span style={{ marginLeft: 4, color: '#64748b', fontSize: 10 }}>↻</span>}
         </label>
         <MultiSelectDropdown
           isOpen={officeDropdownOpen}
-          toggle={() => { closeAll(); setOfficeDropdownOpen((v) => !v); }}
+          toggle={() => { closeAll(); setOfficeDropdownOpen(true); }}
           allLabel={
             selectedDistrictIds.length > 0 || selectedStationIds.length > 0
               ? 'All Offices in Selection'
@@ -388,20 +435,30 @@ export const GlobalFilterBar = () => {
           items={officeOptions}
           onAllClick={() => setFilter('officeIds', '')}
           onToggleItem={(id) => setFilter('officeIds', toggleCsvValue(selectedOfficeIds, id).join(','))}
+          onMouseEnter={() => setOfficeDropdownOpen(true)}
+          onMouseLeave={() => setTimeout(() => setOfficeDropdownOpen(false), 500)}
         />
       </div>
 
       {/* Class of Incident */}
-      <div className="filter-group" ref={classRef} style={{ position: 'relative' }}>
+      <div 
+        className="filter-group" 
+        ref={classRef} 
+        style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setClassDropdownOpen(true); }}
+        onMouseLeave={() => { /* Don't close on group leave */ }}
+      >
         <label>Class of Incident</label>
         <MultiSelectDropdown
           isOpen={classDropdownOpen}
-          toggle={() => { closeAll(); setClassDropdownOpen((v) => !v); }}
+          toggle={() => { closeAll(); setClassDropdownOpen(true); }}
           allLabel="All Classes"
           selectedIds={selectedClassValues}
           items={classOptions}
           onAllClick={() => setFilter('classOfIncident', '')}
           onToggleItem={(value) => setFilter('classOfIncident', toggleCsvValue(selectedClassValues, value).join(','))}
+          onMouseEnter={() => setClassDropdownOpen(true)}
+          onMouseLeave={() => setTimeout(() => setClassDropdownOpen(false), 500)}
         />
       </div>
 

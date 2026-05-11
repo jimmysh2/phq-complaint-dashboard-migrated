@@ -1793,7 +1793,17 @@ body {
   font-size: 0.75rem;
   outline: none;
   min-height: 26px;
-  min-width: 90px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.filter-input:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.filter-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
 }
 .filter-input:focus {
   border-color: #3b82f6;
