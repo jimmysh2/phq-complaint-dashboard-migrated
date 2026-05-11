@@ -44,6 +44,7 @@ interface CctnsSyncResult {
     upserted: number;
     errors: number;
   };
+  syncFailed?: boolean;
 }
 
 let isSyncing = false;
@@ -66,7 +67,7 @@ const withRetry = async <T>(fn: () => Promise<T>, attempts = 3, delayMs = 5000):
 };
 
 export const runCctnsSync = async (
-  options: { fromDate?: string; toDate?: string; label?: string } = {}
+  options: { fromDate?: string; toDate?: string; label?: string; days?: number } = {}
 ): Promise<CctnsSyncResult | null> => {
   if (isSyncing) {
     console.log('[SYNC] Already syncing, skipping...');
@@ -75,16 +76,17 @@ export const runCctnsSync = async (
 
   isSyncing = true;
 
-  // Use provided dates or default to last 2 days (recent registrations)
+  // Use provided days or default to last 1 day (recent registrations) - reduced from 2 to avoid timeout
+  const daysToSync = options.days ?? 1;
   const endDate = new Date();
   const defaultStart = new Date();
-  defaultStart.setDate(endDate.getDate() - 2);
+  defaultStart.setDate(endDate.getDate() - daysToSync);
 
   const timeFrom = options.fromDate ?? formatDateStr(defaultStart);
   const timeTo   = options.toDate   ?? formatDateStr(endDate);
   const label    = options.label    ?? 'background';
 
-  console.log(`[SYNC] Starting ${label} CCTNS sync: ${timeFrom} → ${timeTo}`);
+  console.log(`[SYNC] Starting ${label} CCTNS sync: ${timeFrom} → ${timeTo} (${daysToSync} day${daysToSync > 1 ? 's' : ''})`);
 
   const result: CctnsSyncResult = {
     timeFrom,
@@ -130,6 +132,11 @@ export const runCctnsSync = async (
   } catch (error) {
     result.complaints.errors++;
     console.error(`[SYNC] Failed to sync complaints: ${error}`);
+    
+    // Mark as error if majority failed or crashed
+    if (result.complaints.fetched > 0 && result.complaints.upserted === 0) {
+      result.syncFailed = true;
+    }
   } finally {
     await prisma.syncRun.update({
       where: { id: syncRun.id },
@@ -248,7 +255,7 @@ export const startCctnsBackgroundSync = () => {
         console.log('[SYNC] Background sync ran in the last hour. Skipping startup background sync.');
         return;
       }
-      await runCctnsSync();
+      await runCctnsSync({ days: 1 });
     } catch (error) {
       console.error('[SYNC] Initial sync failed:', error);
     }
@@ -270,11 +277,11 @@ export const startCctnsBackgroundSync = () => {
     }
   }, 60_000);
 
-  // Every 12 hours: sync last 2 days (new registrations + recent status changes)
-  const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+  // Every 6 hours: sync last 1 day only (reduced from 12h/2days to avoid timeout)
+  const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
   intervalHandle = setInterval(() => {
-    runCctnsSync().catch((error) => console.error('[SYNC] Scheduled sync failed:', error));
-  }, TWELVE_HOURS_MS);
+    runCctnsSync({ days: 1 }).catch((error) => console.error('[SYNC] Scheduled sync failed:', error));
+  }, SIX_HOURS_MS);
 
   // Every 24 hours: full rolling sync from oldest pending complaint to today.
   const ONE_DAY_MS = 24 * 60 * 60 * 1000;

@@ -853,8 +853,8 @@ if (disposalAge) {
     if (secret && authHeader !== `Bearer ${secret}`) {
       return reply.status(401).send({ error: 'Unauthorized' });
     }
-    // Run 2-day recent sync (fast, catches new records)
-    const result = await runCctnsSync({ label: 'vercel-cron-daily' });
+    // Run 1-day recent sync (faster, reduces timeout risk)
+    const result = await runCctnsSync({ label: 'vercel-cron-daily', days: 1 });
     return sendSuccess(reply, result ?? { skipped: true }, 'Daily cron sync triggered');
   });
 

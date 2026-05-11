@@ -74,12 +74,30 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     const avgDisposalTime = Math.round(Number(avgResult[0]?.avg_days ?? 0));
 
     // Last successful sync time — shown in the dashboard header (PR #4)
-    const lastSyncRun = await prisma.syncRun.findFirst({
+    const lastSuccessfulSync = await prisma.syncRun.findFirst({
       where: { status: { in: ['success', 'partial'] }, endedAt: { not: null } },
       orderBy: { endedAt: 'desc' },
-      select: { endedAt: true },
+      select: { endedAt: true, message: true },
     });
-    const lastSyncTime = lastSyncRun?.endedAt ?? null;
+
+    // Last failed sync attempt
+    const lastFailedSync = await prisma.syncRun.findFirst({
+      where: { status: { in: ['error'] }, endedAt: { not: null } },
+      orderBy: { endedAt: 'desc' },
+      select: { endedAt: true, message: true },
+    });
+
+    // Count of recent failed syncs (last 7 days)
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const failedSyncCount = await prisma.syncRun.count({
+      where: {
+        status: 'error',
+        startedAt: { gte: sevenDaysAgo },
+      },
+    });
+
+    const lastSyncTime = lastSuccessfulSync?.endedAt ?? null;
+    const lastFailedSyncTime = lastFailedSync?.endedAt ?? null;
 
     // Get DB date range
     const globalDates = await prisma.complaint.aggregate({
@@ -98,6 +116,8 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
       pendingOverTwoMonths: pendingOver2,
       avgDisposalTime,
       lastSyncTime,
+      lastFailedSyncTime,
+      failedSyncCount,
       dbMinDate: globalDates._min.complRegDt,
       dbMaxDate: globalDates._max.complRegDt,
     });

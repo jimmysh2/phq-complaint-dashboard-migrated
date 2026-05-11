@@ -423,27 +423,49 @@ export const DashboardPage = () => {
                     ? `${new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} to ${new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
                     : 'All Time'}
                 </span>
-              </div>
-              
-              {s?.lastSyncTime && (
-                <div title="Last time CCTNS data was successfully synced to this database" className="info-item">
-                  <FontAwesomeIcon icon={faSyncAlt} className="info-icon text-green-400" />
-                  <span className="font-medium text-slate-200">Last Sync:</span>
-                  <span>
+</div>
+               
+               {s?.lastSyncTime && (
+                <div className="info-item">
+                  <FontAwesomeIcon icon={faSyncAlt} className={`info-icon ${s.failedSyncCount > 0 ? 'text-yellow-400' : 'text-green-400'}`} />
+                  <span className="font-medium text-slate-200">Last Successful Sync:</span>
+                  <span title="Last time data was successfully synced from CCTNS to database">
                     {new Date(s.lastSyncTime).toLocaleString('en-IN', {
                       day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
                     })}
+                  </span>
+                  {s.failedSyncCount > 0 && (
+                    <span className="text-red-400 text-xs ml-1" title={`${s.failedSyncCount} sync attempts failed in the last 7 days`}>
+                      ({s.failedSyncCount} failed)
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {s?.lastFailedSyncTime && !s?.lastSyncTime && (
+                <div className="info-item">
+                  <FontAwesomeIcon icon={faSyncAlt} className="info-icon text-red-400" />
+                  <span className="font-medium text-slate-200">Last Sync Attempt:</span>
+                  <span className="text-red-400" title="Last sync attempt failed">
+                    {new Date(s.lastFailedSyncTime).toLocaleString('en-IN', {
+                      day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                    })} - Failed
                   </span>
                 </div>
               )}
               
               {s?.dbMinDate && s?.dbMaxDate && (
-                <div title="Time period of data available in the database" className="info-item">
+                <div className="info-item">
                   <FontAwesomeIcon icon={faDatabase} className="info-icon text-purple-400" />
                   <span className="font-medium text-slate-200">DB Data:</span>
-                  <span>
+                  <span title="Complaint registration dates in database">
                     {new Date(s.dbMinDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} to {new Date(s.dbMaxDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </span>
+                  {s.lastSyncTime && new Date(s.dbMaxDate) > new Date(s.lastSyncTime) && (
+                    <span className="text-yellow-400 ml-1" title="Data extends beyond last successful sync - may include complaints registered before last sync that were imported later">
+                      ⚠
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -602,6 +624,12 @@ export const DashboardPage = () => {
               subValue={`${Math.round(((s?.disposedMissingDateCount || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
               colorClass="purple"
               onClick={() => navigate(buildCctnsUrl('disposed_missing_date'))}
+            />
+            <StatCard
+              label="Avg. Disposal Time"
+              value={`${s?.avgDisposalTime || 0} Days`}
+              subValue="Only for records where date was found"
+              colorClass="teal"
             />
           </div>
         )}
