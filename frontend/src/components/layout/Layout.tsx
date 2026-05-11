@@ -18,6 +18,7 @@ const menuItems = [
 export const Layout = ({ children }: LayoutProps) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [chartExpanded, setChartExpanded] = useState(false);
+  const [filterBarOpen, setFilterBarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -58,10 +59,47 @@ export const Layout = ({ children }: LayoutProps) => {
           </span>
         </div>
 
-        <div style={{ width: '60px' }}></div>
-
-
+        <button 
+          className="filter-toggle-btn"
+          onClick={() => setFilterBarOpen(!filterBarOpen)}
+          title="Toggle Filters"
+        >
+          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
+          <span>Filters</span>
+          <svg 
+            width="12" 
+            height="12" 
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            style={{ 
+              transform: filterBarOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+              transition: 'transform 0.2s',
+              marginLeft: '4px'
+            }}
+          >
+            <path d="M6 9l6 6 6-6"/>
+          </svg>
+        </button>
       </header>
+
+      {filterBarOpen && (
+        <div className="filter-bar-expanded">
+          <GlobalFilterBar />
+          <button 
+            className="filter-close-btn"
+            onClick={() => setFilterBarOpen(false)}
+            title="Close Filters"
+          >
+            <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      )}
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <nav className="sidebar-nav">
           {menuItems.map((item) => (
@@ -110,7 +148,6 @@ export const Layout = ({ children }: LayoutProps) => {
       <div className={`sidebar-overlay ${sidebarOpen ? '' : 'hidden'}`} onClick={() => setSidebarOpen(false)} />
 
       <main className="main-content">
-        <GlobalFilterBar />
         <ChartContext.Provider value={{ expanded: chartExpanded, setExpanded: setChartExpanded }}>
           {children}
         </ChartContext.Provider>
