@@ -292,8 +292,13 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1;
   min-width: 0;
+}
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
 .header-logo {
@@ -387,12 +392,15 @@ body {
   z-index: 100;
   transition: var(--transition);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  flex: 1;
 }
 
 .nav-item {
@@ -452,6 +460,9 @@ body {
   margin-left: var(--sidebar-width);
   margin-top: var(--header-height);
   min-height: calc(100vh - var(--header-height));
+  display: flex;
+  flex-direction: column;
+  overflow: visible;
 }
 
 .page-content {
@@ -1271,31 +1282,40 @@ body {
 .global-filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 10px;
   background: #1e293b;
-  padding: 12px 24px;
+  padding: 6px 12px;
   border-bottom: 1px solid #334155;
-  align-items: flex-end;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-height: 50px;
 }
 .filter-group {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: row;
+  gap: 6px;
+  align-items: center;
 }
 .filter-group label {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   font-weight: 600;
   text-transform: uppercase;
   color: #94a3b8;
+  white-space: nowrap;
 }
 .filter-input {
   background: #0f172a;
   border: 1px solid #334155;
   color: #f1f5f9;
-  padding: 6px 12px;
+  padding: 3px 6px;
   border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   outline: none;
+  min-height: 24px;
+  max-width: 110px;
 }
 .filter-input:focus {
   border-color: #3b82f6;
@@ -1307,9 +1327,9 @@ body {
   background: transparent;
   color: #ef4444;
   border: 1px solid #ef4444;
-  padding: 6px 12px;
+  padding: 4px 10px;
   border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.2s;
 }

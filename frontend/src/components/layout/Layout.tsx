@@ -44,7 +44,7 @@ export const Layout = ({ children }: LayoutProps) => {
           </svg>
         </button>
 
-        <div className="header-brand" style={{ flex: 1 }}>
+        <div className="header-brand">
           <img src="/PHQlogo.png" alt="PHQ" className="header-logo" />
           <div className="header-text">
             <span className="header-title">Complaint Monitoring System</span>
@@ -52,22 +52,15 @@ export const Layout = ({ children }: LayoutProps) => {
           </div>
         </div>
 
-        <div className="header-center" style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
-          <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#e2e8f0', letterSpacing: '1px', textTransform: 'uppercase', textShadow: '0 2px 4px rgba(0,0,0,0.3)' }}>
+        <div className="header-center">
+          <span style={{ fontSize: '1.1rem', fontWeight: 600, color: '#e2e8f0', letterSpacing: '1px', textTransform: 'uppercase', textShadow: '0 2px 4px rgba(0,0,0,0.3)', whiteSpace: 'nowrap' }}>
             {getModuleName()}
           </span>
         </div>
 
-        <div className="header-right" style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
-          <button className="logout-btn" onClick={handleLogout} title="Sign Out">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span>Logout</span>
-          </button>
-        </div>
+        <div style={{ width: '60px' }}></div>
+
+
       </header>
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <nav className="sidebar-nav">
@@ -82,6 +75,36 @@ export const Layout = ({ children }: LayoutProps) => {
             </Link>
           ))}
         </nav>
+        <div style={{ marginTop: 'auto', padding: '16px', borderTop: '1px solid #334155' }}>
+          <button
+            onClick={handleLogout}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '10px',
+              background: 'rgba(239, 68, 68, 0.1)',
+              border: '1px solid #ef4444',
+              borderRadius: '6px',
+              color: '#ef4444',
+              fontSize: '14px',
+              fontWeight: 500,
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'}
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <polyline points="16 17 21 12 16 7" />
+              <line x1="21" y1="12" x2="9" y2="12" />
+            </svg>
+            Logout
+          </button>
+        </div>
       </aside>
 
       <div className={`sidebar-overlay ${sidebarOpen ? '' : 'hidden'}`} onClick={() => setSidebarOpen(false)} />

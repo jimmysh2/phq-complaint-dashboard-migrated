@@ -73,7 +73,7 @@ const MultiSelectDropdown = ({
         onChange={() => {}}
         style={{
           cursor: disabled ? 'not-allowed' : 'pointer',
-          minWidth: '140px',
+          minWidth: '120px',
           opacity: disabled ? 0.5 : 1,
         }}
         title={disabled ? (disabledHint ?? '') : ''}
