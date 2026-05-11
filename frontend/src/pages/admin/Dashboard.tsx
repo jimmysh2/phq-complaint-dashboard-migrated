@@ -11,7 +11,7 @@ import { useFilters } from '@/contexts/FilterContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCalendarAlt, faSyncAlt, faDatabase } from '@fortawesome/free-solid-svg-icons';
 
-const StatCard = ({ label, value, subValue, colorClass, onClick }: { label: string; value: string | number; subValue?: string; colorClass: string; onClick?: () => void }) => (
+const StatCard = ({ label, value, subValue, detail, colorClass, onClick }: { label: string; value: string | number; subValue?: string; detail?: React.ReactNode; colorClass: string; onClick?: () => void }) => (
   <div
     className={`stat-card ${colorClass}`}
     onClick={onClick}
@@ -22,9 +22,10 @@ const StatCard = ({ label, value, subValue, colorClass, onClick }: { label: stri
   >
     <div className="stat-card-label">{label}</div>
     <div className="stat-card-value">{value}</div>
-    {subValue && <div className="text-xs mt-1 opacity-80">{subValue}</div>}
+    {subValue && <div className="stat-card-sub">{subValue}</div>}
+    {detail && <div className="stat-card-detail">{detail}</div>}
     {onClick && (
-      <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7, display: 'flex', alignItems: 'center', gap: 4 }}>
+      <div className="stat-card-click">
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
           <path d="M9 18l6-6-6-6"/>
         </svg>
@@ -550,7 +551,14 @@ export const DashboardPage = () => {
             <StatCard
               label="Total Disposed"
               value={(s?.totalDisposed || 0).toLocaleString()}
-              subValue={`${Math.round(((s?.totalDisposed || 0) / (s?.totalReceived || 1)) * 100)}% of Total Received`}
+              subValue={`${Math.round(((s?.totalDisposed || 0) / (s?.totalReceived || 1)) * 100)}% of Total`}
+              detail={
+                <>
+                  <span className="with-date">{((s?.totalDisposed || 0) - (s?.disposedMissingDateCount || 0)).toLocaleString()} with date</span>
+                  <span style={{ color: '#000000' }}>|</span>
+                  <span className="without-date">{(s?.disposedMissingDateCount || 0).toLocaleString()} without date</span>
+                </>
+              }
               colorClass="green"
               onClick={() => navigate(buildCctnsUrl('disposed'))}
             />

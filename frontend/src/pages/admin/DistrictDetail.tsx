@@ -276,9 +276,9 @@ if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url=
             </button>
             <h1 className="text-2xl font-bold text-slate-100">{district} District Analysis</h1>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="dashboard-export-buttons">
             <button 
-              className="btn-primary" 
+              className="btn-primary dashboard-export-btn" 
               onClick={() => {
                 const wb = XLSX.utils.book_new();
                 
@@ -371,7 +371,7 @@ const psSummary = policeStations.map((ps: any) => ({
               Export Excel
             </button>
             <button 
-              className="btn-primary" 
+              className="btn-primary dashboard-export-btn" 
               onClick={() => window.print()}
               style={{ width: 'auto', margin: 0, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
             >
