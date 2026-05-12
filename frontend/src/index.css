@@ -1155,6 +1155,28 @@ body {
     padding: 8px 6px;
     font-size: 10px;
   }
+
+  /* Frozen first column data cells - keep frozen but allow text wrapping */
+  .data-table td:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 20 !important;
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
+    min-width: 80px !important;
+    max-width: 120px !important;
+    background: #0f172a !important;
+  }
+
+  /* Header first column - keep frozen and no wrap */
+  .data-table thead th:first-child {
+    position: sticky !important;
+    left: 0 !important;
+    z-index: 30 !important;
+    white-space: nowrap !important;
+    min-width: 80px !important;
+  }
 }
 
 /* Table Expand Button */
