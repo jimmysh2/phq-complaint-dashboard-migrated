@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -33,7 +33,7 @@ interface Props<T> {
   onFetchAllForExport?: () => Promise<Record<string, unknown>[]>;
   /** Optional: describe active filters as key-value pairs for export filename/sheet metadata */
   activeFilters?: Record<string, string>;
-/** Optional: default number of rows to show. If set, shows a toggle to show all/limited rows */
+  /** Optional: default number of rows to show. If set, shows a toggle to show all/limited rows */
   defaultLimit?: number;
   /** Optional: when true, table expands to fill available space (used by ChartCard expand) */
   forceFullHeight?: boolean;
@@ -43,6 +43,12 @@ interface Props<T> {
   hideTitleBar?: boolean;
   /** Optional: hide the expand button - ChartCard already has one */
   noExpand?: boolean;
+  /** Optional: callback when table sort changes */
+  onSort?: (key: string | null, direction: 'asc' | 'desc' | null) => void;
+  /** Optional: show a total row at the bottom of the table */
+  showTotalRow?: boolean;
+  /** Optional: function to compute total row values */
+  getTotalRow?: (data: T[]) => Record<string, React.ReactNode>;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -92,6 +98,9 @@ export function DataTable<T extends Record<string, unknown>>({
   forceFullHeight = false,
   isCardExpanded = false,
   hideTitleBar = false,
+  onSort,
+  showTotalRow = false,
+  getTotalRow,
 }: Props<T>) {
   const effectiveMaxHeight = forceFullHeight || isCardExpanded ? 'calc(100vh - 140px)' : maxHeight;
   const [sortKey, setSortKey] = useState<string | null>(null);
@@ -103,9 +112,14 @@ export function DataTable<T extends Record<string, unknown>>({
   const exportBtnRef = useRef<HTMLButtonElement>(null);
 
   const handleSort = (key: string) => {
-    if (sortKey !== key) { setSortKey(key); setSortDir('asc'); }
-    else if (sortDir === 'asc') setSortDir('desc');
-    else if (sortDir === 'desc') { setSortKey(null); setSortDir(null); }
+    let newKey: string | null = key;
+    let newDir: 'asc' | 'desc' | null = 'asc';
+    if (sortKey !== key) { newKey = key; newDir = 'asc'; }
+    else if (sortDir === 'asc') newDir = 'desc';
+    else if (sortDir === 'desc') { newKey = null; newDir = null; }
+    setSortKey(newKey);
+    setSortDir(newDir);
+    onSort?.(newKey, newDir);
   };
 
   const filteredData = useMemo(() => {
@@ -503,6 +517,32 @@ export function DataTable<T extends Record<string, unknown>>({
                 <td colSpan={columns.length} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                   No records found.
                 </td>
+              </tr>
+            )}
+            {showTotalRow && getTotalRow && sorted.length > 0 && (
+              <tr style={{ fontWeight: 700, borderTop: '2px solid #3b82f6' }}>
+                {columns.map((col, colIdx) => {
+                  const totalValue = getTotalRow(sorted)[col.key];
+                  return (
+                    <td
+                      key={col.key}
+                      style={{
+                        textAlign: col.align,
+                        padding: isFullHeight ? '14px 24px' : '10px 16px',
+                        color: colIdx === 0 ? '#f8fafc' : '#60a5fa',
+                        ...(colIdx === 0 ? {
+                          position: 'sticky',
+                          left: 0,
+                          zIndex: 15,
+                          background: '#132035',
+                          boxShadow: '0 -2px 6px rgba(0,0,0,0.3)',
+                        } : {}),
+                      }}
+                    >
+                      {colIdx === 0 ? 'Total' : totalValue}
+                    </td>
+                  );
+                })}
               </tr>
             )}
           </tbody>

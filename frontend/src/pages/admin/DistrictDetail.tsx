@@ -102,7 +102,11 @@ export const DistrictDetail = () => {
   const { district } = useParams<{ district: string }>();
   const navigate = useNavigate();
   const [catSort, setCatSort] = useState<string>('pending');
-      const { filters } = useFilters();
+  const [psTableSort, setPsTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+  const [pendencyTableSort, setPendencyTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+  const [disposalTableSort, setDisposalTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+
+  const { filters } = useFilters();
   const activeFilters = Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''));
 
   const { data, isLoading } = useQuery({
@@ -264,6 +268,37 @@ if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url=
   };
 
   const matrixCardStyle = { backgroundColor: '#1e293b', borderRadius: '8px', padding: '20px', border: '1px solid #334155', display: 'flex', flexDirection: 'column' as const };
+
+  const getCategorySubtitle = () => {
+    return `sorted by ${CAT_SORTS.find(o => o.value === catSort)?.label || 'By Pending ↓'}`;
+  };
+
+  const getPendencySubtitle = () => {
+    if (pendencyTableSort && pendencyTableSort.key) {
+      const col = pendencyCols.find(c => c.key === pendencyTableSort.key);
+      const dirArrow = pendencyTableSort.dir === 'asc' ? '↑' : pendencyTableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || pendencyTableSort.key} ${dirArrow}`;
+    }
+    return 'sorted by default';
+  };
+
+  const getDisposalSubtitle = () => {
+    if (disposalTableSort && disposalTableSort.key) {
+      const col = disposalCols.find(c => c.key === disposalTableSort.key);
+      const dirArrow = disposalTableSort.dir === 'asc' ? '↑' : disposalTableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || disposalTableSort.key} ${dirArrow}`;
+    }
+    return 'sorted by default';
+  };
+
+  const getPsSubtitle = () => {
+    if (psTableSort && psTableSort.key) {
+      const col = psCols.find(c => c.key === psTableSort.key);
+      const dirArrow = psTableSort.dir === 'asc' ? '↑' : psTableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || psTableSort.key} ${dirArrow}`;
+    }
+    return 'sorted by default';
+  };
 
   return (
     <Layout>
@@ -457,19 +492,53 @@ const psSummary = policeStations.map((ps: any) => ({
             {/* PS Summary + Category Chart */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 bg-slate-800 rounded-lg p-5 border border-slate-700" style={{ display: 'flex', flexDirection: 'column' }}>
-                <h2 className="text-lg font-bold text-slate-100 mb-4">Police Station Breakdown &amp; Ageing</h2>
+                <div style={{ marginBottom: '8px' }}>
+                  <h2 className="text-lg font-bold text-slate-100">Police Station Breakdown &amp; Ageing</h2>
+                  <span style={{ fontSize: '12px', color: '#94a3b8' }}>{getPsSubtitle()}</span>
+                </div>
                 <div style={{ flex: 1, position: 'relative' }}>
                   <DataTable
                     title="Police Station Breakdown & Ageing"
-                    data={policeStations.sort((a: any, b: any) => b.o30 - a.o30 || b.pending - a.pending)}
+                    data={policeStations}
                     columns={psCols.map(c => ({ ...c, render: (row) => renderPsCell(c, row) }))}
                     maxHeight="400px"
+                    onSort={(key, dir) => key ? setPsTableSort({ key, dir }) : setPsTableSort(null)}
+                    showTotalRow={true}
+                    getTotalRow={(data) => {
+                      const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                        total: acc.total + Number(r.total || 0),
+                        disposed: acc.disposed + Number(r.disposed || 0),
+                        missingDates: acc.missingDates + Number(r.missingDates || 0),
+                        pending: acc.pending + Number(r.pending || 0),
+                        unknown: acc.unknown + Number(r.unknown || 0),
+                        u7: acc.u7 + Number(r.u7 || 0),
+                        u15: acc.u15 + Number(r.u15 || 0),
+                        u30: acc.u30 + Number(r.u30 || 0),
+                        o30: acc.o30 + Number(r.o30 || 0),
+                        o60: acc.o60 + Number(r.o60 || 0),
+                      }), { total: 0, disposed: 0, missingDates: 0, pending: 0, unknown: 0, u7: 0, u15: 0, u30: 0, o30: 0, o60: 0 });
+                      return {
+                        ps: '',
+                        total: totals.total.toLocaleString(),
+                        disposed: totals.disposed.toLocaleString(),
+                        missingDates: totals.missingDates.toLocaleString(),
+                        pending: totals.pending.toLocaleString(),
+                        unknown: totals.unknown.toLocaleString(),
+                        u7: totals.u7.toLocaleString(),
+                        u15: totals.u15.toLocaleString(),
+                        u30: totals.u30.toLocaleString(),
+                        o30: totals.o30.toLocaleString(),
+                        o60: totals.o60.toLocaleString(),
+                        avgDisposalDays: '-',
+                      };
+                    }}
                   />
                 </div>
               </div>
               <div className="lg:col-span-1">
                 <ChartCard
                   title="Complaints by Class of Incident"
+                  subtitle={getCategorySubtitle()}
                   option={getStackedBarOptions(categories.slice(0, 12).reverse())}
                   fullOption={getStackedBarOptions([...categories].reverse())}
                   height="450px"
@@ -489,26 +558,76 @@ const psSummary = policeStations.map((ps: any) => ({
             <div className="dashboard-matrices-grid">
               <div style={{ ...matrixCardStyle, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                  <h2 className="text-lg font-bold text-slate-100">Pendency Ageing Matrix</h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-100">Pendency Ageing Matrix</h2>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>{getPendencySubtitle()}</span>
+                  </div>
                 </div>
                 <DataTable
                   title="Pendency Ageing Matrix"
                   data={policeStations}
                   columns={pendencyCols.map(c => ({ ...c, render: (row) => renderPendencyDays(c, row) }))}
                   maxHeight="350px"
+                  onSort={(key, dir) => key ? setPendencyTableSort({ key, dir }) : setPendencyTableSort(null)}
+                  showTotalRow={true}
+                  getTotalRow={(data) => {
+                    const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                      pending: acc.pending + Number(r.pending || 0),
+                      u7: acc.u7 + Number(r.u7 || 0),
+                      u15: acc.u15 + Number(r.u15 || 0),
+                      u30: acc.u30 + Number(r.u30 || 0),
+                      o30: acc.o30 + Number(r.o30 || 0),
+                      o60: acc.o60 + Number(r.o60 || 0),
+                    }), { pending: 0, u7: 0, u15: 0, u30: 0, o30: 0, o60: 0 });
+                    return {
+                      ps: '',
+                      pending: totals.pending.toLocaleString(),
+                      u7: totals.u7.toLocaleString(),
+                      u15: totals.u15.toLocaleString(),
+                      u30: totals.u30.toLocaleString(),
+                      o30: totals.o30.toLocaleString(),
+                      o60: totals.o60.toLocaleString(),
+                    };
+                  }}
                 />
               </div>
 
               {/* Disposal Time Matrix */}
               <div style={{ ...matrixCardStyle, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-                  <h2 className="text-lg font-bold text-slate-100">Disposal Time Matrix</h2>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-100">Disposal Time Matrix</h2>
+                    <span style={{ fontSize: '12px', color: '#94a3b8' }}>{getDisposalSubtitle()}</span>
+                  </div>
                 </div>
                 <DataTable
                   title="Disposal Time Matrix"
                   data={policeStations}
                   columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
                   maxHeight="350px"
+                  onSort={(key, dir) => key ? setDisposalTableSort({ key, dir }) : setDisposalTableSort(null)}
+                  showTotalRow={true}
+                  getTotalRow={(data) => {
+                    const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                      disposed: acc.disposed + Number(r.disposed || 0),
+                      missingDates: acc.missingDates + Number(r.missingDates || 0),
+                      du7: acc.du7 + Number(r.du7 || 0),
+                      du15: acc.du15 + Number(r.du15 || 0),
+                      du30: acc.du30 + Number(r.du30 || 0),
+                      do30: acc.do30 + Number(r.do30 || 0),
+                      do60: acc.do60 + Number(r.do60 || 0),
+                    }), { disposed: 0, missingDates: 0, du7: 0, du15: 0, du30: 0, do30: 0, do60: 0 });
+                    return {
+                      ps: '',
+                      disposed: totals.disposed.toLocaleString(),
+                      missingDates: totals.missingDates.toLocaleString(),
+                      du7: totals.du7.toLocaleString(),
+                      du15: totals.du15.toLocaleString(),
+                      du30: totals.du30.toLocaleString(),
+                      do30: totals.do30.toLocaleString(),
+                      do60: totals.do60.toLocaleString(),
+                    };
+                  }}
                 />
               </div>
             </div>

@@ -155,6 +155,42 @@ export const HotspotsPage = () => {
 
   const [districtSort, setDistrictSort] = useState<SortKey>('total');
   const [categorySort, setCategorySort] = useState<SortKey>('total');
+  const [districtTableSort, setDistrictTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+  const [categoryTableSort, setCategoryTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+
+  const districtColumnsList = [
+    { key: 'district', label: 'District' },
+    { key: 'total', label: 'Total' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'disposed', label: 'Disposed' },
+    { key: 'pendPct', label: 'Pending %' },
+  ];
+
+  const categoryColumnsList = [
+    { key: 'category', label: 'Class of Incident' },
+    { key: 'total', label: 'Total' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'disposed', label: 'Disposed' },
+    { key: 'pendPct', label: 'Pending %' },
+  ];
+
+  const getDistrictSubtitle = () => {
+    if (districtTableSort && districtTableSort.key) {
+      const col = districtColumnsList.find(c => c.key === districtTableSort.key);
+      const dirArrow = districtTableSort.dir === 'asc' ? '↑' : districtTableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || districtTableSort.key} ${dirArrow}`;
+    }
+    return `sorted by ${SORT_OPTIONS.find(o => o.value === districtSort)?.label || 'By Total ↓'}`;
+  };
+
+  const getCategorySubtitle = () => {
+    if (categoryTableSort && categoryTableSort.key) {
+      const col = categoryColumnsList.find(c => c.key === categoryTableSort.key);
+      const dirArrow = categoryTableSort.dir === 'asc' ? '↑' : categoryTableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || categoryTableSort.key} ${dirArrow}`;
+    }
+    return `sorted by ${SORT_OPTIONS.find(o => o.value === categorySort)?.label || 'By Total ↓'}`;
+  };
 
   const { data: dd, isLoading: dl } = useQuery({
     queryKey: ['dashboard', 'district', activeFilters],
@@ -252,6 +288,7 @@ export const HotspotsPage = () => {
             <div className="charts-grid" style={{ gap: '16px', marginBottom: '24px' }}>
               <ChartCard
                 title="District-wise Hotspots"
+                subtitle={getDistrictSubtitle()}
                 option={getDistrictBarOptions(districtChartData)}
                 fullOption={getDistrictBarOptions([...sortedDistrictRows].reverse())}
                 height="320px"
@@ -267,6 +304,7 @@ export const HotspotsPage = () => {
               />
               <ChartCard
                 title="Class of Incident Hotspots"
+                subtitle={getCategorySubtitle()}
                 option={getStackedBarOptions(categoryChartData)}
                 fullOption={getStackedBarOptions([...sortedCategoryRows].reverse())}
                 height="320px"
@@ -291,8 +329,7 @@ export const HotspotsPage = () => {
                   <div>
                     <h3 className="highlights-section-title">District-wise Hotspots</h3>
                     <span className="highlights-section-meta">
-                      {sortedDistrictRows.length} districts · sorted by{' '}
-                      {SORT_OPTIONS.find(o => o.value === districtSort)?.label}
+                      {sortedDistrictRows.length} districts · {getDistrictSubtitle()}
                     </span>
                   </div>
                 </div>
@@ -305,6 +342,23 @@ export const HotspotsPage = () => {
                   }))}
                   maxHeight="none"
                   defaultLimit={5}
+                  onSort={(key, dir) => key ? setDistrictTableSort({ key, dir }) : setDistrictTableSort(null)}
+                  showTotalRow={true}
+                  getTotalRow={(data) => {
+                    const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                      total: acc.total + Number(r.total || 0),
+                      pending: acc.pending + Number(r.pending || 0),
+                      disposed: acc.disposed + Number(r.disposed || 0),
+                    }), { total: 0, pending: 0, disposed: 0 });
+                    const grandTotal = totals.total || 1;
+                    return {
+                      district: '',
+                      total: totals.total.toLocaleString(),
+                      pending: totals.pending.toLocaleString(),
+                      disposed: totals.disposed.toLocaleString(),
+                      pendPct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%',
+                    };
+                  }}
                 />
               </div>
 
@@ -314,8 +368,7 @@ export const HotspotsPage = () => {
                   <div>
                     <h3 className="highlights-section-title">Class of Incident Hotspots</h3>
                     <span className="highlights-section-meta">
-                      {sortedCategoryRows.length} categories · sorted by{' '}
-                      {SORT_OPTIONS.find(o => o.value === categorySort)?.label}
+                      {sortedCategoryRows.length} categories · {getCategorySubtitle()}
                     </span>
                   </div>
                 </div>
@@ -328,6 +381,23 @@ export const HotspotsPage = () => {
                   }))}
                   maxHeight="none"
                   defaultLimit={5}
+                  onSort={(key, dir) => key ? setCategoryTableSort({ key, dir }) : setCategoryTableSort(null)}
+                  showTotalRow={true}
+                  getTotalRow={(data) => {
+                    const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                      total: acc.total + Number(r.total || 0),
+                      pending: acc.pending + Number(r.pending || 0),
+                      disposed: acc.disposed + Number(r.disposed || 0),
+                    }), { total: 0, pending: 0, disposed: 0 });
+                    const grandTotal = totals.total || 1;
+                    return {
+                      category: '',
+                      total: totals.total.toLocaleString(),
+                      pending: totals.pending.toLocaleString(),
+                      disposed: totals.disposed.toLocaleString(),
+                      pendPct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%',
+                    };
+                  }}
                 />
               </div>
 

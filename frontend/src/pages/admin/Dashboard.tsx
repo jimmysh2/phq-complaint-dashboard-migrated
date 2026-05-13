@@ -249,6 +249,24 @@ export const DashboardPage = () => {
   const [categoryViewType, setCategoryViewType] = useState<'graph' | 'table'>('graph');
   const [pendencyView, setPendencyView] = useState<'numbers' | 'pct'>('numbers');
   const [disposalView, setDisposalView] = useState<'numbers' | 'pct'>('numbers');
+  const [districtTableSort, setDistrictTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+  const [categoryTableSort, setCategoryTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+  const [pendencyMatrixSort, setPendencyMatrixSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+  const [disposalMatrixSort, setDisposalMatrixSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+
+  const handleDistrictViewChange = (newType: 'graph' | 'table') => {
+    if (newType === 'graph') {
+      setDistrictTableSort(null);
+    }
+    setDistrictViewType(newType);
+  };
+
+  const handleCategoryViewChange = (newType: 'graph' | 'table') => {
+    if (newType === 'graph') {
+      setCategoryTableSort(null);
+    }
+    setCategoryViewType(newType);
+  };
 
   const stateTotal = s?.totalReceived || 1;
 
@@ -286,6 +304,86 @@ export const DashboardPage = () => {
 
   const sortedDistricts = sortData(districts, districtSort);
   const sortedCategories = sortData(categories, categorySort);
+
+  const districtSortOptions = [
+    { value: 'total', label: 'By Total' },
+    { value: 'pending', label: 'By Pending' },
+    { value: 'disposed', label: 'By Disposed' },
+    { value: 'total_pct_state', label: 'By Total %' },
+    { value: 'pending_pct', label: 'By Pending %' },
+    { value: 'disposed_pct', label: 'By Disposed %' },
+    { value: 'az', label: 'A → Z' },
+    { value: 'za', label: 'Z → A' },
+  ];
+  const districtSortLabel = districtSortOptions.find(o => o.value === districtSort)?.label || 'By Total';
+
+  const categorySortOptions = [
+    { value: 'total', label: 'By Total' },
+    { value: 'pending', label: 'By Pending' },
+    { value: 'disposed', label: 'By Disposed' },
+    { value: 'total_pct_state', label: 'By Total %' },
+    { value: 'pending_pct', label: 'By Pending %' },
+    { value: 'disposed_pct', label: 'By Disposed %' },
+    { value: 'az', label: 'A → Z' },
+    { value: 'za', label: 'Z → A' },
+  ];
+  const categorySortLabel = categorySortOptions.find(o => o.value === categorySort)?.label || 'By Total';
+
+  const districtColumns = [
+    { key: 'district', label: 'District' },
+    { key: 'total', label: 'Total Reg' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'pending_pct', label: 'Pending %' },
+    { key: 'disposed', label: 'Disposed' },
+    { key: 'disposed_pct', label: 'Disposed %' },
+    { key: 'unknown', label: 'Status NF' },
+    { key: 'unknown_pct', label: 'Status NF %' },
+  ];
+
+  const categoryColumns = [
+    { key: 'category', label: 'Class of Incident' },
+    { key: 'total', label: 'Total Reg' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'pending_pct', label: 'Pending %' },
+    { key: 'disposed', label: 'Disposed' },
+    { key: 'disposed_pct', label: 'Disposed %' },
+  ];
+
+  const getDistrictSubtitle = () => {
+    if (districtViewType === 'table' && districtTableSort && districtTableSort.key) {
+      const col = districtColumns.find(c => c.key === districtTableSort.key);
+      const dirArrow = districtTableSort.dir === 'asc' ? '↑' : districtTableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || districtTableSort.key} ${dirArrow}`;
+    }
+    return `sorted by ${districtSortLabel} ↓`;
+  };
+
+  const getCategorySubtitle = () => {
+    if (categoryViewType === 'table' && categoryTableSort && categoryTableSort.key) {
+      const col = categoryColumns.find(c => c.key === categoryTableSort.key);
+      const dirArrow = categoryTableSort.dir === 'asc' ? '↑' : categoryTableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || categoryTableSort.key} ${dirArrow}`;
+    }
+    return `sorted by ${categorySortLabel} ↓`;
+  };
+
+  const getPendencyMatrixSubtitle = () => {
+    if (pendencyMatrixSort && pendencyMatrixSort.key) {
+      const col = matrixCols.find(c => c.key === pendencyMatrixSort.key);
+      const dirArrow = pendencyMatrixSort.dir === 'asc' ? '↑' : pendencyMatrixSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || pendencyMatrixSort.key} ${dirArrow}`;
+    }
+    return 'sorted by default';
+  };
+
+  const getDisposalMatrixSubtitle = () => {
+    if (disposalMatrixSort && disposalMatrixSort.key) {
+      const col = matrixCols.find(c => c.key === disposalMatrixSort.key);
+      const dirArrow = disposalMatrixSort.dir === 'asc' ? '↑' : disposalMatrixSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || disposalMatrixSort.key} ${dirArrow}`;
+    }
+    return 'sorted by default';
+  };
 
   const matrixWithTotal = matrix.map((row: any) => {
     // API now returns row.pending with the actual total from DB including those with missing dates
@@ -653,12 +751,13 @@ export const DashboardPage = () => {
           {districtViewType === 'graph' ? (
             <ChartCard
               title="Top District Pendency"
+              subtitle={getDistrictSubtitle()}
               option={getDistrictBarOptions(sortedDistricts.slice(0, 7).reverse())}
               fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
               height="320px"
               actions={
                 <div className="chart-actions">
-                  <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
+                  <ViewToggle value={districtViewType} onChange={handleDistrictViewChange} />
                   <SortDropdown 
                     value={districtSort}
                     onChange={setDistrictSort}
@@ -679,23 +778,10 @@ export const DashboardPage = () => {
           ) : (
             <ChartCard
               title="Top District Pendency"
+              subtitle={getDistrictSubtitle()}
               actions={
                 <div className="chart-actions">
-                  <ViewToggle value={districtViewType} onChange={setDistrictViewType} />
-                  <SortDropdown 
-                    value={districtSort}
-                    onChange={setDistrictSort}
-                    options={[
-                      { value: 'total', label: 'Total Reg' },
-                      { value: 'pending', label: 'Total Pending' },
-                      { value: 'disposed', label: 'Total Disposed' },
-                      { value: 'total_pct_state', label: 'Total % (from state total)' },
-                      { value: 'pending_pct', label: 'Pending % (from district total)' },
-                      { value: 'disposed_pct', label: 'Disposed % (from district total)' },
-                      { value: 'az', label: 'A → Z' },
-                      { value: 'za', label: 'Z → A' },
-                    ]}
-                  />
+                  <ViewToggle value={districtViewType} onChange={handleDistrictViewChange} />
                 </div>
               }
             >
@@ -715,15 +801,37 @@ export const DashboardPage = () => {
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
                 noExpand={true}
                 hideTitleBar={true}
+                onSort={(key, dir) => key ? setDistrictTableSort({ key, dir }) : setDistrictTableSort(null)}
+                showTotalRow={true}
+                getTotalRow={(data) => {
+                  const totals = data.reduce((acc, r) => ({
+                    total: acc.total + Number(r.total || 0),
+                    pending: acc.pending + Number(r.pending || 0),
+                    disposed: acc.disposed + Number(r.disposed || 0),
+                    unknown: acc.unknown + Number(r.unknown || 0),
+                  }), { total: 0, pending: 0, disposed: 0, unknown: 0 });
+                  const grandTotal = totals.total || 1;
+                  return {
+                    district: '',
+                    total: totals.total.toLocaleString(),
+                    pending: totals.pending.toLocaleString(),
+                    pending_pct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%',
+                    disposed: totals.disposed.toLocaleString(),
+                    disposed_pct: ((totals.disposed / grandTotal) * 100).toFixed(1) + '%',
+                    unknown: totals.unknown.toLocaleString(),
+                    unknown_pct: ((totals.unknown / grandTotal) * 100).toFixed(1) + '%',
+                  };
+                }}
               />
             </ChartCard>
           )}
           {categoryViewType === 'graph' ? (
             <ChartCard
               title="Top Classes of Incident"
+              subtitle={getCategorySubtitle()}
               actions={
                 <div className="chart-actions">
-                  <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
+                  <ViewToggle value={categoryViewType} onChange={handleCategoryViewChange} />
                   <SortDropdown
                     value={categorySort}
                     onChange={setCategorySort}
@@ -747,23 +855,10 @@ export const DashboardPage = () => {
           ) : (
             <ChartCard
               title="Top Classes of Incident"
+              subtitle={getCategorySubtitle()}
               actions={
                 <div className="chart-actions">
-                  <ViewToggle value={categoryViewType} onChange={setCategoryViewType} />
-                  <SortDropdown
-                    value={categorySort}
-                    onChange={setCategorySort}
-                    options={[
-                      { value: 'total', label: 'Total Reg' },
-                      { value: 'pending', label: 'Total Pending' },
-                      { value: 'disposed', label: 'Total Disposed' },
-                      { value: 'total_pct_state', label: 'Total % (from state total)' },
-                      { value: 'pending_pct', label: 'Pending % (from category total)' },
-                      { value: 'disposed_pct', label: 'Disposed % (from category total)' },
-                      { value: 'az', label: 'A → Z' },
-                      { value: 'za', label: 'Z → A' },
-                    ]}
-                  />
+                  <ViewToggle value={categoryViewType} onChange={handleCategoryViewChange} />
                 </div>
               }
             >
@@ -819,6 +914,27 @@ export const DashboardPage = () => {
                 onRowClick={(row) => navigate(buildCategoryCctnsUrl(row.category))}
                 noExpand={true}
                 hideTitleBar={true}
+                onSort={(key, dir) => key ? setCategoryTableSort({ key, dir }) : setCategoryTableSort(null)}
+                showTotalRow={true}
+                getTotalRow={(data) => {
+                  const totals = data.reduce((acc, r) => ({
+                    total: acc.total + Number(r.total || 0),
+                    pending: acc.pending + Number(r.pending || 0),
+                    disposed: acc.disposed + Number(r.disposed || 0),
+                    unknown: acc.unknown + Number(r.unknown || 0),
+                  }), { total: 0, pending: 0, disposed: 0, unknown: 0 });
+                  const grandTotal = totals.total || 1;
+                  return {
+                    category: '',
+                    total: totals.total.toLocaleString(),
+                    pending: totals.pending.toLocaleString(),
+                    pending_pct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%',
+                    disposed: totals.disposed.toLocaleString(),
+                    disposed_pct: ((totals.disposed / grandTotal) * 100).toFixed(1) + '%',
+                    unknown: totals.unknown.toLocaleString(),
+                    unknown_pct: ((totals.unknown / grandTotal) * 100).toFixed(1) + '%',
+                  };
+                }}
               />
             </ChartCard>
           )}
@@ -830,7 +946,10 @@ export const DashboardPage = () => {
           {/* Pendency Ageing Matrix */}
           <div className="bg-slate-800 rounded-lg p-5 border border-slate-700" style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-              <h2 className="text-lg font-bold text-slate-100">Pendency Ageing Matrix</h2>
+              <div>
+                <h2 className="text-lg font-bold text-slate-100">Pendency Ageing Matrix</h2>
+                <span style={{ fontSize: '12px', color: '#94a3b8' }}>{getPendencyMatrixSubtitle()}</span>
+              </div>
               <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155', flexShrink: 0 }}>
                 {(['numbers', 'pct'] as const).map((v) => (
                   <button
@@ -863,6 +982,27 @@ export const DashboardPage = () => {
                 columns={matrixCols.map(c => ({ ...c, render: (row) => renderMatrixDays(c, row) }))}
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
                 maxHeight="400px"
+                onSort={(key, dir) => key ? setPendencyMatrixSort({ key, dir }) : setPendencyMatrixSort(null)}
+                showTotalRow={true}
+                getTotalRow={(data) => {
+                  const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                    total: acc.total + Number(r.total || 0),
+                    u7: acc.u7 + Number(r.u7 || 0),
+                    u15: acc.u15 + Number(r.u15 || 0),
+                    u30: acc.u30 + Number(r.u30 || 0),
+                    o30: acc.o30 + Number(r.o30 || 0),
+                    o60: acc.o60 + Number(r.o60 || 0),
+                  }), { total: 0, u7: 0, u15: 0, u30: 0, o30: 0, o60: 0 });
+                  return {
+                    district: '',
+                    total: totals.total.toLocaleString(),
+                    u7: totals.u7.toLocaleString(),
+                    u15: totals.u15.toLocaleString(),
+                    u30: totals.u30.toLocaleString(),
+                    o30: totals.o30.toLocaleString(),
+                    o60: totals.o60.toLocaleString(),
+                  };
+                }}
               />
             ) : (
               <DataTable
@@ -871,6 +1011,28 @@ export const DashboardPage = () => {
                 columns={matrixPctCols.map(c => ({ ...c, render: (row) => renderMatrixPct(c, row) }))}
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
                 maxHeight="400px"
+                onSort={(key, dir) => key ? setPendencyMatrixSort({ key, dir }) : setPendencyMatrixSort(null)}
+                showTotalRow={true}
+                getTotalRow={(data) => {
+                  const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                    pct_total: acc.pct_total + Number(r.pct_total || 0),
+                    pct_u7: acc.pct_u7 + Number(r.pct_u7 || 0),
+                    pct_u15: acc.pct_u15 + Number(r.pct_u15 || 0),
+                    pct_u30: acc.pct_u30 + Number(r.pct_u30 || 0),
+                    pct_o30: acc.pct_o30 + Number(r.pct_o30 || 0),
+                    pct_o60: acc.pct_o60 + Number(r.pct_o60 || 0),
+                  }), { pct_total: 0, pct_u7: 0, pct_u15: 0, pct_u30: 0, pct_o30: 0, pct_o60: 0 });
+                  const count = data.length || 1;
+                  return {
+                    district: '',
+                    pct_total: (totals.pct_total / count).toFixed(1) + '%',
+                    pct_u7: (totals.pct_u7 / count).toFixed(1) + '%',
+                    pct_u15: (totals.pct_u15 / count).toFixed(1) + '%',
+                    pct_u30: (totals.pct_u30 / count).toFixed(1) + '%',
+                    pct_o30: (totals.pct_o30 / count).toFixed(1) + '%',
+                    pct_o60: (totals.pct_o60 / count).toFixed(1) + '%',
+                  };
+                }}
               />
             )}
           </div>
@@ -878,7 +1040,10 @@ export const DashboardPage = () => {
           {/* Disposal Time Matrix */}
           <div className="bg-slate-800 rounded-lg p-5 border border-slate-700" style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-              <h2 className="text-lg font-bold text-slate-100">Disposal Time Matrix</h2>
+              <div>
+                <h2 className="text-lg font-bold text-slate-100">Disposal Time Matrix</h2>
+                <span style={{ fontSize: '12px', color: '#94a3b8' }}>{getDisposalMatrixSubtitle()}</span>
+              </div>
               <div style={{ display: 'flex', gap: '4px', backgroundColor: '#0f172a', borderRadius: '8px', padding: '3px', border: '1px solid #334155', flexShrink: 0 }}>
                 {(['numbers', 'pct'] as const).map((v) => (
                   <button
@@ -911,6 +1076,29 @@ export const DashboardPage = () => {
                 columns={disposalCols.map(c => ({ ...c, render: (row) => renderDisposalDays(c, row) }))}
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
                 maxHeight="400px"
+                onSort={(key, dir) => key ? setDisposalMatrixSort({ key, dir }) : setDisposalMatrixSort(null)}
+                showTotalRow={true}
+                getTotalRow={(data) => {
+                  const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                    total: acc.total + Number(r.total || 0),
+                    missingDates: acc.missingDates + Number(r.missingDates || 0),
+                    u7: acc.u7 + Number(r.u7 || 0),
+                    u15: acc.u15 + Number(r.u15 || 0),
+                    u30: acc.u30 + Number(r.u30 || 0),
+                    o30: acc.o30 + Number(r.o30 || 0),
+                    o60: acc.o60 + Number(r.o60 || 0),
+                  }), { total: 0, missingDates: 0, u7: 0, u15: 0, u30: 0, o30: 0, o60: 0 });
+                  return {
+                    district: '',
+                    total: totals.total.toLocaleString(),
+                    missingDates: totals.missingDates.toLocaleString(),
+                    u7: totals.u7.toLocaleString(),
+                    u15: totals.u15.toLocaleString(),
+                    u30: totals.u30.toLocaleString(),
+                    o30: totals.o30.toLocaleString(),
+                    o60: totals.o60.toLocaleString(),
+                  };
+                }}
               />
             ) : (
               <DataTable
@@ -919,6 +1107,30 @@ export const DashboardPage = () => {
                 columns={disposalPctCols.map(c => ({ ...c, render: (row) => renderDisposalPct(c, row) }))}
                 onRowClick={(row) => navigate(`/admin/district/${encodeURIComponent(String(row.district))}`)}
                 maxHeight="400px"
+                onSort={(key, dir) => key ? setDisposalMatrixSort({ key, dir }) : setDisposalMatrixSort(null)}
+                showTotalRow={true}
+                getTotalRow={(data) => {
+                  const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                    pct_total: acc.pct_total + Number(r.pct_total || 0),
+                    pct_missing: acc.pct_missing + Number(r.pct_missing || 0),
+                    pct_u7: acc.pct_u7 + Number(r.pct_u7 || 0),
+                    pct_u15: acc.pct_u15 + Number(r.pct_u15 || 0),
+                    pct_u30: acc.pct_u30 + Number(r.pct_u30 || 0),
+                    pct_o30: acc.pct_o30 + Number(r.pct_o30 || 0),
+                    pct_o60: acc.pct_o60 + Number(r.pct_o60 || 0),
+                  }), { pct_total: 0, pct_missing: 0, pct_u7: 0, pct_u15: 0, pct_u30: 0, pct_o30: 0, pct_o60: 0 });
+                  const count = data.length || 1;
+                  return {
+                    district: '',
+                    pct_total: (totals.pct_total / count).toFixed(1) + '%',
+                    pct_missing: (totals.pct_missing / count).toFixed(1) + '%',
+                    pct_u7: (totals.pct_u7 / count).toFixed(1) + '%',
+                    pct_u15: (totals.pct_u15 / count).toFixed(1) + '%',
+                    pct_u30: (totals.pct_u30 / count).toFixed(1) + '%',
+                    pct_o30: (totals.pct_o30 / count).toFixed(1) + '%',
+                    pct_o60: (totals.pct_o60 / count).toFixed(1) + '%',
+                  };
+                }}
               />
             )}
           </div>

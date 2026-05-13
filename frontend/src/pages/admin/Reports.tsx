@@ -20,45 +20,74 @@ const tabs = [
 ];
 
 const apiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>> = {
-  'district':         (p) => reportsApi.district(p),
-  'mode-receipt':     (p) => reportsApi.modeReceipt(p),
+  'district': (p) => reportsApi.district(p),
+  'mode-receipt': (p) => reportsApi.modeReceipt(p),
   'complaint-source': (p) => reportsApi.complaintsSource(p),
-  'type-complaint':   (p) => reportsApi.typeComplaint(p),
-  'type-against':     (p) => reportsApi.typeAgainst(p),
-  'status':           (p) => reportsApi.status(p),
-  'branch-wise':      (p) => reportsApi.branchWise(p),
-  'oldest-pending':   (p) => reportsApi.oldestPending(p),
+  'type-complaint': (p) => reportsApi.typeComplaint(p),
+  'type-against': (p) => reportsApi.typeAgainst(p),
+  'status': (p) => reportsApi.status(p),
+  'branch-wise': (p) => reportsApi.branchWise(p),
+  'oldest-pending': (p) => reportsApi.oldestPending(p),
 };
 
 // ─── Reusable sort dropdown (local to this page) ─────────────────────────────
 type SortOpt = { label: string; value: string };
 const CHART_SORTS: SortOpt[] = [
-  { label: 'By Total ↓',    value: 'total'    },
-  { label: 'By Pending ↓',  value: 'pending'  },
+  { label: 'By Total ↓', value: 'total' },
+  { label: 'By Pending ↓', value: 'pending' },
   { label: 'By Disposed ↓', value: 'disposed' },
-  { label: 'A → Z',         value: 'az'       },
-  { label: 'Z → A',         value: 'za'       },
+  { label: 'A → Z', value: 'az' },
+  { label: 'Z → A', value: 'za' },
 ];
 
 const ChartSortDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
-  const cur = CHART_SORTS.find(o => o.value === value)?.label ?? 'Sort';
+
+  const handleMenuMouseEnter = () => {
+    if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+  };
+
+  const handleMenuMouseLeave = () => {
+    closeTimeoutRef.current = setTimeout(() => {
+      setOpen(false);
+    }, 300);
+  };
+
+  const handleButtonClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setOpen(prev => !prev);
+  };
+
   return (
     <div ref={ref} style={{ position: 'relative' }}>
-      <button onClick={() => setOpen(v => !v)} className="chart-expand-btn"
-        style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <button
+        onClick={handleButtonClick}
+        onMouseEnter={e => { setOpen(true); (e.currentTarget as HTMLElement).style.backgroundColor = 'rgba(30, 48, 72, 0.95)'; (e.currentTarget as HTMLElement).style.color = '#f8fafc'; }}
+        onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = ''; (e.currentTarget as HTMLElement).style.color = ''; }}
+        className="chart-expand-btn"
+        title="Sort Options"
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px' }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
-        </svg>{cur}
+        </svg>
       </button>
       {open && (
-        <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 9999, minWidth: 180, padding: '4px 0' }}>
+        <div
+          style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.4)', zIndex: 9999, minWidth: 180, padding: '4px 0' }}
+          onMouseEnter={handleMenuMouseEnter}
+          onMouseLeave={handleMenuMouseLeave}
+        >
           {CHART_SORTS.map(opt => (
             <div key={opt.value} onClick={() => { onChange(opt.value); setOpen(false); }}
               style={{ padding: '7px 14px', fontSize: 12, cursor: 'pointer', color: value === opt.value ? '#60a5fa' : '#cbd5e1', fontWeight: value === opt.value ? 600 : 400, backgroundColor: value === opt.value ? 'rgba(51,65,85,0.6)' : 'transparent' }}
@@ -77,6 +106,34 @@ export const ReportsPage = () => {
   const type = sp.get('type') || 'district';
   const [chartSort, setChartSort] = useState<string>('total');
   const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
+  const [tableSort, setTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+
+  const reportColumnsList = [
+    { key: 'name', label: 'Name' },
+    { key: 'total', label: 'Total' },
+    { key: 'pending', label: 'Pending' },
+    { key: 'disposed', label: 'Disposed' },
+    { key: 'unknown', label: 'Status NF' },
+    { key: 'pendPct', label: 'Pending %' },
+    { key: 'dispPct', label: 'Disposed %' },
+    { key: 'unknPct', label: 'Status NF %' },
+  ];
+
+  const getReportSubtitle = () => {
+    if (viewMode === 'table' && tableSort && tableSort.key) {
+      const col = reportColumnsList.find(c => c.key === tableSort.key);
+      const dirArrow = tableSort.dir === 'asc' ? '↑' : tableSort.dir === 'desc' ? '↓' : '';
+      return `sorted by ${col?.label || tableSort.key} ${dirArrow}`;
+    }
+    return `sorted by ${CHART_SORTS.find(o => o.value === chartSort)?.label || 'By Total ↓'}`;
+  };
+
+  const handleViewModeChange = (newMode: 'chart' | 'table') => {
+    if (newMode === 'chart') {
+      setTableSort(null);
+    }
+    setViewMode(newMode);
+  };
 
   // Same pattern as Dashboard — read global filters, strip empty values
   const { filters } = useFilters();
@@ -102,18 +159,18 @@ export const ReportsPage = () => {
   });
 
   const rows = data?.data || [];
-  const total   = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.total   || r.count   || 0), 0);
-  const pend    = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.pending || 0), 0);
-  const disp    = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.disposed || 0), 0);
-  const unk     = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.unknown || 0), 0);
+  const total = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.total || r.count || 0), 0);
+  const pend = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.pending || 0), 0);
+  const disp = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.disposed || 0), 0);
+  const unk = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.unknown || 0), 0);
   const missing = rows.reduce((s: number, r: Record<string, unknown>) => s + Number(r.missingDates || 0), 0);
 
   const tableData = useMemo(() => {
     const mapped = rows.map((r: Record<string, unknown>, i: number) => {
       const tot = Number(r.total || r.count || 0);
-      const p   = Number(r.pending  || 0);
-      const d   = Number(r.disposed || 0);
-      const u   = Number(r.unknown  || 0);
+      const p = Number(r.pending || 0);
+      const d = Number(r.disposed || 0);
+      const u = Number(r.unknown || 0);
       const rawName = String(
         r.district || r.branch || r.mode || r.status ||
         r.natureOfIncident || r.typeAgainst || r.actionTaken ||
@@ -124,34 +181,34 @@ export const ReportsPage = () => {
           ? 'Status Not Found'
           : rawName || `Item ${i + 1}`;
       return {
-        name:     displayName,
-        total:    tot,
-        pending:  p,
+        name: displayName,
+        total: tot,
+        pending: p,
         disposed: d,
-        unknown:  u,
-        pendPct:  tot > 0 ? Math.round((p / tot) * 100) + '%' : '0%',
-        dispPct:  tot > 0 ? Math.round((d / tot) * 100) + '%' : '0%',
-        unknPct:  tot > 0 ? Math.round((u / tot) * 100) + '%' : '0%',
+        unknown: u,
+        pendPct: tot > 0 ? Math.round((p / tot) * 100) + '%' : '0%',
+        dispPct: tot > 0 ? Math.round((d / tot) * 100) + '%' : '0%',
+        unknPct: tot > 0 ? Math.round((u / tot) * 100) + '%' : '0%',
       };
     });
     return [...mapped].sort((a, b) => {
       if (chartSort === 'az') return a.name.localeCompare(b.name);
       if (chartSort === 'za') return b.name.localeCompare(a.name);
-      if (chartSort === 'pending')  return b.pending  - a.pending;
+      if (chartSort === 'pending') return b.pending - a.pending;
       if (chartSort === 'disposed') return b.disposed - a.disposed;
       return b.total - a.total; // default
     });
   }, [rows, type, chartSort]);
 
   const columns: Column<typeof tableData[0]>[] = [
-    { key: 'name',     label: 'Name',                sortable: true },
-    { key: 'total',    label: 'Total',               sortable: true, align: 'right' },
-    { key: 'pending',  label: 'Pending',             sortable: true, align: 'right' },
-    { key: 'disposed', label: 'Disposed',            sortable: true, align: 'right' },
-    { key: 'unknown',  label: 'Status Not Found',    sortable: true, align: 'right' },
-    { key: 'pendPct',  label: 'Pending %',           sortable: true, align: 'center' },
-    { key: 'dispPct',  label: 'Disposed %',          sortable: true, align: 'center' },
-    { key: 'unknPct',  label: 'Status Not Found %',  sortable: true, align: 'center' },
+    { key: 'name', label: 'Name', sortable: true },
+    { key: 'total', label: 'Total', sortable: true, align: 'right' },
+    { key: 'pending', label: 'Pending', sortable: true, align: 'right' },
+    { key: 'disposed', label: 'Disposed', sortable: true, align: 'right' },
+    { key: 'unknown', label: 'Status Not Found', sortable: true, align: 'right' },
+    { key: 'pendPct', label: 'Pending %', sortable: true, align: 'center' },
+    { key: 'dispPct', label: 'Disposed %', sortable: true, align: 'center' },
+    { key: 'unknPct', label: 'Status Not Found %', sortable: true, align: 'center' },
   ];
 
   // Chart preview: top 25 sorted rows reversed so highest appears at the top of horizontal bar
@@ -162,10 +219,10 @@ export const ReportsPage = () => {
       return getDistrictBarOptions(chartRows.map(d => ({ ...d, district: d.name })));
     return getStackedBarOptions(chartRows.map(d => ({
       category: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status' : d.name,
-      total:    d.total,
-      pending:  d.pending,
+      total: d.total,
+      pending: d.pending,
       disposed: d.disposed,
-      unknown:  d.unknown,
+      unknown: d.unknown,
     })));
   }, [chartRows, type]);
 
@@ -175,10 +232,10 @@ export const ReportsPage = () => {
       return getDistrictBarOptions(allRowsRev.map(d => ({ ...d, district: d.name })));
     return getStackedBarOptions(allRowsRev.map(d => ({
       category: type === 'status' && (!d.name || d.name.trim() === '') ? 'Unknown Status' : d.name,
-      total:    d.total,
-      pending:  d.pending,
+      total: d.total,
+      pending: d.pending,
       disposed: d.disposed,
-      unknown:  d.unknown,
+      unknown: d.unknown,
     })));
   }, [tableData, type]);
 
@@ -196,16 +253,16 @@ export const ReportsPage = () => {
         ) : type === 'oldest-pending' ? (
           <div>
             {oldestDistrict && (
-              <button 
+              <button
                 onClick={() => setOldestDistrict(null)}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: '#60a5fa', 
-                  cursor: 'pointer', 
-                  marginBottom: '16px', 
-                  display: 'flex', 
-                  alignItems: 'center', 
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#60a5fa',
+                  cursor: 'pointer',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: '4px',
                   fontSize: '14px',
                   fontWeight: 500
@@ -228,9 +285,9 @@ export const ReportsPage = () => {
               columns={[
                 { key: 'name', label: oldestDistrict ? 'Police Station' : 'District', sortable: true },
                 { key: 'oldestDate', label: 'Oldest Complaint Date', sortable: true },
-                { 
-                  key: 'complaintNumber', 
-                  label: 'Complaint Number', 
+                {
+                  key: 'complaintNumber',
+                  label: 'Complaint Number',
                   sortable: true,
                   render: (row: any) => row.complaintNumber && row.complaintNumber !== 'N/A' ? (
                     <Link
@@ -272,92 +329,64 @@ export const ReportsPage = () => {
               </div>
             </div>
 
-            <div className="reports-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <h2 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#f8fafc' }}>
-                {tabs.find(t => t.id === type)?.label || 'Report'}
-              </h2>
-              <div className="reports-view-toggle" style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '8px', padding: '4px' }}>
-                <button
-                  onClick={() => setViewMode('chart')}
-                  style={{
-                    padding: '6px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    backgroundColor: viewMode === 'chart' ? '#3b82f6' : 'transparent',
-                    color: viewMode === 'chart' ? '#fff' : '#94a3b8',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
+            <ChartCard
+              title={tabs.find(t => t.id === type)?.label || 'Report'}
+              subtitle={getReportSubtitle()}
+              option={chartOption}
+              fullOption={fullChartOption}
+              height="400px"
+              viewMode={viewMode}
+              onViewModeChange={handleViewModeChange}
+              chartActions={
+                <ChartSortDropdown
+                  value={chartSort}
+                  onChange={v => setChartSort(v)}
+                />
+              }
+            >
+              {viewMode === 'table' && (
+                <DataTable
+                  data={tableData}
+                  columns={columns.map(c => ({
+                    ...c,
+                    render: (row) => {
+                      if (c.key === 'name') return <span style={{ fontWeight: 500 }}>{String(row.name)}</span>;
+                      if (c.key === 'total') return <span style={{ fontWeight: 600 }}>{String(row.total)}</span>;
+                      if (c.key === 'pending') return <span style={{ color: '#fbbf24' }}>{String(row.pending)}</span>;
+                      if (c.key === 'disposed') return <span style={{ color: '#34d399' }}>{String(row.disposed)}</span>;
+                      if (c.key === 'unknown') return <span style={{ color: '#94a3b8' }}>{String(row.unknown)}</span>;
+                      if (c.key === 'pendPct') return <span style={{ color: '#fbbf24' }}>{String(row.pendPct)}</span>;
+                      if (c.key === 'dispPct') return <span style={{ color: '#34d399' }}>{String(row.dispPct)}</span>;
+                      if (c.key === 'unknPct') return <span style={{ color: '#94a3b8' }}>{String(row.unknPct)}</span>;
+                      return String(row[c.key as keyof typeof row] ?? '-');
+                    },
+                  }))}
+                  maxHeight="calc(100vh - 400px)"
+                  onSort={(key, dir) => key ? setTableSort({ key, dir }) : setTableSort(null)}
+                  hideTitleBar={true}
+                  showTotalRow={true}
+                  getTotalRow={(data) => {
+                    const totals = data.reduce<Record<string, number>>((acc, r) => ({
+                      total: acc.total + Number(r.total || 0),
+                      pending: acc.pending + Number(r.pending || 0),
+                      disposed: acc.disposed + Number(r.disposed || 0),
+                      unknown: acc.unknown + Number(r.unknown || 0),
+                    }), { total: 0, pending: 0, disposed: 0, unknown: 0 });
+                    const grandTotal = totals.total || 1;
+                    return {
+                      name: '',
+                      total: totals.total.toLocaleString(),
+                      pending: totals.pending.toLocaleString(),
+                      disposed: totals.disposed.toLocaleString(),
+                      unknown: totals.unknown.toLocaleString(),
+                      pendPct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%',
+                      dispPct: ((totals.disposed / grandTotal) * 100).toFixed(1) + '%',
+                      unknPct: ((totals.unknown / grandTotal) * 100).toFixed(1) + '%',
+                    };
                   }}
-                >
-                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                  Chart
-                </button>
-                <button
-                  onClick={() => setViewMode('table')}
-                  style={{
-                    padding: '6px 16px',
-                    borderRadius: '6px',
-                    border: 'none',
-                    fontSize: '14px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    backgroundColor: viewMode === 'table' ? '#3b82f6' : 'transparent',
-                    color: viewMode === 'table' ? '#fff' : '#94a3b8',
-                    transition: 'all 0.2s ease',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px'
-                  }}
-                >
-                  <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
-                  Table
-                </button>
-              </div>
-            </div>
-
-            {viewMode === 'chart' ? (
-              <ChartCard
-                title="" // Title is now shown above the toggle
-                option={chartOption}
-                fullOption={fullChartOption}
-                height="400px" // Increased height since it has the whole space
-                actions={
-                  <ChartSortDropdown
-                    value={chartSort}
-                    onChange={v => setChartSort(v)}
-                  />
-                }
-              />
-            ) : (
-              <DataTable
-                title="" // Title is now shown above the toggle
-                data={tableData}
-                columns={columns.map(c => ({
-                  ...c,
-                  render: (row) => {
-                    if (c.key === 'name')     return <span style={{ fontWeight: 500 }}>{String(row.name)}</span>;
-                    if (c.key === 'total')    return <span style={{ fontWeight: 600 }}>{String(row.total)}</span>;
-                    if (c.key === 'pending')  return <span style={{ color: '#fbbf24' }}>{String(row.pending)}</span>;
-                    if (c.key === 'disposed') return <span style={{ color: '#34d399' }}>{String(row.disposed)}</span>;
-                    if (c.key === 'unknown')  return <span style={{ color: '#94a3b8' }}>{String(row.unknown)}</span>;
-                    if (c.key === 'pendPct')  return <span style={{ color: '#fbbf24' }}>{String(row.pendPct)}</span>;
-                    if (c.key === 'dispPct')  return <span style={{ color: '#34d399' }}>{String(row.dispPct)}</span>;
-                    if (c.key === 'unknPct')  return <span style={{ color: '#94a3b8' }}>{String(row.unknPct)}</span>;
-                    return String(row[c.key as keyof typeof row] ?? '-');
-                  },
-                }))}
-                maxHeight="calc(100vh - 350px)"
-              />
-            )}
+                />
+              )}
+            </ChartCard>
           </>
         )}
       </div>

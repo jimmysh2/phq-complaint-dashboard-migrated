@@ -16,6 +16,7 @@
   --bg-card: rgba(19, 32, 53, 0.90);
   --bg-hover: rgba(30, 48, 72, 0.95);
   --bg-input: rgba(9, 14, 23, 0.85);
+  --glass-bg: rgba(30, 41, 59, 0.8);
 
   --text-primary: #f8fafc;
   --text-secondary: #cbd5e1;
@@ -818,6 +819,12 @@ body {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.chart-card-subtitle {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 400;
 }
 
 .chart-expand-btn {
