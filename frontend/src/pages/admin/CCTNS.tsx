@@ -44,30 +44,30 @@ export const CCTNSPage = () => {
   const navigate = useNavigate();
 
   // Read ?statusGroup and global filters from URL (set by dashboard card clicks)
-  const urlStatusGroup    = searchParams.get('statusGroup')      || '';
-  const urlDistrictIds    = searchParams.get('districtIds')      || '';
-  const urlDistrict       = searchParams.get('district')         || '';
-  const urlPsIds          = searchParams.get('policeStationIds') || '';
-  const urlOfficeIds      = searchParams.get('officeIds')        || '';
-  const urlClassOfInc     = searchParams.get('classOfIncident')  || '';
-  const urlFromDate       = searchParams.get('fromDate')         || '';
-  const urlToDate         = searchParams.get('toDate')           || '';
-  const urlPendencyAge    = searchParams.get('pendencyAge')      || '';
-  const urlDisposalAge    = searchParams.get('disposalAge')      || '';
-  const urlUnmappedPs     = searchParams.get('unmappedPs')       || '';
-  const urlPsName         = searchParams.get('psName')           || '';
-  const urlSearch         = searchParams.get('search')           || '';
+  const urlStatusGroup = searchParams.get('statusGroup') || '';
+  const urlDistrictIds = searchParams.get('districtIds') || '';
+  const urlDistrict = searchParams.get('district') || '';
+  const urlPsIds = searchParams.get('policeStationIds') || '';
+  const urlOfficeIds = searchParams.get('officeIds') || '';
+  const urlClassOfInc = searchParams.get('classOfIncident') || '';
+  const urlFromDate = searchParams.get('fromDate') || '';
+  const urlToDate = searchParams.get('toDate') || '';
+  const urlPendencyAge = searchParams.get('pendencyAge') || '';
+  const urlDisposalAge = searchParams.get('disposalAge') || '';
+  const urlUnmappedPs = searchParams.get('unmappedPs') || '';
+  const urlPsName = searchParams.get('psName') || '';
+  const urlSearch = searchParams.get('search') || '';
 
   // Global filters from FilterContext (set via the GlobalFilterBar in the header)
   const { filters: ctxFilters, resetFilters: resetCtxFilters } = useFilters();
 
   // Effective values: URL params take precedence (drill-down), otherwise fall back to FilterContext
-  const effDistrictIds    = urlDistrictIds    || ctxFilters.districtIds;
-  const effPsIds          = urlPsIds          || ctxFilters.policeStationIds;
-  const effOfficeIds      = urlOfficeIds      || ctxFilters.officeIds;
-  const effClassOfInc     = urlClassOfInc     || ctxFilters.classOfIncident;
-  const effFromDate       = urlFromDate       || ctxFilters.fromDate;
-  const effToDate         = urlToDate         || ctxFilters.toDate;
+  const effDistrictIds = urlDistrictIds || ctxFilters.districtIds;
+  const effPsIds = urlPsIds || ctxFilters.policeStationIds;
+  const effOfficeIds = urlOfficeIds || ctxFilters.officeIds;
+  const effClassOfInc = urlClassOfInc || ctxFilters.classOfIncident;
+  const effFromDate = urlFromDate || ctxFilters.fromDate;
+  const effToDate = urlToDate || ctxFilters.toDate;
 
   // Derived: any global filter is active (URL-based OR context-based)
   const hasGlobalFilters = !!(
@@ -89,7 +89,7 @@ export const CCTNSPage = () => {
   // Sync job state (persist in localStorage so navigation doesn't kill it)
   const [activeJobId, setActiveJobId] = useState<string | null>(() => localStorage.getItem('cctnsActiveJobId'));
   const [jobStatus, setJobStatus] = useState<string>(() => localStorage.getItem('cctnsActiveJobId') ? 'pending' : '');
-  
+
   useEffect(() => {
     if (activeJobId) {
       localStorage.setItem('cctnsActiveJobId', activeJobId);
@@ -179,11 +179,11 @@ export const CCTNSPage = () => {
   useEffect(() => {
     const sg = searchParams.get('statusGroup');
     const searchVal = searchParams.get('search');
-    
+
     if (sg || searchVal) {
       setActiveTab('synced');
       setPage(1);
-      
+
       if (sg) {
         const resolved = sg === 'all' ? '' : sg === 'disposed_missing_date' ? 'disposed' : sg;
         setFilterStatus(resolved);
@@ -192,14 +192,14 @@ export const CCTNSPage = () => {
         setFilterDateFrom('');
         setFilterDateTo('');
       }
-      
+
       if (searchVal) {
         setSearchQuery(searchVal);
       } else if (sg) {
         setSearchQuery('');
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   // —— Synced records from DB (paginated gateway) ——
@@ -226,24 +226,24 @@ export const CCTNSPage = () => {
         page,
         limit,
         search: searchQuery || undefined,
-        district:         (urlDistrict || filterDistrict) || undefined,
-        statusGroup:      filterStatus || undefined,
+        district: (urlDistrict || filterDistrict) || undefined,
+        statusGroup: filterStatus || undefined,
         isDisposedMissingDate: filterMissingDateOnly ? 'true' : undefined,
         dateFrom: filterDateFrom || undefined,
         dateTo: filterDateTo || undefined,
         sortBy,
         sortOrder,
         // Forward effective filters (URL params take priority over FilterContext)
-        districtIds:      effDistrictIds  || undefined,
-        policeStationIds: effPsIds        || undefined,
-        officeIds:        effOfficeIds    || undefined,
-        classOfIncident:  effClassOfInc   || undefined,
-        fromDate:         effFromDate     || undefined,
-        toDate:           effToDate       || undefined,
-        pendencyAge:      urlPendencyAge  || undefined,
-        disposalAge:      urlDisposalAge  || undefined,
-        unmappedPs:       urlUnmappedPs   || undefined,
-        psName:           urlPsName       || undefined,
+        districtIds: effDistrictIds || undefined,
+        policeStationIds: effPsIds || undefined,
+        officeIds: effOfficeIds || undefined,
+        classOfIncident: effClassOfInc || undefined,
+        fromDate: effFromDate || undefined,
+        toDate: effToDate || undefined,
+        pendencyAge: urlPendencyAge || undefined,
+        disposalAge: urlDisposalAge || undefined,
+        unmappedPs: urlUnmappedPs || undefined,
+        psName: urlPsName || undefined,
       }),
     enabled: activeTab === 'synced',
     staleTime: 0,
@@ -446,14 +446,14 @@ export const CCTNSPage = () => {
               row.statusGroup === 'disposed'
                 ? 'rgba(34,197,94,0.15)'
                 : row.statusGroup === 'pending'
-                ? 'rgba(239,68,68,0.15)'
-                : 'rgba(234,179,8,0.15)',
+                  ? 'rgba(239,68,68,0.15)'
+                  : 'rgba(234,179,8,0.15)',
             color:
               row.statusGroup === 'disposed'
                 ? '#22c55e'
                 : row.statusGroup === 'pending'
-                ? '#ef4444'
-                : '#eab308',
+                  ? '#ef4444'
+                  : '#eab308',
           }}
         >
           {row.statusOfComplaint || '—'}
@@ -535,14 +535,14 @@ export const CCTNSPage = () => {
               row.status === 'success'
                 ? 'rgba(34,197,94,0.15)'
                 : row.status === 'partial'
-                ? 'rgba(234,179,8,0.15)'
-                : 'rgba(239,68,68,0.15)',
+                  ? 'rgba(234,179,8,0.15)'
+                  : 'rgba(239,68,68,0.15)',
             color:
               row.status === 'success'
                 ? '#22c55e'
                 : row.status === 'partial'
-                ? '#eab308'
-                : '#ef4444',
+                  ? '#eab308'
+                  : '#ef4444',
           }}
         >
           {row.status}
@@ -643,33 +643,11 @@ export const CCTNSPage = () => {
     <Layout>
       <div className="page-content">
         {/* —— Header —— */}
-        <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12 }}>
-          {hasGlobalFilters && (
-            <button
-              onClick={() => navigate(-1)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '6px 12px',
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid var(--border)',
-                borderRadius: 6,
-                color: 'var(--text-main)',
-                fontSize: 13,
-                cursor: 'pointer',
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-              Back
-            </button>
-          )}
-          <div>
-            <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>CCTNS Integration</h2>
-            <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
-              Unified Complaint Data from Haryana Police CCTNS API
-            </p>
-          </div>
+        <div style={{ marginBottom: 20 }}>
+          <h2 style={{ margin: 0, fontSize: 20, fontWeight: 700 }}>CCTNS Integration</h2>
+          <p style={{ margin: '4px 0 0', color: 'var(--text-muted)', fontSize: 13 }}>
+            Unified Complaint Data from Haryana Police CCTNS API
+          </p>
         </div>
 
         {/* —— Tabs at the top —— */}
@@ -756,15 +734,14 @@ export const CCTNSPage = () => {
                 jobStatus === 'success'
                   ? 'rgba(34,197,94,0.1)'
                   : jobStatus === 'error'
-                  ? 'rgba(239,68,68,0.1)'
-                  : 'rgba(59,130,246,0.1)',
-              border: `1px solid ${
-                jobStatus === 'success'
+                    ? 'rgba(239,68,68,0.1)'
+                    : 'rgba(59,130,246,0.1)',
+              border: `1px solid ${jobStatus === 'success'
                   ? 'rgba(34,197,94,0.3)'
                   : jobStatus === 'error'
-                  ? 'rgba(239,68,68,0.3)'
-                  : 'rgba(59,130,246,0.3)'
-              }`,
+                    ? 'rgba(239,68,68,0.3)'
+                    : 'rgba(59,130,246,0.3)'
+                }`,
               fontSize: 13,
             }}
           >
@@ -785,17 +762,17 @@ export const CCTNSPage = () => {
                 </span>
               )}
             </div>
-            
+
             {/* Progress Bar */}
             {(!jobStatus || jobStatus === 'pending' || jobStatus === 'running') && (
               <div style={{ width: '100%', background: 'rgba(0,0,0,0.1)', borderRadius: 4, height: 8, overflow: 'hidden' }}>
-                <div 
-                  style={{ 
-                    height: '100%', 
-                    background: '#3b82f6', 
+                <div
+                  style={{
+                    height: '100%',
+                    background: '#3b82f6',
                     width: `${jobQuery.data?.data?.progressPercentage || (jobStatus === 'running' ? 5 : 0)}%`,
                     transition: 'width 0.3s ease-in-out'
-                  }} 
+                  }}
                 />
               </div>
             )}
@@ -930,9 +907,9 @@ export const CCTNSPage = () => {
                     <strong>
                       {liveData.length > 0
                         ? new Date(liveData[0].updatedAt).toLocaleString('en-IN', {
-                            day: '2-digit', month: 'short', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit', second: '2-digit'
-                          })
+                          day: '2-digit', month: 'short', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit', second: '2-digit'
+                        })
                         : new Date().toLocaleTimeString('en-IN')}
                     </strong>
                   </span>
@@ -963,9 +940,9 @@ export const CCTNSPage = () => {
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                   <span>
                     <strong>📊 Filter Active</strong>
-                    {urlStatusGroup === 'pending'               && ' — Showing pending complaints only'}
-                    {urlStatusGroup === 'disposed'              && ' — Showing disposed complaints only'}
-                    {urlStatusGroup === 'unknown'               && ' — Showing complaints with unknown/missing status'}
+                    {urlStatusGroup === 'pending' && ' — Showing pending complaints only'}
+                    {urlStatusGroup === 'disposed' && ' — Showing disposed complaints only'}
+                    {urlStatusGroup === 'unknown' && ' — Showing complaints with unknown/missing status'}
                     {urlStatusGroup === 'disposed_missing_date' && ' — Showing disposed complaints with no disposal date'}
                     {urlSearch && ` — Search: "${urlSearch}"`}
                   </span>
@@ -974,25 +951,25 @@ export const CCTNSPage = () => {
                     {[
                       urlSearch && `Search: "${urlSearch}"`,
                       urlStatusGroup && `Status: ${urlStatusGroup === 'pending' ? 'Pending' : urlStatusGroup === 'disposed' ? 'Disposed' : urlStatusGroup === 'unknown' ? 'Unknown' : urlStatusGroup === 'all' ? 'All' : urlStatusGroup}`,
-                      urlDistrict       && `District: ${urlDistrict}`,
+                      urlDistrict && `District: ${urlDistrict}`,
                       (urlPsIds || urlPsName) && `Police Station: ${urlPsName || `ID: ${urlPsIds}`}`,
-                      effDistrictIds    && !urlDistrict && `Districts (Filter): ${effDistrictIds}`,
-                      effPsIds          && !urlPsIds    && `Police Stations (Filter): ${effPsIds}`,
-                      effOfficeIds                     && `Offices (Filter): ${effOfficeIds}`,
-                      effClassOfInc                    && `Class: ${effClassOfInc}`,
-                      effFromDate                      && `From: ${effFromDate}`,
-                      effToDate                        && `To: ${effToDate}`,
+                      effDistrictIds && !urlDistrict && `Districts (Filter): ${effDistrictIds}`,
+                      effPsIds && !urlPsIds && `Police Stations (Filter): ${effPsIds}`,
+                      effOfficeIds && `Offices (Filter): ${effOfficeIds}`,
+                      effClassOfInc && `Class: ${effClassOfInc}`,
+                      effFromDate && `From: ${effFromDate}`,
+                      effToDate && `To: ${effToDate}`,
                       urlPendencyAge && (urlPendencyAge === 'u7' ? 'Pendency: < 7 Days' :
-                                         urlPendencyAge === 'u15' ? 'Pendency: 7 - 15 Days' :
-                                         urlPendencyAge === 'u30' ? 'Pendency: 15 - 30 Days' :
-                                         urlPendencyAge === 'o30' ? 'Pendency: 1 - 2 Months' :
-                                         urlPendencyAge === 'o60' ? 'Pendency: Over 2 Months' : `Pendency: ${urlPendencyAge}`),
+                        urlPendencyAge === 'u15' ? 'Pendency: 7 - 15 Days' :
+                          urlPendencyAge === 'u30' ? 'Pendency: 15 - 30 Days' :
+                            urlPendencyAge === 'o30' ? 'Pendency: 1 - 2 Months' :
+                              urlPendencyAge === 'o60' ? 'Pendency: Over 2 Months' : `Pendency: ${urlPendencyAge}`),
                       urlDisposalAge && (urlDisposalAge === 'u7' ? 'Disposal: < 7 Days' :
-                                         urlDisposalAge === 'u15' ? 'Disposal: 7 - 15 Days' :
-                                         urlDisposalAge === 'u30' ? 'Disposal: 15 - 30 Days' :
-                                         urlDisposalAge === 'o30' ? 'Disposal: 1 - 2 Months' :
-                                         urlDisposalAge === 'o60' ? 'Disposal: Over 2 Months' : `Disposal: ${urlDisposalAge}`),
-                      urlUnmappedPs      && 'Unmapped PS',
+                        urlDisposalAge === 'u15' ? 'Disposal: 7 - 15 Days' :
+                          urlDisposalAge === 'u30' ? 'Disposal: 15 - 30 Days' :
+                            urlDisposalAge === 'o30' ? 'Disposal: 1 - 2 Months' :
+                              urlDisposalAge === 'o60' ? 'Disposal: Over 2 Months' : `Disposal: ${urlDisposalAge}`),
+                      urlUnmappedPs && 'Unmapped PS',
                     ].filter(Boolean).join(' | ')}
                   </span>
                 </span>
@@ -1017,8 +994,6 @@ export const CCTNSPage = () => {
                 borderRadius: 8,
                 border: '1px solid var(--border)',
                 alignItems: 'center',
-                opacity: hasGlobalFilters ? 0.6 : 1,
-                pointerEvents: hasGlobalFilters ? 'none' : 'auto',
               }}
             >
               <input
@@ -1028,7 +1003,6 @@ export const CCTNSPage = () => {
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 200, fontSize: 13 }}
-                disabled={hasGlobalFilters}
               />
               <input
                 type="text"
@@ -1037,45 +1011,55 @@ export const CCTNSPage = () => {
                 onChange={(e) => { setFilterDistrict(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 150, fontSize: 13 }}
-                disabled={hasGlobalFilters}
               />
               <select
                 value={filterStatus}
                 onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
                 className="form-input"
                 style={{ width: 140, fontSize: 13 }}
-                disabled={hasGlobalFilters}
               >
                 <option value="">All Status</option>
                 <option value="pending">Pending</option>
                 <option value="disposed">Disposed</option>
                 <option value="unknown">Unknown</option>
               </select>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: hasGlobalFilters ? 'default' : 'pointer' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)', whiteSpace: 'nowrap', cursor: 'pointer' }}>
                 <input
                   type="checkbox"
                   checked={filterMissingDateOnly}
                   onChange={(e) => { setFilterMissingDateOnly(e.target.checked); setPage(1); }}
-                  style={{ cursor: hasGlobalFilters ? 'default' : 'pointer' }}
-                  disabled={hasGlobalFilters}
+                  style={{ cursor: 'pointer' }}
                 />
                 Missing Disposal Date
               </label>
+              {/* Date filters: disabled only when global date filter is active */}
               <input
                 type="date"
                 value={filterDateFrom}
                 onChange={(e) => { setFilterDateFrom(e.target.value); setPage(1); }}
                 className="form-input"
-                style={{ width: 150, fontSize: 13 }}
-                disabled={hasGlobalFilters}
+                style={{
+                  width: 150,
+                  fontSize: 13,
+                  opacity: (effFromDate || effToDate) ? 0.45 : 1,
+                  cursor: (effFromDate || effToDate) ? 'not-allowed' : 'pointer',
+                }}
+                disabled={!!(effFromDate || effToDate)}
+                title={(effFromDate || effToDate) ? 'Controlled by global date filter — clear it from the filter bar above' : ''}
               />
               <input
                 type="date"
                 value={filterDateTo}
                 onChange={(e) => { setFilterDateTo(e.target.value); setPage(1); }}
                 className="form-input"
-                style={{ width: 150, fontSize: 13 }}
-                disabled={hasGlobalFilters}
+                style={{
+                  width: 150,
+                  fontSize: 13,
+                  opacity: (effFromDate || effToDate) ? 0.45 : 1,
+                  cursor: (effFromDate || effToDate) ? 'not-allowed' : 'pointer',
+                }}
+                disabled={!!(effFromDate || effToDate)}
+                title={(effFromDate || effToDate) ? 'Controlled by global date filter — clear it from the filter bar above' : ''}
               />
               <select
                 value={`${sortBy}:${sortOrder}`}
@@ -1087,7 +1071,6 @@ export const CCTNSPage = () => {
                 }}
                 className="form-input"
                 style={{ width: 160, fontSize: 13 }}
-                disabled={hasGlobalFilters}
               >
                 <option value="id:desc">Newest First</option>
                 <option value="id:asc">Oldest First</option>
@@ -1116,24 +1099,24 @@ export const CCTNSPage = () => {
               </div>
             ) : (
               <>
-                  <DataTable
-                    title="CCTNS Database Gateway"
-                    data={syncedData}
-                    columns={recordCols}
-                    maxHeight="calc(100vh - 400px)"
-                    activeFilters={cctnsActiveFilters}
-                    onSearch={(q) => { setSearchQuery(q); setPage(1); }}
-                    searchValue={searchQuery}
-                    onFetchAllForExport={fetchAllCctnsForExport}
-                    pagination={syncedPagination ? {
-                      page: syncedPagination.page,
-                      limit,
-                      total: syncedPagination.total,
-                      totalPages: syncedPagination.totalPages,
-                      onPageChange: setPage,
-                      onLimitChange: (l) => { setLimit(l); setPage(1); }
-                    } : undefined}
-                  />
+                <DataTable
+                  title="CCTNS Database Gateway"
+                  data={syncedData}
+                  columns={recordCols}
+                  maxHeight="calc(100vh - 400px)"
+                  activeFilters={cctnsActiveFilters}
+                  onSearch={(q) => { setSearchQuery(q); setPage(1); }}
+                  searchValue={searchQuery}
+                  onFetchAllForExport={fetchAllCctnsForExport}
+                  pagination={syncedPagination ? {
+                    page: syncedPagination.page,
+                    limit,
+                    total: syncedPagination.total,
+                    totalPages: syncedPagination.totalPages,
+                    onPageChange: setPage,
+                    onLimitChange: (l) => { setLimit(l); setPage(1); }
+                  } : undefined}
+                />
               </>
             )}
           </>

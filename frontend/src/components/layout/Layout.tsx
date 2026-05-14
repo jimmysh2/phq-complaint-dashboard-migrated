@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { GlobalFilterBar } from './GlobalFilterBar';
+import { useFilters } from '../../contexts/FilterContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -21,6 +22,18 @@ export const Layout = ({ children }: LayoutProps) => {
   const [filterBarOpen, setFilterBarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const { filters } = useFilters();
+
+  // Count how many independent filter groups are set
+  const activeFilterCount = [
+    filters.districtIds,
+    filters.policeStationIds,
+    filters.officeIds,
+    filters.classOfIncident,
+    (filters.fromDate || filters.toDate) ? '1' : '', // date range = 1 group
+  ].filter(Boolean).length;
+
+  const hasActiveFilters = activeFilterCount > 0;
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -61,28 +74,49 @@ export const Layout = ({ children }: LayoutProps) => {
           </span>
         </div>
 
-        <button 
-          className="filter-toggle-btn"
+        <button
+          className={`filter-toggle-btn${hasActiveFilters ? ' filter-toggle-btn--active' : ''}`}
           onClick={() => setFilterBarOpen(!filterBarOpen)}
-          title="Toggle Filters"
+          title={
+            hasActiveFilters
+              ? `${activeFilterCount} global filter${activeFilterCount > 1 ? 's' : ''} active — click to edit`
+              : 'Toggle Global Filters'
+          }
         >
-          <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          {/* Animated live-pulse dot — only when filters are active */}
+          {hasActiveFilters && <span className="filter-active-dot" aria-hidden="true" />}
+
+          {/* Funnel icon — filled when active */}
+          <svg
+            width="15" height="15"
+            fill={hasActiveFilters ? 'currentColor' : 'none'}
+            stroke="currentColor" strokeWidth="2"
+            viewBox="0 0 24 24"
+            style={{ flexShrink: 0 }}
+          >
             <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
           </svg>
-          <span>Filters</span>
-          <svg 
-            width="12" 
-            height="12" 
-            fill="none" 
-            stroke="currentColor" 
-            strokeWidth="2" 
-            style={{ 
-              transform: filterBarOpen ? 'rotate(180deg)' : 'rotate(0deg)', 
+
+
+
+          {/* Numeric count badge — slides in when active */}
+          {hasActiveFilters && (
+            <span className="filter-count-badge" aria-label={`${activeFilterCount} active filters`}>
+              {activeFilterCount}
+            </span>
+          )}
+
+          {/* Chevron */}
+          <svg
+            width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2"
+            style={{
+              transform: filterBarOpen ? 'rotate(180deg)' : 'rotate(0deg)',
               transition: 'transform 0.2s',
-              marginLeft: '4px'
+              marginLeft: '2px',
+              flexShrink: 0,
             }}
           >
-            <path d="M6 9l6 6 6-6"/>
+            <path d="M6 9l6 6 6-6" />
           </svg>
         </button>
       </header>
@@ -90,7 +124,7 @@ export const Layout = ({ children }: LayoutProps) => {
       {filterBarOpen && (
         <div className="filter-bar-expanded">
           <GlobalFilterBar />
-          <button 
+          <button
             className="filter-close-btn"
             onClick={() => setFilterBarOpen(false)}
             title="Close Filters"
@@ -162,7 +196,7 @@ import { createContext, useContext } from 'react';
 
 export const ChartContext = createContext<{ expanded: boolean; setExpanded: (v: boolean) => void }>({
   expanded: false,
-  setExpanded: () => {},
+  setExpanded: () => { },
 });
 
 export const useChartExpand = () => useContext(ChartContext);
