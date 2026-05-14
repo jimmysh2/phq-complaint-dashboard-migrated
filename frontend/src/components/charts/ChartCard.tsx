@@ -107,7 +107,7 @@ export const ChartCard = ({
         }}>
           {childWithExpandedProp
             ? <div style={{ width: '100%', minWidth: '100%' }}>{childWithExpandedProp}</div>
-            : <BaseChart option={viewMode === 'chart' ? (fullOption || option || {}) : {}} height={expandedHeight} />
+            : <BaseChart option={fullOption || option || {}} height={expandedHeight} />
           }
         </div>
       </div>
