@@ -79,7 +79,7 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
       onMouseLeave={handleMouseLeave}
     >
       <button className="chart-expand-btn" title="Sort Options" onClick={handleClick}>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6"></line>
           <line x1="8" y1="12" x2="16" y2="12"></line>
           <line x1="10" y1="18" x2="14" y2="18"></line>
@@ -131,37 +131,12 @@ const SortDropdown = ({ value, onChange, options }: { value: string, onChange: (
   );
 };
 
-const ViewToggle = ({ value, onChange }: { value: 'graph' | 'table', onChange: (val: 'graph' | 'table') => void }) => (
-  <div className="view-toggle-container">
-    <button
-      className={`view-toggle-btn ${value === 'graph' ? 'active' : ''}`}
-      onClick={() => onChange('graph')}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M18 20V10M12 20V4M6 20v-6" />
-      </svg>
-      Graph
-    </button>
-    <button
-      className={`view-toggle-btn ${value === 'table' ? 'active' : ''}`}
-      onClick={() => onChange('table')}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <line x1="3" y1="9" x2="21" y2="9" />
-        <line x1="3" y1="15" x2="21" y2="15" />
-        <line x1="9" y1="3" x2="9" y2="21" />
-      </svg>
-      Table
-    </button>
-  </div>
-);
 
 export const DashboardPage = () => {
   const { filters } = useFilters();
   const navigate = useNavigate();
 
-  // ── Drawer state ─────────────────────────────────────────────────────────
+  // -- Drawer state ---------------------------------------------------------
   const [drawer, setDrawer] = useState<{ open: boolean; title: string; filters: DrawerFilters }>({
     open: false,
     title: '',
@@ -778,212 +753,116 @@ export const DashboardPage = () => {
             fullOption={getDurationLineOptions(durations)}
             height="320px"
           />
-          {districtViewType === 'graph' ? (
-            <ChartCard
-              title="Top District Pendency"
-              subtitle={getDistrictSubtitle()}
-              option={getDistrictBarOptions(sortedDistricts.slice(0, 7).reverse())}
-              fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
-              height="320px"
-              actions={
-                <div className="chart-actions">
-                  <ViewToggle value={districtViewType} onChange={handleDistrictViewChange} />
-                  <SortDropdown
-                    value={districtSort}
-                    onChange={setDistrictSort}
-                    options={[
-                      { value: 'total', label: 'Total Reg' },
-                      { value: 'pending', label: 'Total Pending' },
-                      { value: 'disposed', label: 'Total Disposed' },
-                      { value: 'total_pct_state', label: 'Total % (from state total)' },
-                      { value: 'pending_pct', label: 'Pending % (from district total)' },
-                      { value: 'disposed_pct', label: 'Disposed % (from district total)' },
-                      { value: 'az', label: 'A → Z' },
-                      { value: 'za', label: 'Z → A' },
-                    ]}
-                  />
-                </div>
-              }
-              onEvents={{
-                click: (params: any) => {
-                  const name = params.name || (params.data && params.data.name);
-                  if (name) navigate(`/admin/district/${encodeURIComponent(String(name))}`);
-                },
-              }}
-            />
-          ) : (
-            <ChartCard
-              title="Top District Pendency"
-              subtitle={getDistrictSubtitle()}
-              actions={
-                <div className="chart-actions">
-                  <ViewToggle value={districtViewType} onChange={handleDistrictViewChange} />
-                </div>
-              }
-            >
+          <ChartCard
+            title="Top District Pendency"
+            subtitle={getDistrictSubtitle()}
+            option={districtViewType === 'graph' ? getDistrictBarOptions(sortedDistricts.slice(0, 7).reverse()) : undefined}
+            fullOption={getDistrictBarOptions([...sortedDistricts].reverse())}
+            height="320px"
+            viewMode={districtViewType === 'graph' ? 'chart' : 'table'}
+            onViewModeChange={(m) => handleDistrictViewChange(m === 'chart' ? 'graph' : 'table')}
+            chartActions={
+              <SortDropdown
+                value={districtSort}
+                onChange={setDistrictSort}
+                options={[
+                  { value: 'total', label: 'Total Reg' },
+                  { value: 'pending', label: 'Total Pending' },
+                  { value: 'disposed', label: 'Total Disposed' },
+                  { value: 'total_pct_state', label: 'Total % (from state total)' },
+                  { value: 'pending_pct', label: 'Pending % (from district total)' },
+                  { value: 'disposed_pct', label: 'Disposed % (from district total)' },
+                  { value: 'az', label: 'A ? Z' },
+                  { value: 'za', label: 'Z ? A' },
+                ]}
+              />
+            }
+            onEvents={{
+              click: (params: any) => {
+                const name = params.name || (params.data && params.data.name);
+                if (name) navigate(`/admin/district/${encodeURIComponent(String(name))}`);
+              },
+            }}
+          >
+            {districtViewType === 'table' && (
               <DataTable
                 data={sortedDistricts}
                 columns={[
                   { key: 'district', label: 'District', sortable: true },
-                  { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ fontWeight: 600, color: '#60a5fa', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} — All`, drawerFiltersForDistrict(row.district, 'all')); }}>{row.total}</span> : <span style={{ fontWeight: 600 }}>{row.total}</span> },
-                  { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ color: '#ef4444', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} — Pending`, drawerFiltersForDistrict(row.district, 'pending')); }}>{row.pending}</span> : <span style={{ color: '#ef4444' }}>{row.pending}</span> },
+                  { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ fontWeight: 600, color: '#60a5fa', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} � All`, drawerFiltersForDistrict(row.district, 'all')); }}>{row.total}</span> : <span style={{ fontWeight: 600 }}>{row.total}</span> },
+                  { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ color: '#ef4444', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} � Pending`, drawerFiltersForDistrict(row.district, 'pending')); }}>{row.pending}</span> : <span style={{ color: '#ef4444' }}>{row.pending}</span> },
                   { key: 'pending_pct', label: 'Pending %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#dc2626', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.pending_pct?.toFixed ? row.pending_pct.toFixed(1) : row.pending_pct}%</span> },
-                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ color: '#16a34a', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} — Disposed`, drawerFiltersForDistrict(row.district, 'disposed')); }}>{row.disposed}</span> : <span style={{ color: '#16a34a' }}>{row.disposed}</span> },
+                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ color: '#16a34a', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} � Disposed`, drawerFiltersForDistrict(row.district, 'disposed')); }}>{row.disposed}</span> : <span style={{ color: '#16a34a' }}>{row.disposed}</span> },
                   { key: 'disposed_pct', label: 'Disposed %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.disposed_pct?.toFixed ? row.disposed_pct.toFixed(1) : row.disposed_pct}%</span> },
-                  { key: 'unknown', label: 'Status NF', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ color: '#64748b', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} — Status NF`, drawerFiltersForDistrict(row.district, 'unknown')); }}>{row.unknown || 0}</span> : <span style={{ color: '#64748b' }}>{row.unknown || 0}</span> },
+                  { key: 'unknown', label: 'Status NF', sortable: true, align: 'center', render: (row) => row.district ? <span style={{ color: '#64748b', cursor: 'pointer', textDecoration: 'underline dotted' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.district} � Status NF`, drawerFiltersForDistrict(row.district, 'unknown')); }}>{row.unknown || 0}</span> : <span style={{ color: '#64748b' }}>{row.unknown || 0}</span> },
                   { key: 'unknown_pct', label: 'Status NF %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#64748b', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.unknown_pct?.toFixed ? row.unknown_pct.toFixed(1) : row.unknown_pct}%</span> },
                 ]}
                 maxHeight="300px"
-                onRowClick={(row) => {
-                  if (row.district) navigate(`/admin/district/${encodeURIComponent(String(row.district))}`);
-                }}
+                onRowClick={(row) => { if (row.district) navigate(`/admin/district/${encodeURIComponent(String(row.district))}`); }}
                 noExpand={true}
                 hideTitleBar={true}
                 onSort={(key, dir) => key ? setDistrictTableSort({ key, dir }) : setDistrictTableSort(null)}
                 showTotalRow={true}
                 getTotalRow={(data) => {
-                  const totals = data.reduce((acc, r) => ({
-                    total: acc.total + Number(r.total || 0),
-                    pending: acc.pending + Number(r.pending || 0),
-                    disposed: acc.disposed + Number(r.disposed || 0),
-                    unknown: acc.unknown + Number(r.unknown || 0),
-                  }), { total: 0, pending: 0, disposed: 0, unknown: 0 });
+                  const totals = data.reduce((acc, r) => ({ total: acc.total + Number(r.total || 0), pending: acc.pending + Number(r.pending || 0), disposed: acc.disposed + Number(r.disposed || 0), unknown: acc.unknown + Number(r.unknown || 0) }), { total: 0, pending: 0, disposed: 0, unknown: 0 });
                   const grandTotal = totals.total || 1;
-                  return {
-                    district: '',
-                    total: totals.total.toLocaleString(),
-                    pending: totals.pending.toLocaleString(),
-                    pending_pct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%',
-                    disposed: totals.disposed.toLocaleString(),
-                    disposed_pct: ((totals.disposed / grandTotal) * 100).toFixed(1) + '%',
-                    unknown: totals.unknown.toLocaleString(),
-                    unknown_pct: ((totals.unknown / grandTotal) * 100).toFixed(1) + '%',
-                  };
+                  return { district: '', total: totals.total.toLocaleString(), pending: totals.pending.toLocaleString(), pending_pct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%', disposed: totals.disposed.toLocaleString(), disposed_pct: ((totals.disposed / grandTotal) * 100).toFixed(1) + '%', unknown: totals.unknown.toLocaleString(), unknown_pct: ((totals.unknown / grandTotal) * 100).toFixed(1) + '%' };
                 }}
               />
-            </ChartCard>
-          )}
-          {categoryViewType === 'graph' ? (
-            <ChartCard
-              title="Top Classes of Incident"
-              subtitle={getCategorySubtitle()}
-              actions={
-                <div className="chart-actions">
-                  <ViewToggle value={categoryViewType} onChange={handleCategoryViewChange} />
-                  <SortDropdown
-                    value={categorySort}
-                    onChange={setCategorySort}
-                    options={[
-                      { value: 'total', label: 'Total Reg' },
-                      { value: 'pending', label: 'Total Pending' },
-                      { value: 'disposed', label: 'Total Disposed' },
-                      { value: 'total_pct_state', label: 'Total % (from state total)' },
-                      { value: 'pending_pct', label: 'Pending % (from category total)' },
-                      { value: 'disposed_pct', label: 'Disposed % (from category total)' },
-                      { value: 'az', label: 'A → Z' },
-                      { value: 'za', label: 'Z → A' },
-                    ]}
-                  />
-                </div>
-              }
-              option={getStackedBarOptions(sortedCategories.slice(0, 5).reverse())}
-              fullOption={getStackedBarOptions([...sortedCategories].reverse())}
-              height="320px"
-            />
-          ) : (
-            <ChartCard
-              title="Top Classes of Incident"
-              subtitle={getCategorySubtitle()}
-              actions={
-                <div className="chart-actions">
-                  <ViewToggle value={categoryViewType} onChange={handleCategoryViewChange} />
-                </div>
-              }
-            >
+            )}
+          </ChartCard>
+          <ChartCard
+            title="Top Classes of Incident"
+            subtitle={getCategorySubtitle()}
+            option={categoryViewType === 'graph' ? getStackedBarOptions(sortedCategories.slice(0, 5).reverse()) : undefined}
+            fullOption={getStackedBarOptions([...sortedCategories].reverse())}
+            height="320px"
+            viewMode={categoryViewType === 'graph' ? 'chart' : 'table'}
+            onViewModeChange={(m) => handleCategoryViewChange(m === 'chart' ? 'graph' : 'table')}
+            chartActions={
+              <SortDropdown
+                value={categorySort}
+                onChange={setCategorySort}
+                options={[
+                  { value: 'total', label: 'Total Reg' },
+                  { value: 'pending', label: 'Total Pending' },
+                  { value: 'disposed', label: 'Total Disposed' },
+                  { value: 'total_pct_state', label: 'Total % (from state total)' },
+                  { value: 'pending_pct', label: 'Pending % (from category total)' },
+                  { value: 'disposed_pct', label: 'Disposed % (from category total)' },
+                  { value: 'az', label: 'A ? Z' },
+                  { value: 'za', label: 'Z ? A' },
+                ]}
+              />
+            }
+          >
+            {categoryViewType === 'table' && (
               <DataTable
                 data={sortedCategories}
                 columns={[
                   { key: 'category', label: 'Class of Incident', sortable: true },
-                  {
-                    key: 'total',
-                    label: 'Total Reg',
-                    sortable: true,
-                    align: 'center',
-                    render: (row) => (
-                      <span style={{ fontWeight: 600, cursor: 'pointer', color: '#60a5fa' }}
-                        onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} — All`, drawerFiltersForCategory(row.category)); }}>
-                        {row.total}
-                      </span>
-                    )
-                  },
-                  {
-                    key: 'pending',
-                    label: 'Pending',
-                    sortable: true,
-                    align: 'center',
-                    render: (row) => (
-                      <span style={{ cursor: 'pointer', color: '#ef4444' }}
-                        onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} — Pending`, drawerFiltersForCategory(row.category, 'pending')); }}>
-                        {row.pending}
-                      </span>
-                    )
-                  },
+                  { key: 'total', label: 'Total Reg', sortable: true, align: 'center', render: (row) => <span style={{ fontWeight: 600, cursor: 'pointer', color: '#60a5fa' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} � All`, drawerFiltersForCategory(row.category)); }}>{row.total}</span> },
+                  { key: 'pending', label: 'Pending', sortable: true, align: 'center', render: (row) => <span style={{ cursor: 'pointer', color: '#ef4444' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} � Pending`, drawerFiltersForCategory(row.category, 'pending')); }}>{row.pending}</span> },
                   { key: 'pending_pct', label: 'Pending %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#dc2626', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.pending_pct?.toFixed(1)}%</span> },
-                  {
-                    key: 'disposed',
-                    label: 'Disposed',
-                    sortable: true,
-                    align: 'center',
-                    render: (row) => (
-                      <span style={{ cursor: 'pointer', color: '#16a34a' }}
-                        onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} — Disposed`, drawerFiltersForCategory(row.category, 'disposed')); }}>
-                        {row.disposed}
-                      </span>
-                    )
-                  },
+                  { key: 'disposed', label: 'Disposed', sortable: true, align: 'center', render: (row) => <span style={{ cursor: 'pointer', color: '#16a34a' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} � Disposed`, drawerFiltersForCategory(row.category, 'disposed')); }}>{row.disposed}</span> },
                   { key: 'disposed_pct', label: 'Disposed %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#16a34a', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.disposed_pct?.toFixed(1)}%</span> },
-                  {
-                    key: 'unknown',
-                    label: 'Status NF',
-                    sortable: true,
-                    align: 'center',
-                    render: (row) => (
-                      <span style={{ cursor: 'pointer', color: '#64748b' }}
-                        onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} — Status NF`, drawerFiltersForCategory(row.category, 'unknown')); }}>
-                        {row.unknown || 0}
-                      </span>
-                    )
-                  },
+                  { key: 'unknown', label: 'Status NF', sortable: true, align: 'center', render: (row) => <span style={{ cursor: 'pointer', color: '#64748b' }} onClick={(e) => { e.stopPropagation(); openDrawer(`${row.category} � Status NF`, drawerFiltersForCategory(row.category, 'unknown')); }}>{row.unknown || 0}</span> },
                   { key: 'unknown_pct', label: 'Status NF %', sortable: true, align: 'center', render: (row) => <span style={{ color: '#64748b', fontWeight: 600, display: 'inline-block', minWidth: '45px' }}>{row.unknown_pct?.toFixed(1)}%</span> },
                 ]}
                 maxHeight="300px"
-                onRowClick={(row) => openDrawer(`${row.category} — All Complaints`, drawerFiltersForCategory(row.category))}
+                onRowClick={(row) => openDrawer(`${row.category} � All Complaints`, drawerFiltersForCategory(row.category))}
                 noExpand={true}
                 hideTitleBar={true}
                 onSort={(key, dir) => key ? setCategoryTableSort({ key, dir }) : setCategoryTableSort(null)}
                 showTotalRow={true}
                 getTotalRow={(data) => {
-                  const totals = data.reduce((acc, r) => ({
-                    total: acc.total + Number(r.total || 0),
-                    pending: acc.pending + Number(r.pending || 0),
-                    disposed: acc.disposed + Number(r.disposed || 0),
-                    unknown: acc.unknown + Number(r.unknown || 0),
-                  }), { total: 0, pending: 0, disposed: 0, unknown: 0 });
+                  const totals = data.reduce((acc, r) => ({ total: acc.total + Number(r.total || 0), pending: acc.pending + Number(r.pending || 0), disposed: acc.disposed + Number(r.disposed || 0), unknown: acc.unknown + Number(r.unknown || 0) }), { total: 0, pending: 0, disposed: 0, unknown: 0 });
                   const grandTotal = totals.total || 1;
-                  return {
-                    category: '',
-                    total: totals.total.toLocaleString(),
-                    pending: totals.pending.toLocaleString(),
-                    pending_pct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%',
-                    disposed: totals.disposed.toLocaleString(),
-                    disposed_pct: ((totals.disposed / grandTotal) * 100).toFixed(1) + '%',
-                    unknown: totals.unknown.toLocaleString(),
-                    unknown_pct: ((totals.unknown / grandTotal) * 100).toFixed(1) + '%',
-                  };
+                  return { category: '', total: totals.total.toLocaleString(), pending: totals.pending.toLocaleString(), pending_pct: ((totals.pending / grandTotal) * 100).toFixed(1) + '%', disposed: totals.disposed.toLocaleString(), disposed_pct: ((totals.disposed / grandTotal) * 100).toFixed(1) + '%', unknown: totals.unknown.toLocaleString(), unknown_pct: ((totals.unknown / grandTotal) * 100).toFixed(1) + '%' };
                 }}
               />
-            </ChartCard>
-          )}
+            )}
+          </ChartCard>
         </div>
 
         {/* ── Matrix cards: Pendency + Disposal side by side ─────────────────── */}

@@ -2,6 +2,8 @@ import { ReactNode, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { GlobalFilterBar } from './GlobalFilterBar';
 import { useFilters } from '../../contexts/FilterContext';
+import { ChartContext } from '../../contexts/ChartContext';
+export { useChartExpand } from '../../contexts/ChartContext';
 
 interface LayoutProps {
   children: ReactNode;
@@ -191,15 +193,6 @@ export const Layout = ({ children }: LayoutProps) => {
     </div>
   );
 };
-
-import { createContext, useContext } from 'react';
-
-export const ChartContext = createContext<{ expanded: boolean; setExpanded: (v: boolean) => void }>({
-  expanded: false,
-  setExpanded: () => { },
-});
-
-export const useChartExpand = () => useContext(ChartContext);
 
 export const AuthLayout = ({ children }: LayoutProps) => {
   return (

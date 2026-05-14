@@ -18,16 +18,48 @@ interface ChartCardProps {
   onEvents?: Record<string, (params: any) => void>;
 }
 
-export const ChartCard = ({ 
-  title, 
-  subtitle, 
-  option, 
-  fullOption, 
-  height = '280px', 
-  expandedHeight = 'calc(100vh - 120px)', 
-  actions, 
+/* Compact pill toggle — matches Reports style exactly */
+const ViewPill = ({
+  viewMode,
+  onViewModeChange,
+}: {
+  viewMode: 'chart' | 'table';
+  onViewModeChange: (m: 'chart' | 'table') => void;
+}) => (
+  <div style={{ display: 'flex', backgroundColor: '#0f172a', borderRadius: 5, padding: 2, gap: 0, flexShrink: 0 }}>
+    {(['chart', 'table'] as const).map((m) => (
+      <button
+        key={m}
+        onClick={() => onViewModeChange(m)}
+        style={{
+          padding: '3px 10px',
+          borderRadius: 4,
+          border: 'none',
+          fontSize: 11,
+          fontWeight: 500,
+          cursor: 'pointer',
+          whiteSpace: 'nowrap',
+          backgroundColor: viewMode === m ? '#3b82f6' : 'transparent',
+          color: viewMode === m ? '#fff' : '#64748b',
+          transition: 'all 0.15s ease',
+        }}
+      >
+        {m === 'chart' ? 'Graph' : 'Table'}
+      </button>
+    ))}
+  </div>
+);
+
+export const ChartCard = ({
+  title,
+  subtitle,
+  option,
+  fullOption,
+  height = '280px',
+  expandedHeight = 'calc(100vh - 120px)',
+  actions,
   chartActions,
-  children, 
+  children,
   noExpand,
   viewMode,
   onViewModeChange,
@@ -44,48 +76,15 @@ export const ChartCard = ({
       <div className="chart-overlay" style={{ zIndex: 400 }}>
         <div className="chart-overlay-header" style={{ padding: '16px 24px', gap: '16px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <span className="chart-overlay-title" style={{ fontSize: '18px', fontWeight: 600 }}>{title}</span>
               {viewMode && onViewModeChange && (
-                <div style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '6px', padding: '2px' }}>
-                  <button
-                    onClick={() => onViewModeChange('chart')}
-                    style={{
-                      padding: '4px 12px',
-                      borderRadius: '4px',
-                      border: 'none',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      backgroundColor: viewMode === 'chart' ? '#3b82f6' : 'transparent',
-                      color: viewMode === 'chart' ? '#fff' : '#94a3b8',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    Chart
-                  </button>
-                  <button
-                    onClick={() => onViewModeChange('table')}
-                    style={{
-                      padding: '4px 12px',
-                      borderRadius: '4px',
-                      border: 'none',
-                      fontSize: '12px',
-                      fontWeight: 500,
-                      cursor: 'pointer',
-                      backgroundColor: viewMode === 'table' ? '#3b82f6' : 'transparent',
-                      color: viewMode === 'table' ? '#fff' : '#94a3b8',
-                      transition: 'all 0.2s ease',
-                    }}
-                  >
-                    Table
-                  </button>
-                </div>
+                <ViewPill viewMode={viewMode} onViewModeChange={onViewModeChange} />
               )}
             </div>
             {subtitle && <span style={{ fontSize: '12px', color: '#94a3b8' }}>{subtitle}</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             {viewMode === 'chart' && chartActions}
             {actions && <div>{actions}</div>}
             <button className="chart-overlay-close" onClick={() => setExpanded(false)}>
@@ -96,10 +95,10 @@ export const ChartCard = ({
             </button>
           </div>
         </div>
-        <div className="chart-overlay-body" style={{ 
-          overflowY: 'auto', 
+        <div className="chart-overlay-body" style={{
+          overflowY: 'auto',
           overflowX: 'auto',
-          padding: '20px', 
+          padding: '20px',
           width: '100%',
           maxWidth: '100%',
           margin: 0,
@@ -122,54 +121,44 @@ export const ChartCard = ({
     <div className="chart-card">
       {showHeader && (
         <div className="chart-card-header">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          {/* Left: title + subtitle */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: 0, flex: 1 }}>
             {title && <span className="chart-card-title">{title}</span>}
             {subtitle && <span className="chart-card-subtitle">{subtitle}</span>}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+
+          {/* Right: controls row — wraps on narrow cards so expand is never hidden */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+            flexShrink: 0,
+          }}>
+            {/* Graph / Table pill toggle */}
             {viewMode && onViewModeChange && (
-              <div style={{ display: 'flex', backgroundColor: '#1e293b', borderRadius: '6px', padding: '2px' }}>
-                <button
-                  onClick={() => onViewModeChange('chart')}
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    backgroundColor: viewMode === 'chart' ? '#3b82f6' : 'transparent',
-                    color: viewMode === 'chart' ? '#fff' : '#94a3b8',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  Chart
-                </button>
-                <button
-                  onClick={() => onViewModeChange('table')}
-                  style={{
-                    padding: '4px 12px',
-                    borderRadius: '4px',
-                    border: 'none',
-                    fontSize: '12px',
-                    fontWeight: 500,
-                    cursor: 'pointer',
-                    backgroundColor: viewMode === 'table' ? '#3b82f6' : 'transparent',
-                    color: viewMode === 'table' ? '#fff' : '#94a3b8',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  Table
-                </button>
-              </div>
+              <ViewPill viewMode={viewMode} onViewModeChange={onViewModeChange} />
             )}
-            {viewMode === 'chart' && chartActions}
-            {actions && <div>{actions}</div>}
+
+            {/* Chart-specific actions (Sort dropdown) — only when in chart mode */}
+            {viewMode !== 'table' && chartActions}
+
+            {/* Legacy actions slot */}
+            {actions && <div style={{ flexShrink: 0 }}>{actions}</div>}
+
+            {/* Expand — icon-only, always last, always visible */}
             {!noExpand && (
-              <button className="chart-expand-btn" onClick={() => setExpanded(true)} title="Expand">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" />
-                  <line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" />
+              <button
+                className="chart-expand-btn chart-expand-btn--icon"
+                onClick={() => setExpanded(true)}
+                title="Expand"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="15 3 21 3 21 9" />
+                  <polyline points="9 21 3 21 3 15" />
+                  <line x1="21" y1="3" x2="14" y2="10" />
+                  <line x1="3" y1="21" x2="10" y2="14" />
                 </svg>
               </button>
             )}
