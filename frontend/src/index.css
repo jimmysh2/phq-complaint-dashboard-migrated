@@ -833,13 +833,20 @@ body {
   border: 1px solid var(--border);
   color: var(--text-muted);
   cursor: pointer;
-  width: 28px;
-  height: 28px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   transition: var(--transition);
+  gap: 6px;
+  padding: 4px 10px;
+  height: auto;
+  white-space: nowrap;
+}
+
+.chart-expand-btn span {
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .chart-expand-btn:hover {
@@ -920,9 +927,7 @@ body {
   }
   .chart-expand-btn {
     opacity: 1;
-    width: 32px;
-    height: 32px;
-    padding: 6px;
+    padding: 6px 12px;
   }
 }
 
@@ -1512,8 +1517,7 @@ body {
   }
 
   .chart-expand-btn {
-    width: 26px;
-    height: 26px;
+    padding: 5px 10px;
   }
 
   .chart-expand-btn svg {
@@ -1533,8 +1537,7 @@ body {
   }
 
   .chart-expand-btn {
-    width: 24px;
-    height: 24px;
+    padding: 4px 8px;
   }
 
   .chart-expand-btn svg {

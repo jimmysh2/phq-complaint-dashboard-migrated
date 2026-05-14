@@ -76,11 +76,11 @@ const ChartSortDropdown = ({ value, onChange }: { value: string; onChange: (v: s
         onMouseLeave={e => { (e.currentTarget as HTMLElement).style.backgroundColor = ''; (e.currentTarget as HTMLElement).style.color = ''; }}
         className="chart-expand-btn"
         title="Sort Options"
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '28px', height: '28px' }}
       >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <line x1="4" y1="6" x2="20" y2="6" /><line x1="8" y1="12" x2="16" y2="12" /><line x1="10" y1="18" x2="14" y2="18" />
         </svg>
+        <span>Sort</span>
       </button>
       {open && (
         <div
