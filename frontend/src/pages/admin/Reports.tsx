@@ -7,6 +7,7 @@ import { DataTable, Column } from '@/components/data/DataTable';
 import { getStackedBarOptions, getDistrictBarOptions } from '@/components/charts/Charts';
 import { reportsApi } from '@/services/api';
 import { useFilters } from '@/contexts/FilterContext';
+import { ComplaintsDrawer, DrawerFilters } from '@/components/common/ComplaintsDrawer';
 
 const tabs = [
   { id: 'district', label: 'District' },
@@ -107,6 +108,11 @@ export const ReportsPage = () => {
   const [chartSort, setChartSort] = useState<string>('total');
   const [viewMode, setViewMode] = useState<'chart' | 'table'>('chart');
   const [tableSort, setTableSort] = useState<{ key: string; dir: 'asc' | 'desc' | null } | null>(null);
+
+  // Drawer state
+  const [drawer, setDrawer] = useState<{ open: boolean; title: string; filters: DrawerFilters }>({ open: false, title: '', filters: {} });
+  const openDrawer = (title: string, drawerFilters: DrawerFilters) => setDrawer({ open: true, title, filters: drawerFilters });
+  const closeDrawer = () => setDrawer(d => ({ ...d, open: false }));
 
   const reportColumnsList = [
     { key: 'name', label: 'Name' },
@@ -290,13 +296,15 @@ export const ReportsPage = () => {
                   label: 'Complaint Number',
                   sortable: true,
                   render: (row: any) => row.complaintNumber && row.complaintNumber !== 'N/A' ? (
-                    <Link
-                      to={`/admin/cctns?tab=synced&search=${encodeURIComponent(row.complaintNumber)}`}
-                      style={{ color: '#60a5fa', textDecoration: 'underline' }}
-                      onClick={(e) => e.stopPropagation()}
+                    <span
+                      style={{ color: '#60a5fa', textDecoration: 'underline', cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDrawer(`Complaint: ${row.complaintNumber}`, { search: row.complaintNumber, statusGroup: 'pending', ...activeFilters } as DrawerFilters);
+                      }}
                     >
                       {row.complaintNumber}
-                    </Link>
+                    </span>
                   ) : (row.complaintNumber || 'N/A')
                 }
               ]}
@@ -390,6 +398,13 @@ export const ReportsPage = () => {
           </>
         )}
       </div>
+
+      <ComplaintsDrawer
+        open={drawer.open}
+        title={drawer.title}
+        filters={drawer.filters}
+        onClose={closeDrawer}
+      />
     </Layout>
   );
 };

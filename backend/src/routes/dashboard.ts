@@ -7,7 +7,6 @@ import { buildPrismaWhereClause, buildRawWhereClause } from '../utils/filters.js
 import { cached } from '../utils/cache.js';
 import {
   getDistrictNameByIdMap,
-  getPoliceStationNameByIdMap,
 } from '../services/master-mapping.js';
 
 const UNMAPPED = 'Unmapped';
@@ -21,10 +20,6 @@ const getDistrictLabel = (id: bigint | null, map: Map<string, string>) => {
   return map.get(id.toString()) || UNMAPPED;
 };
 
-const getPoliceStationLabel = (id: bigint | null, map: Map<string, string>) => {
-  if (!id) return UNMAPPED;
-  return map.get(id.toString()) || UNMAPPED;
-};
 
 export const dashboardRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/dashboard/summary', {
@@ -401,6 +396,7 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
         const baseWhere = buildPrismaWhereClause(request.query);
 
         let districtFilter: any;
+        let resolvedDistrictId: bigint | null = null;
         if (!districtParam || districtParam.toLowerCase() === UNMAPPED.toLowerCase()) {
           districtFilter = { districtMasterId: null };
         } else {
@@ -408,23 +404,38 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
           if (!district) {
             return { district: districtParam, policeStations: [], categories: [] };
           }
+          resolvedDistrictId = district.id;
           districtFilter = { districtMasterId: district.id };
         }
 
-        const [stationMapById, complaints] = await Promise.all([
-          getPoliceStationNameByIdMap(),
-          prisma.complaint.findMany({
-            where: withAnd(baseWhere, districtFilter),
-            select: {
-          policeStationMasterId: true,
-          statusGroup: true,
-          complRegDt: true,
-          disposalDate: true,
-          isDisposedMissingDate: true,
-          classOfIncident: true,
-        },
-      }),
-    ]);
+        // Build a PS name map scoped STRICTLY to this district only.
+        // Key insight: if a complaint's policeStationMasterId points to a PS from
+        // another district (e.g. QILLA under Rohtak appearing in Hisar), it will NOT
+        // be found here and will be grouped as 'Unmapped' — preventing cross-district leakage.
+        const stationMapById = await (async () => {
+          const stations = await prisma.policeStation.findMany({
+            where: resolvedDistrictId != null
+              ? { districtId: resolvedDistrictId }
+              : {},
+            select: { id: true, name: true },
+          });
+          const map = new Map<string, string>();
+          for (const s of stations) map.set(s.id.toString(), s.name);
+          return map;
+        })();
+
+        const complaints = await prisma.complaint.findMany({
+          where: withAnd(baseWhere, districtFilter),
+          select: {
+            policeStationMasterId: true,
+            submitPsCd: true,         // submitting PS code (primary operational field)
+            statusGroup: true,
+            complRegDt: true,
+            disposalDate: true,
+            isDisposedMissingDate: true,
+            classOfIncident: true,
+          },
+        });
 
     const now = Date.now();
     const psMap = new Map<string, {
@@ -436,7 +447,21 @@ export const dashboardRoutes = async (fastify: FastifyInstance) => {
     const categoryMap = new Map<string, { total: number; pending: number; disposed: number; unknown: number; missingDates: number }>();
 
     for (const comp of complaints) {
-      const ps = getPoliceStationLabel(comp.policeStationMasterId, stationMapById);
+      // Strict district-scoped PS resolution:
+      // 1. policeStationMasterId → name from THIS district's PS map only
+      //    (cross-district IDs like QILLA-under-Rohtak won't resolve → Unmapped)
+      // 2. submitPsCd as numeric ID → try THIS district's PS map
+      // 3. Unmapped
+      let ps: string = UNMAPPED;
+      if (comp.policeStationMasterId) {
+        ps = stationMapById.get(comp.policeStationMasterId.toString()) || UNMAPPED;
+      } else if (comp.submitPsCd) {
+        // submitPsCd is a numeric code — try it as a PS master ID within this district
+        const parsed = parseInt(comp.submitPsCd, 10);
+        if (!isNaN(parsed)) {
+          ps = stationMapById.get(String(parsed)) || UNMAPPED;
+        }
+      }
       const category = comp.classOfIncident || UNMAPPED;
       const stats = psMap.get(ps) || {
         psIds: new Set<bigint>(),

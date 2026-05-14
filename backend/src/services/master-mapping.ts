@@ -111,12 +111,14 @@ const resolvePoliceStationId = (
   const existing = input.policeStationMasterId ?? null;
   if (existing) return existing;
 
+  // Use the submitting PS code (SUBMIT_PS_CD) as the primary identifier.
+  // This is the operational PS that actually handled the complaint.
+  // We do NOT fall back to addressPs (complainant's home address PS) as that
+  // represents where the complainant lives, not which PS handled the complaint.
   const byCode = toId(firstPresent(input.submitPsCd));
   if (byCode && stationIdSet.has(byCode.toString())) return byCode;
 
-  const stationName = firstPresent(input.addressPs);
-  if (!stationName) return null;
-  return stationByName.get(normalizeName(stationName)) ?? null;
+  return null;
 };
 
 const resolveOfficeId = (

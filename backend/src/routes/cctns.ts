@@ -327,17 +327,10 @@ export const cctnsRoutes = async (fastify: FastifyInstance) => {
 // ── District filter from drill-down navigation ───────────────────────────
     // When district is passed from DistrictDetail page drill-down (and no global districtIds), 
     // apply the district filter to maintain consistent counts. 
-    // HOWEVER: When policeStationIds is also passed (from clicking on a specific PS in the table),
-    // we should NOT also apply the district filter - we should ONLY apply the PS filter.
-    // 
-    // Reason: DistrictDetail counts records for a specific PS by querying with ONLY district filter
-    // (not filtering by PS). The PS counts in the table come from grouping by PS after the district query.
-    // So to match those counts exactly, we should use the same logic: filter by district only when
-    // navigating to view "all records in district", but filter by PS only when clicking on a specific PS.
-    //
-    // The double-filtering (district + PS) causes records to be excluded where a PS exists but
-    // has records with different/null district mappings in the database.
-    if (district && !districtIds && !policeStationIds) {
+    // We MUST apply the district filter even if policeStationIds is passed because 
+    // DistrictDetail counts records for a specific PS by querying with the district filter FIRST, 
+    // then grouping by PS. To match those exact counts in the drawer, we must filter by BOTH district and PS.
+    if (district && !districtIds) {
       const districtRecord = await prisma.district.findFirst({
         where: { name: { equals: district, mode: 'insensitive' } },
         select: { id: true },

@@ -320,7 +320,6 @@ export const CCTNSPage = () => {
 
   const recordCols: Column<any>[] = [
     // Identity
-    { key: 'id', label: 'DB ID', sortable: true },
     {
       key: 'complRegNum',
       label: 'Reg. No.',
@@ -1095,6 +1094,8 @@ export const CCTNSPage = () => {
                     columns={recordCols}
                     maxHeight="calc(100vh - 400px)"
                     activeFilters={cctnsActiveFilters}
+                    onSearch={(q) => { setSearchQuery(q); setPage(1); }}
+                    searchValue={searchQuery}
                     onFetchAllForExport={fetchAllCctnsForExport}
                     pagination={syncedPagination ? {
                       page: syncedPagination.page,

@@ -49,6 +49,10 @@ interface Props<T> {
   showTotalRow?: boolean;
   /** Optional: function to compute total row values */
   getTotalRow?: (data: T[]) => Record<string, React.ReactNode>;
+  /** Optional: callback when search input changes (for server-side search) */
+  onSearch?: (query: string) => void;
+  /** Optional: current search query (for server-side search) */
+  searchValue?: string;
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -101,15 +105,28 @@ export function DataTable<T extends Record<string, unknown>>({
   onSort,
   showTotalRow = false,
   getTotalRow,
+  onSearch,
+  searchValue,
 }: Props<T>) {
   const effectiveMaxHeight = forceFullHeight || isCardExpanded ? 'calc(100vh - 140px)' : maxHeight;
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [exporting, setExporting] = useState<'excel' | 'pdf' | null>(null);
   const [showAllRows, setShowAllRows] = useState(false);
+  const [gotoPage, setGotoPage] = useState('');
   const exportBtnRef = useRef<HTMLButtonElement>(null);
+
+  const actualSearchQuery = searchValue !== undefined ? searchValue : localSearchQuery;
+
+  const handleSearchChange = (val: string) => {
+    if (onSearch) {
+      onSearch(val);
+    } else {
+      setLocalSearchQuery(val);
+    }
+  };
 
   const handleSort = (key: string) => {
     let newKey: string | null = key;
@@ -123,12 +140,13 @@ export function DataTable<T extends Record<string, unknown>>({
   };
 
   const filteredData = useMemo(() => {
-    if (!searchQuery) return data;
-    const lowerQuery = searchQuery.toLowerCase();
+    if (onSearch) return data; // If server-side search, data is already filtered
+    if (!actualSearchQuery) return data;
+    const lowerQuery = actualSearchQuery.toLowerCase();
     return data.filter(row =>
       columns.some(col => String(row[col.key] ?? '').toLowerCase().includes(lowerQuery))
     );
-  }, [data, columns, searchQuery]);
+  }, [data, columns, actualSearchQuery, onSearch]);
 
   const sorted = useMemo(() => {
     if (!sortKey || !sortDir) return filteredData;
@@ -444,6 +462,38 @@ export function DataTable<T extends Record<string, unknown>>({
                   →
                 </button>
               </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px', borderLeft: '1px solid var(--border)', paddingLeft: '12px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Go to:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={pagination.totalPages}
+                  value={gotoPage}
+                  onChange={(e) => setGotoPage(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const p = parseInt(gotoPage, 10);
+                      if (!isNaN(p) && p >= 1 && p <= pagination.totalPages) {
+                        pagination.onPageChange(p);
+                        setGotoPage('');
+                      }
+                    }
+                  }}
+                  style={{ width: '50px', background: 'rgba(255,255,255,0.05)', color: '#fff', border: '1px solid var(--border)', borderRadius: '4px', padding: '4px', fontSize: '12px', outline: 'none', textAlign: 'center' }}
+                />
+                <button
+                  onClick={() => {
+                    const p = parseInt(gotoPage, 10);
+                    if (!isNaN(p) && p >= 1 && p <= pagination.totalPages) {
+                      pagination.onPageChange(p);
+                      setGotoPage('');
+                    }
+                  }}
+                  style={{ padding: '4px 8px', background: 'rgba(99,102,241,0.2)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.4)', borderRadius: '4px', fontSize: '11px', cursor: 'pointer' }}
+                >
+                  Go
+                </button>
+              </div>
             </div>
             </>
           )}
@@ -468,8 +518,8 @@ export function DataTable<T extends Record<string, unknown>>({
                       position: 'sticky',
                       left: 0,
                       zIndex: 20,
-                      background: '#0f172a',
-                      boxShadow: '2px 0 6px rgba(0,0,0,0.4)',
+                      backgroundColor: '#0f172a',
+                      boxShadow: '2px 0 6px rgba(0,0,0,0.6)',
                     } : {}),
                   }}
                   onClick={() => col.sortable && handleSort(col.key)}
@@ -502,8 +552,8 @@ export function DataTable<T extends Record<string, unknown>>({
                           position: 'sticky',
                           left: 0,
                           zIndex: 10,
-                          background: '#132035',
-                          boxShadow: '2px 0 6px rgba(0,0,0,0.3)',
+                          backgroundColor: '#0f172a',
+                          boxShadow: '2px 0 6px rgba(0,0,0,0.6)',
                         } : {}),
                       }}
                     >
@@ -534,8 +584,8 @@ export function DataTable<T extends Record<string, unknown>>({
                           position: 'sticky',
                           left: 0,
                           zIndex: 15,
-                          background: '#132035',
-                          boxShadow: '0 -2px 6px rgba(0,0,0,0.3)',
+                          backgroundColor: '#0f172a',
+                          boxShadow: '2px -2px 6px rgba(0,0,0,0.5)',
                         } : {}),
                       }}
                     >
@@ -566,9 +616,9 @@ export function DataTable<T extends Record<string, unknown>>({
           <div style={{ width: '280px', position: 'relative' }}>
             <input
               type="text"
-              placeholder="Search in table..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={onSearch ? "Search all records..." : "Search in table..."}
+              value={actualSearchQuery}
+              onChange={(e) => handleSearchChange(e.target.value)}
               style={{
                 width: '100%',
                 padding: '8px 16px 8px 36px',
@@ -588,7 +638,7 @@ export function DataTable<T extends Record<string, unknown>>({
             </svg>
           </div>
 
-          <button className="chart-overlay-close" onClick={() => { setExpanded(false); setSearchQuery(''); }}>
+          <button className="chart-overlay-close" onClick={() => { setExpanded(false); handleSearchChange(''); }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
             </svg>
@@ -596,7 +646,7 @@ export function DataTable<T extends Record<string, unknown>>({
           </button>
         </div>
       </div>
-      <div className="chart-overlay-body" style={{ display: 'flex', flexDirection: 'column', padding: '0 40px 20px 40px', maxWidth: '1600px', margin: '0 auto', width: '100%', alignItems: 'stretch' }}>
+      <div className="chart-overlay-body" style={{ display: 'flex', flexDirection: 'column', padding: '0 40px 20px 40px', maxWidth: '100%', margin: '0', width: '100%', alignItems: 'stretch' }}>
         {renderTable(true)}
       </div>
     </div>

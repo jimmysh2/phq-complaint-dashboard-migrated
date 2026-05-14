@@ -15,6 +15,7 @@ interface ChartCardProps {
   noExpand?: boolean;
   viewMode?: 'chart' | 'table';
   onViewModeChange?: (mode: 'chart' | 'table') => void;
+  onEvents?: Record<string, (params: any) => void>;
 }
 
 export const ChartCard = ({ 
@@ -29,7 +30,8 @@ export const ChartCard = ({
   children, 
   noExpand,
   viewMode,
-  onViewModeChange
+  onViewModeChange,
+  onEvents,
 }: ChartCardProps) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -107,7 +109,7 @@ export const ChartCard = ({
         }}>
           {childWithExpandedProp
             ? <div style={{ width: '100%', minWidth: '100%' }}>{childWithExpandedProp}</div>
-            : <BaseChart option={fullOption || option || {}} height={expandedHeight} />
+            : <BaseChart option={fullOption || option || {}} height={expandedHeight} onEvents={onEvents} />
           }
         </div>
       </div>
@@ -178,7 +180,7 @@ export const ChartCard = ({
         {children && typeof children !== 'boolean' ? (
           children
         ) : (
-          option ? <BaseChart option={option} height={height} /> : null
+          option ? <BaseChart option={option} height={height} onEvents={onEvents} /> : null
         )}
       </div>
     </div>
