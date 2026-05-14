@@ -10,11 +10,11 @@ import { useFilters } from '@/contexts/FilterContext';
 
 // ─── Mini sort dropdown ─────────────────────────────────────────────────────
 const CAT_SORTS = [
-  { label: 'By Pending ↓',  value: 'pending'  },
-  { label: 'By Total ↓',    value: 'total'    },
+  { label: 'By Pending ↓', value: 'pending' },
+  { label: 'By Total ↓', value: 'total' },
   { label: 'By Disposed ↓', value: 'disposed' },
-  { label: 'A → Z',         value: 'az'       },
-  { label: 'Z → A',         value: 'za'       },
+  { label: 'A → Z', value: 'az' },
+  { label: 'Z → A', value: 'za' },
 ];
 const CatSortDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
   const [open, setOpen] = useState(false);
@@ -90,7 +90,7 @@ const StatCard = ({ label, value, subValue, colorClass, onClick }: { label: stri
     {onClick && (
       <div style={{ marginTop: 6, fontSize: 11, opacity: 0.7, display: 'flex', alignItems: 'center', gap: 4 }}>
         <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M9 18l6-6-6-6"/>
+          <path d="M9 18l6-6-6-6" />
         </svg>
         Click to view complaints
       </div>
@@ -113,8 +113,8 @@ export const DistrictDetail = () => {
     queryKey: ['district-analysis', district, activeFilters],
     queryFn: async () => {
       const params = new URLSearchParams(activeFilters as Record<string, string>);
-      const r = await fetch(`/api/dashboard/district-analysis/${district}?${params.toString()}`, { 
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } 
+      const r = await fetch(`/api/dashboard/district-analysis/${district}?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       return r.json();
     },
@@ -122,51 +122,51 @@ export const DistrictDetail = () => {
   });
 
   const policeStations = data?.data?.policeStations || [];
-  const rawCategories  = data?.data?.categories || [];
+  const rawCategories = data?.data?.categories || [];
 
   // Sort categories for the chart
   const categories = [...rawCategories].sort((a: any, b: any) => {
-    if (catSort === 'az')       return String(a.category).localeCompare(String(b.category));
-    if (catSort === 'za')       return String(b.category).localeCompare(String(a.category));
-    if (catSort === 'total')    return b.total    - a.total;
+    if (catSort === 'az') return String(a.category).localeCompare(String(b.category));
+    if (catSort === 'za') return String(b.category).localeCompare(String(a.category));
+    if (catSort === 'total') return b.total - a.total;
     if (catSort === 'disposed') return b.disposed - a.disposed;
     return b.pending - a.pending; // default
   });
-  
+
   // Aggregates — disposed = ALL records with statusGroup=disposed (with + without date)
   const totalReceived = policeStations.reduce((sum: number, ps: any) => sum + ps.total, 0);
-  const totalPending  = policeStations.reduce((sum: number, ps: any) => sum + ps.pending, 0);
+  const totalPending = policeStations.reduce((sum: number, ps: any) => sum + ps.pending, 0);
   const totalDisposed = policeStations.reduce((sum: number, ps: any) => sum + ps.disposed, 0);
   const totalMissingDates = policeStations.reduce((sum: number, ps: any) => sum + (ps.missingDates || 0), 0);
   const totalDisposedWithDate = totalDisposed - totalMissingDates;
-  const totalUnknown  = policeStations.reduce((sum: number, ps: any) => sum + (ps.unknown || 0), 0);
+  const totalUnknown = policeStations.reduce((sum: number, ps: any) => sum + (ps.unknown || 0), 0);
   const totalDisposedDays = policeStations.reduce((sum: number, ps: any) => sum + (ps.avgDisposalDays * (ps.disposed - (ps.missingDates || 0))), 0);
   const avgDisposalTime = totalDisposedWithDate > 0 ? Math.round(totalDisposedDays / totalDisposedWithDate) : 0;
 
   // ── Police Station Summary Table ──────────────────────────────────────────
   const psCols: Column<any>[] = [
-    { key: 'ps',              label: 'Police Station',       sortable: true },
-    { key: 'total',           label: 'Total',                sortable: true, align: 'center' },
-    { key: 'disposed',        label: 'Disposed',             sortable: true, align: 'center' },
-    { key: 'missingDates',   label: 'Disposed but Date Not Found',     sortable: true, align: 'center' },
-    { key: 'pending',         label: 'Pending',              sortable: true, align: 'center' },
-    { key: 'unknown',         label: 'Status Not Found',     sortable: true, align: 'center' },
-    { key: 'u7',              label: '< 7 Days',             sortable: true, align: 'center' },
-    { key: 'u15',             label: '7 - 15 Days',          sortable: true, align: 'center' },
-    { key: 'u30',             label: '15 - 30 Days',         sortable: true, align: 'center' },
-    { key: 'o30',             label: '1-2 Months',           sortable: true, align: 'center' },
-    { key: 'o60',             label: 'Over 2 Months',        sortable: true, align: 'center' },
+    { key: 'ps', label: 'Police Station', sortable: true },
+    { key: 'total', label: 'Total', sortable: true, align: 'center' },
+    { key: 'disposed', label: 'Disposed', sortable: true, align: 'center' },
+    { key: 'missingDates', label: 'Disposed but Date Not Found', sortable: true, align: 'center' },
+    { key: 'pending', label: 'Pending', sortable: true, align: 'center' },
+    { key: 'unknown', label: 'Status Not Found', sortable: true, align: 'center' },
+    { key: 'u7', label: '< 7 Days', sortable: true, align: 'center' },
+    { key: 'u15', label: '7 - 15 Days', sortable: true, align: 'center' },
+    { key: 'u30', label: '15 - 30 Days', sortable: true, align: 'center' },
+    { key: 'o30', label: '1-2 Months', sortable: true, align: 'center' },
+    { key: 'o60', label: 'Over 2 Months', sortable: true, align: 'center' },
     { key: 'avgDisposalDays', label: 'Avg. Disposal (Days)', sortable: true, align: 'center' },
   ];
 
   const buildCellUrl = (psName: string, psId: string | null | undefined, statusGroup: string, extraParams: Record<string, string> = {}) => {
     const p = new URLSearchParams();
-    if (filters.districtIds)      p.set('districtIds',      filters.districtIds);
+    if (filters.districtIds) p.set('districtIds', filters.districtIds);
     if (filters.policeStationIds) p.set('policeStationIds', filters.policeStationIds);
-    if (filters.officeIds)        p.set('officeIds',        filters.officeIds);
-    if (filters.classOfIncident)  p.set('classOfIncident',  filters.classOfIncident);
-    if (filters.fromDate)         p.set('fromDate',         filters.fromDate);
-    if (filters.toDate)           p.set('toDate',           filters.toDate);
+    if (filters.officeIds) p.set('officeIds', filters.officeIds);
+    if (filters.classOfIncident) p.set('classOfIncident', filters.classOfIncident);
+    if (filters.fromDate) p.set('fromDate', filters.fromDate);
+    if (filters.toDate) p.set('toDate', filters.toDate);
 
     if (district) {
       p.set('district', district);
@@ -202,37 +202,37 @@ export const DistrictDetail = () => {
   );
 
   const renderPsCell = (col: Column<any>, row: any) => {
-    if (col.key === 'ps')              return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'total')           return <ClickableCell value={row.total} url={buildCellUrl(row.ps, row.psId, 'all')} color="#60a5fa" />;
-if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url={buildCellUrl(row.ps, row.psId, 'disposed')} color="#4ade80" />;
-    if (col.key === 'missingDates')  return <ClickableCell value={row.missingDates ?? 0} url={buildCellUrl(row.ps, row.psId, 'disposed_missing_date')} color="#fbbf24" />;
-    if (col.key === 'pending')      return <ClickableCell value={row.pending} url={buildCellUrl(row.ps, row.psId, 'pending')} color="#fbbf24" />;
-    if (col.key === 'unknown')         return <ClickableCell value={row.unknown ?? 0} url={buildCellUrl(row.ps, row.psId, 'unknown')} color="#94a3b8" />;
-    if (col.key === 'u7')              return <ClickableCell value={row.u7} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u7' })} color="var(--text-muted)" />;
-    if (col.key === 'u15')             return <ClickableCell value={row.u15} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u15' })} color="#eab308" />;
-    if (col.key === 'u30')             return <ClickableCell value={row.u30} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u30' })} color="#fb923c" fw={500} />;
-    if (col.key === 'o30')             return <ClickableCell value={row.o30} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'o30' })} color="#ef4444" fw="bold" />;
-    if (col.key === 'o60')             return <ClickableCell value={row.o60 || 0} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'o60' })} color="#b91c1c" fw="bold" />;
+    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'total') return <ClickableCell value={row.total} url={buildCellUrl(row.ps, row.psId, 'all')} color="#60a5fa" />;
+    if (col.key === 'disposed') return <ClickableCell value={row.disposed} url={buildCellUrl(row.ps, row.psId, 'disposed')} color="#4ade80" />;
+    if (col.key === 'missingDates') return <ClickableCell value={row.missingDates ?? 0} url={buildCellUrl(row.ps, row.psId, 'disposed_missing_date')} color="#fbbf24" />;
+    if (col.key === 'pending') return <ClickableCell value={row.pending} url={buildCellUrl(row.ps, row.psId, 'pending')} color="#fbbf24" />;
+    if (col.key === 'unknown') return <ClickableCell value={row.unknown ?? 0} url={buildCellUrl(row.ps, row.psId, 'unknown')} color="#94a3b8" />;
+    if (col.key === 'u7') return <ClickableCell value={row.u7} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u7' })} color="var(--text-muted)" />;
+    if (col.key === 'u15') return <ClickableCell value={row.u15} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u15' })} color="#eab308" />;
+    if (col.key === 'u30') return <ClickableCell value={row.u30} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u30' })} color="#fb923c" fw={500} />;
+    if (col.key === 'o30') return <ClickableCell value={row.o30} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'o30' })} color="#ef4444" fw="bold" />;
+    if (col.key === 'o60') return <ClickableCell value={row.o60 || 0} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'o60' })} color="#b91c1c" fw="bold" />;
     if (col.key === 'avgDisposalDays') return <span style={{ color: '#c084fc' }}>{row.avgDisposalDays}d</span>;
     return row[col.key];
   };
 
   // ── Pendency Ageing Matrix (Days) ─────────────────────────────────────────
   const pendencyCols: Column<any>[] = [
-    { key: 'ps',   label: 'Police Station', sortable: true },
-    { key: 'pending', label: 'Total',       sortable: true, align: 'center' },
-    { key: 'u7',   label: '< 7 Days',       sortable: true, align: 'center' },
-    { key: 'u15',  label: '7-15 Days',      sortable: true, align: 'center' },
-    { key: 'u30',  label: '15-30 Days',     sortable: true, align: 'center' },
-    { key: 'o30',  label: '1-2 Months',     sortable: true, align: 'center' },
-    { key: 'o60',  label: 'Over 2 Months',  sortable: true, align: 'center' },
+    { key: 'ps', label: 'Police Station', sortable: true },
+    { key: 'pending', label: 'Total', sortable: true, align: 'center' },
+    { key: 'u7', label: '< 7 Days', sortable: true, align: 'center' },
+    { key: 'u15', label: '7-15 Days', sortable: true, align: 'center' },
+    { key: 'u30', label: '15-30 Days', sortable: true, align: 'center' },
+    { key: 'o30', label: '1-2 Months', sortable: true, align: 'center' },
+    { key: 'o60', label: 'Over 2 Months', sortable: true, align: 'center' },
   ];
 
   const renderPendencyDays = (col: Column<any>, row: any) => {
     const total = row.pending || 1;
-    if (col.key === 'ps')  return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
     if (col.key === 'pending') return <ClickableCell value={row.pending} url={buildCellUrl(row.ps, row.psId, 'pending')} color="#60a5fa" />;
-    if (col.key === 'u7')  return <span style={{ color: 'var(--text-muted)' }}><ClickableCell value={row.u7} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u7' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.u7 || 0) * 100 / total)}%)</span></span>;
+    if (col.key === 'u7') return <span style={{ color: 'var(--text-muted)' }}><ClickableCell value={row.u7} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u7' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.u7 || 0) * 100 / total)}%)</span></span>;
     if (col.key === 'u15') return <span style={{ color: '#eab308' }}><ClickableCell value={row.u15} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u15' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.u15 || 0) * 100 / total)}%)</span></span>;
     if (col.key === 'u30') return <span style={{ color: '#fb923c', fontWeight: 500 }}><ClickableCell value={row.u30} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'u30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.u30 || 0) * 100 / total)}%)</span></span>;
     if (col.key === 'o30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}><ClickableCell value={row.o30} url={buildCellUrl(row.ps, row.psId, 'pending', { pendencyAge: 'o30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.o30 || 0) * 100 / total)}%)</span></span>;
@@ -242,24 +242,24 @@ if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url=
 
   // ── Disposal Time Matrix (Days) ───────────────────────────────────────────
   const disposalCols: Column<any>[] = [
-    { key: 'ps',              label: 'Police Station',         sortable: true },
-    { key: 'disposed',        label: 'Total Disposed',          sortable: true, align: 'center' },
-    { key: 'missingDates',    label: 'Date Not Found',          sortable: true, align: 'center' },
-    { key: 'du7',             label: '< 7 Days',                sortable: true, align: 'center' },
-    { key: 'du15',            label: '7-15 Days',               sortable: true, align: 'center' },
-    { key: 'du30',            label: '15-30 Days',              sortable: true, align: 'center' },
-    { key: 'do30',            label: '1-2 Months',              sortable: true, align: 'center' },
-    { key: 'do60',            label: 'Over 2 Months',            sortable: true, align: 'center' },
+    { key: 'ps', label: 'Police Station', sortable: true },
+    { key: 'disposed', label: 'Total Disposed', sortable: true, align: 'center' },
+    { key: 'missingDates', label: 'Date Not Found', sortable: true, align: 'center' },
+    { key: 'du7', label: '< 7 Days', sortable: true, align: 'center' },
+    { key: 'du15', label: '7-15 Days', sortable: true, align: 'center' },
+    { key: 'du30', label: '15-30 Days', sortable: true, align: 'center' },
+    { key: 'do30', label: '1-2 Months', sortable: true, align: 'center' },
+    { key: 'do60', label: 'Over 2 Months', sortable: true, align: 'center' },
   ];
 
   const renderDisposalDays = (col: Column<any>, row: any) => {
     const disposedWithDate = row.disposed || 0;
-    const disposedNoDate   = row.missingDates || 0;
-    const denominator      = disposedWithDate || 1;
-    if (col.key === 'ps')           return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
-    if (col.key === 'disposed')     return <ClickableCell value={disposedWithDate} url={buildCellUrl(row.ps, row.psId, 'disposed')} color="#4ade80" />;
+    const disposedNoDate = row.missingDates || 0;
+    const denominator = disposedWithDate || 1;
+    if (col.key === 'ps') return <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{row.ps}</span>;
+    if (col.key === 'disposed') return <ClickableCell value={disposedWithDate} url={buildCellUrl(row.ps, row.psId, 'disposed')} color="#4ade80" />;
     if (col.key === 'missingDates') return <ClickableCell value={disposedNoDate} url={buildCellUrl(row.ps, row.psId, 'disposed_missing_date')} color="#fbbf24" />;
-    if (col.key === 'du7')  return <span style={{ color: '#4ade80' }}><ClickableCell value={row.du7} url={buildCellUrl(row.ps, row.psId, 'disposed', { disposalAge: 'u7' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.du7 || 0) * 100 / denominator)}%)</span></span>;
+    if (col.key === 'du7') return <span style={{ color: '#4ade80' }}><ClickableCell value={row.du7} url={buildCellUrl(row.ps, row.psId, 'disposed', { disposalAge: 'u7' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.du7 || 0) * 100 / denominator)}%)</span></span>;
     if (col.key === 'du15') return <span style={{ color: '#a3e635' }}><ClickableCell value={row.du15} url={buildCellUrl(row.ps, row.psId, 'disposed', { disposalAge: 'u15' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.du15 || 0) * 100 / denominator)}%)</span></span>;
     if (col.key === 'du30') return <span style={{ color: '#eab308' }}><ClickableCell value={row.du30} url={buildCellUrl(row.ps, row.psId, 'disposed', { disposalAge: 'u30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.du30 || 0) * 100 / denominator)}%)</span></span>;
     if (col.key === 'do30') return <span style={{ color: '#ef4444', fontWeight: 'bold' }}><ClickableCell value={row.do30} url={buildCellUrl(row.ps, row.psId, 'disposed', { disposalAge: 'o30' })} color="inherit" /> <span style={{ fontSize: '11px', opacity: 0.6 }}>({Math.round((row.do30 || 0) * 100 / denominator)}%)</span></span>;
@@ -270,7 +270,7 @@ if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url=
   const matrixCardStyle = { backgroundColor: '#1e293b', borderRadius: '8px', padding: '20px', border: '1px solid #334155', display: 'flex', flexDirection: 'column' as const };
 
   const getCategorySubtitle = () => {
-    return `sorted by ${CAT_SORTS.find(o => o.value === catSort)?.label || 'By Pending ↓'}`;
+    return `sorted ${CAT_SORTS.find(o => o.value === catSort)?.label || 'By Pending ↓'}`;
   };
 
   const getPendencySubtitle = () => {
@@ -339,11 +339,11 @@ if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url=
             <h1 className="text-2xl font-bold text-slate-100">{district} District Analysis</h1>
           </div>
           <div className="dashboard-export-buttons">
-            <button 
-              className="btn-primary dashboard-export-btn" 
+            <button
+              className="btn-primary dashboard-export-btn"
               onClick={() => {
                 const wb = XLSX.utils.book_new();
-                
+
                 // Sheet 1: Executive Summary
                 const execSummary = [{
                   'Metric': 'District', 'Value': district
@@ -360,55 +360,55 @@ if (col.key === 'disposed')      return <ClickableCell value={row.disposed} url=
                 }, {
                   'Metric': 'Disposed (% of Total)', 'Value': `${Math.round((totalDisposed / (totalReceived || 1)) * 100)}%`
                 }, {
-                  'Metric': 'Pending (% of Total)',  'Value': `${Math.round((totalPending  / (totalReceived || 1)) * 100)}%`
+                  'Metric': 'Pending (% of Total)', 'Value': `${Math.round((totalPending / (totalReceived || 1)) * 100)}%`
                 }, {
                   'Metric': 'Avg. Disposal Time (Days)', 'Value': avgDisposalTime
                 }];
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(execSummary), 'Overview');
 
                 // Sheet 2: Police Station Summary
-const psSummary = policeStations.map((ps: any) => ({
-                  'Police Station':          ps.ps,
-                  'Total':                   ps.total,
-                  'Disposed (With Date)':    ps.disposed,
+                const psSummary = policeStations.map((ps: any) => ({
+                  'Police Station': ps.ps,
+                  'Total': ps.total,
+                  'Disposed (With Date)': ps.disposed,
                   'Disposed (Date Not Found)': ps.missingDates ?? 0,
-                  'Pending':                  ps.pending,
-                  'Status Not Found':        ps.unknown ?? 0,
-                  'Disposed %':              `${Math.round((ps.disposed / (ps.total || 1)) * 100)}%`,
-                  'Pending %':               `${Math.round((ps.pending  / (ps.total || 1)) * 100)}%`,
-                  'Status Not Found %':      `${Math.round(((ps.unknown || 0) / (ps.total || 1)) * 100)}%`,
-                  '< 7 Days (Pending)':      ps.u7,
-                  '7 - 15 Days (Pending)':   ps.u15,
-                  '15 - 30 Days (Pending)':   ps.u30,
-                  '> 30 Days (Pending)':      ps.o30,
-                  'Avg Disposal (Days)':     ps.avgDisposalDays
+                  'Pending': ps.pending,
+                  'Status Not Found': ps.unknown ?? 0,
+                  'Disposed %': `${Math.round((ps.disposed / (ps.total || 1)) * 100)}%`,
+                  'Pending %': `${Math.round((ps.pending / (ps.total || 1)) * 100)}%`,
+                  'Status Not Found %': `${Math.round(((ps.unknown || 0) / (ps.total || 1)) * 100)}%`,
+                  '< 7 Days (Pending)': ps.u7,
+                  '7 - 15 Days (Pending)': ps.u15,
+                  '15 - 30 Days (Pending)': ps.u30,
+                  '> 30 Days (Pending)': ps.o30,
+                  'Avg Disposal (Days)': ps.avgDisposalDays
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(psSummary), 'PS Summary');
 
                 // Sheet 3: Category Breakdown
                 const catSummary = categories.map((cat: any) => ({
-                  'Category':          cat.category,
-                  'Total':             cat.total,
-                  'Disposed':          cat.disposed,
-                  'Pending':           cat.pending,
-                  'Status Not Found':  cat.unknown ?? 0,
-                  'Disposed %':        `${Math.round((cat.disposed / (cat.total || 1)) * 100)}%`,
-                  'Pending %':         `${Math.round((cat.pending  / (cat.total || 1)) * 100)}%`,
+                  'Category': cat.category,
+                  'Total': cat.total,
+                  'Disposed': cat.disposed,
+                  'Pending': cat.pending,
+                  'Status Not Found': cat.unknown ?? 0,
+                  'Disposed %': `${Math.round((cat.disposed / (cat.total || 1)) * 100)}%`,
+                  'Pending %': `${Math.round((cat.pending / (cat.total || 1)) * 100)}%`,
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(catSummary), 'Category Breakdown');
 
                 // Sheet 4: Disposal Time Matrix
                 const psDisposal = policeStations.map((ps: any) => ({
-                  'Police Station':           ps.ps,
-                  'Disposed (With Date)':     ps.disposed,
+                  'Police Station': ps.ps,
+                  'Disposed (With Date)': ps.disposed,
                   'Disposed (Date Not Found)': ps.missingDates ?? 0,
-                  '< 7 Days (Disposed)':      ps.du7,
-                  '7 - 15 Days (Disposed)':   ps.du15,
-                  '15 - 30 Days (Disposed)':  ps.du30,
-                  '> 30 Days (Disposed)':     ps.do30
+                  '< 7 Days (Disposed)': ps.du7,
+                  '7 - 15 Days (Disposed)': ps.du15,
+                  '15 - 30 Days (Disposed)': ps.du30,
+                  '> 30 Days (Disposed)': ps.do30
                 }));
                 XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(psDisposal), 'Disposal Matrix');
-                
+
                 // Write as binary array and download via Blob to avoid corruption
                 const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
                 const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -432,8 +432,8 @@ const psSummary = policeStations.map((ps: any) => ({
               </svg>
               Export Excel
             </button>
-            <button 
-              className="btn-primary dashboard-export-btn" 
+            <button
+              className="btn-primary dashboard-export-btn"
               onClick={() => window.print()}
               style={{ width: 'auto', margin: 0, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: '8px' }}
             >

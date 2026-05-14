@@ -123,9 +123,9 @@ export const ReportsPage = () => {
     if (viewMode === 'table' && tableSort && tableSort.key) {
       const col = reportColumnsList.find(c => c.key === tableSort.key);
       const dirArrow = tableSort.dir === 'asc' ? '↑' : tableSort.dir === 'desc' ? '↓' : '';
-      return `sorted by ${col?.label || tableSort.key} ${dirArrow}`;
+      return `sorted ${col?.label || tableSort.key} ${dirArrow}`;
     }
-    return `sorted by ${CHART_SORTS.find(o => o.value === chartSort)?.label || 'By Total ↓'}`;
+    return `sorted ${CHART_SORTS.find(o => o.value === chartSort)?.label || 'By Total ↓'}`;
   };
 
   const handleViewModeChange = (newMode: 'chart' | 'table') => {

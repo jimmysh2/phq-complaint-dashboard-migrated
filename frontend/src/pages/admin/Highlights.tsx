@@ -53,8 +53,8 @@ const SortDropdown = ({
   };
 
   return (
-    <div 
-      ref={ref} 
+    <div
+      ref={ref}
       style={{ position: 'relative' }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -119,10 +119,10 @@ function sortRows<T extends { pending: number; total: number; disposed: number; 
 ): (T & { district?: string; category?: string })[] {
   return [...rows].sort((a, b) => {
     switch (key) {
-      case 'pending':  return b.pending  - a.pending;
-      case 'total':    return b.total    - a.total;
+      case 'pending': return b.pending - a.pending;
+      case 'total': return b.total - a.total;
       case 'disposed': return b.disposed - a.disposed;
-      case 'pendPct':  return b.pendPct  - a.pendPct;
+      case 'pendPct': return b.pendPct - a.pendPct;
       case 'az': {
         const la = String(a.district ?? a.category ?? '');
         const lb = String(b.district ?? b.category ?? '');
@@ -139,12 +139,12 @@ function sortRows<T extends { pending: number; total: number; disposed: number; 
 }
 
 const SORT_OPTIONS: SortOption[] = [
-  { label: 'By Total ↓',   value: 'total'    },
-  { label: 'By Pending ↓',  value: 'pending'  },
-  { label: 'By Disposed ↓',value: 'disposed' },
-  { label: 'By Pend % ↓',  value: 'pendPct'  },
-  { label: 'A → Z',        value: 'az'       },
-  { label: 'Z → A',        value: 'za'       },
+  { label: 'By Total ↓', value: 'total' },
+  { label: 'By Pending ↓', value: 'pending' },
+  { label: 'By Disposed ↓', value: 'disposed' },
+  { label: 'By Pend % ↓', value: 'pendPct' },
+  { label: 'A → Z', value: 'az' },
+  { label: 'Z → A', value: 'za' },
 ];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -178,18 +178,18 @@ export const HotspotsPage = () => {
     if (districtTableSort && districtTableSort.key) {
       const col = districtColumnsList.find(c => c.key === districtTableSort.key);
       const dirArrow = districtTableSort.dir === 'asc' ? '↑' : districtTableSort.dir === 'desc' ? '↓' : '';
-      return `sorted by ${col?.label || districtTableSort.key} ${dirArrow}`;
+      return `sorted ${col?.label || districtTableSort.key} ${dirArrow}`;
     }
-    return `sorted by ${SORT_OPTIONS.find(o => o.value === districtSort)?.label || 'By Total ↓'}`;
+    return `sorted ${SORT_OPTIONS.find(o => o.value === districtSort)?.label || 'By Total ↓'}`;
   };
 
   const getCategorySubtitle = () => {
     if (categoryTableSort && categoryTableSort.key) {
       const col = categoryColumnsList.find(c => c.key === categoryTableSort.key);
       const dirArrow = categoryTableSort.dir === 'asc' ? '↑' : categoryTableSort.dir === 'desc' ? '↓' : '';
-      return `sorted by ${col?.label || categoryTableSort.key} ${dirArrow}`;
+      return `sorted ${col?.label || categoryTableSort.key} ${dirArrow}`;
     }
-    return `sorted by ${SORT_OPTIONS.find(o => o.value === categorySort)?.label || 'By Total ↓'}`;
+    return `sorted ${SORT_OPTIONS.find(o => o.value === categorySort)?.label || 'By Total ↓'}`;
   };
 
   const { data: dd, isLoading: dl } = useQuery({
@@ -235,42 +235,42 @@ export const HotspotsPage = () => {
   // ── Column definitions ────────────────────────────────────────────────────
 
   const districtCols: Column<any>[] = [
-    { key: 'district',  label: 'District',          sortable: true },
-    { key: 'total',     label: 'Total',              sortable: true, align: 'right' },
-    { key: 'pending',   label: 'Pending',            sortable: true, align: 'right' },
-    { key: 'disposed',  label: 'Disposed',           sortable: true, align: 'right' },
-    { key: 'pendPct',   label: 'Pending %',          sortable: true, align: 'center' },
+    { key: 'district', label: 'District', sortable: true },
+    { key: 'total', label: 'Total', sortable: true, align: 'right' },
+    { key: 'pending', label: 'Pending', sortable: true, align: 'right' },
+    { key: 'disposed', label: 'Disposed', sortable: true, align: 'right' },
+    { key: 'pendPct', label: 'Pending %', sortable: true, align: 'center' },
   ];
 
   const categoryCols: Column<any>[] = [
-    { key: 'category',  label: 'Class of Incident',  sortable: true },
-    { key: 'total',     label: 'Total',              sortable: true, align: 'right' },
-    { key: 'pending',   label: 'Pending',            sortable: true, align: 'right' },
-    { key: 'disposed',  label: 'Disposed',           sortable: true, align: 'right' },
-    { key: 'pendPct',   label: 'Pending %',          sortable: true, align: 'center' },
+    { key: 'category', label: 'Class of Incident', sortable: true },
+    { key: 'total', label: 'Total', sortable: true, align: 'right' },
+    { key: 'pending', label: 'Pending', sortable: true, align: 'right' },
+    { key: 'disposed', label: 'Disposed', sortable: true, align: 'right' },
+    { key: 'pendPct', label: 'Pending %', sortable: true, align: 'center' },
   ];
 
   const renderDistrictRow = (c: Column<any>, row: any) => {
     if (c.key === 'district') return <span style={{ fontWeight: 500, fontSize: '13px' }}>{String(row.district)}</span>;
-    if (c.key === 'total')    return <span style={{ fontWeight: 600 }}>{row.total.toLocaleString()}</span>;
-    if (c.key === 'pending')  return <span style={{ color: '#fbbf24', fontWeight: 500 }}>{row.pending.toLocaleString()}</span>;
+    if (c.key === 'total') return <span style={{ fontWeight: 600 }}>{row.total.toLocaleString()}</span>;
+    if (c.key === 'pending') return <span style={{ color: '#fbbf24', fontWeight: 500 }}>{row.pending.toLocaleString()}</span>;
     if (c.key === 'disposed') return <span style={{ color: '#34d399', fontWeight: 500 }}>{row.disposed.toLocaleString()}</span>;
-    if (c.key === 'pendPct')  return <span className="status-badge pending">{row.pendPct}%</span>;
+    if (c.key === 'pendPct') return <span className="status-badge pending">{row.pendPct}%</span>;
     return String(row[c.key] ?? '-');
   };
 
   const renderCategoryRow = (c: Column<any>, row: any) => {
     if (c.key === 'category') return <span style={{ fontWeight: 500, fontSize: '13px' }}>{String(row.category)}</span>;
-    if (c.key === 'total')    return <span style={{ fontWeight: 600 }}>{row.total.toLocaleString()}</span>;
-    if (c.key === 'pending')  return <span style={{ color: '#fbbf24', fontWeight: 500 }}>{row.pending.toLocaleString()}</span>;
+    if (c.key === 'total') return <span style={{ fontWeight: 600 }}>{row.total.toLocaleString()}</span>;
+    if (c.key === 'pending') return <span style={{ color: '#fbbf24', fontWeight: 500 }}>{row.pending.toLocaleString()}</span>;
     if (c.key === 'disposed') return <span style={{ color: '#34d399', fontWeight: 500 }}>{row.disposed.toLocaleString()}</span>;
-    if (c.key === 'pendPct')  return <span className="status-badge pending">{row.pendPct}%</span>;
+    if (c.key === 'pendPct') return <span className="status-badge pending">{row.pendPct}%</span>;
     return String(row[c.key] ?? '-');
   };
 
   // Chart previews — top 25 of sorted, reversed so the bar chart reads highest at top
-  const districtChartData  = sortedDistrictRows.slice(0, 25).reverse();
-  const categoryChartData  = sortedCategoryRows.slice(0, 25).reverse();
+  const districtChartData = sortedDistrictRows.slice(0, 25).reverse();
+  const categoryChartData = sortedCategoryRows.slice(0, 25).reverse();
 
   return (
     <Layout>
