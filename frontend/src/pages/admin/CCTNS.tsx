@@ -5,6 +5,7 @@ import { Layout } from '@/components/layout/Layout';
 import { Button } from '@/components/common/Button';
 import { DataTable, Column } from '@/components/data/DataTable';
 import { cctnsApi } from '@/services/api';
+import { useFilters } from '@/contexts/FilterContext';
 
 type Tab = 'live' | 'synced' | 'history';
 
@@ -57,8 +58,23 @@ export const CCTNSPage = () => {
   const urlPsName         = searchParams.get('psName')           || '';
   const urlSearch         = searchParams.get('search')           || '';
 
-  // Derived: any global filter is active
-  const hasGlobalFilters = !!(urlStatusGroup || urlDistrict || urlDistrictIds || urlPsIds || urlOfficeIds || urlClassOfInc || urlFromDate || urlToDate || urlPendencyAge || urlDisposalAge || urlUnmappedPs || urlPsName || searchParams.get('search'));
+  // Global filters from FilterContext (set via the GlobalFilterBar in the header)
+  const { filters: ctxFilters, resetFilters: resetCtxFilters } = useFilters();
+
+  // Effective values: URL params take precedence (drill-down), otherwise fall back to FilterContext
+  const effDistrictIds    = urlDistrictIds    || ctxFilters.districtIds;
+  const effPsIds          = urlPsIds          || ctxFilters.policeStationIds;
+  const effOfficeIds      = urlOfficeIds      || ctxFilters.officeIds;
+  const effClassOfInc     = urlClassOfInc     || ctxFilters.classOfIncident;
+  const effFromDate       = urlFromDate       || ctxFilters.fromDate;
+  const effToDate         = urlToDate         || ctxFilters.toDate;
+
+  // Derived: any global filter is active (URL-based OR context-based)
+  const hasGlobalFilters = !!(
+    urlStatusGroup || urlDistrict || effDistrictIds || effPsIds || effOfficeIds ||
+    effClassOfInc || effFromDate || effToDate ||
+    urlPendencyAge || urlDisposalAge || urlUnmappedPs || urlPsName || searchParams.get('search')
+  );
 
   // Map special values: 'all' -> no status filter, 'disposed_missing_date' -> handled separately
   const resolvedInitialStatus = urlStatusGroup === 'all' ? '' :
@@ -201,8 +217,9 @@ export const CCTNSPage = () => {
       filterDateTo,
       sortBy,
       sortOrder,
-      // Global filters come from URL directly — include in key so query re-runs on navigation
-      urlDistrictIds, urlDistrict, urlPsIds, urlOfficeIds, urlClassOfInc, urlFromDate, urlToDate, urlPendencyAge, urlDisposalAge, urlUnmappedPs, urlPsName,
+      // Include effective filters (URL + context) so query re-runs when either changes
+      effDistrictIds, effPsIds, effOfficeIds, effClassOfInc, effFromDate, effToDate,
+      urlDistrict, urlPendencyAge, urlDisposalAge, urlUnmappedPs, urlPsName,
     ],
     queryFn: () =>
       cctnsApi.listPaginated({
@@ -216,16 +233,17 @@ export const CCTNSPage = () => {
         dateTo: filterDateTo || undefined,
         sortBy,
         sortOrder,
-        // Forward global dashboard filters unchanged — backend applies them via buildPrismaWhereClause
-        districtIds:      urlDistrictIds || undefined,
-        officeIds:        urlOfficeIds   || undefined,
-        classOfIncident:  urlClassOfInc  || undefined,
-        fromDate:         urlFromDate    || undefined,
-        toDate:           urlToDate      || undefined,
-        pendencyAge:      urlPendencyAge || undefined,
-        disposalAge:      urlDisposalAge || undefined,
-        unmappedPs:       urlUnmappedPs  || undefined,
-        psName:           urlPsName      || undefined,
+        // Forward effective filters (URL params take priority over FilterContext)
+        districtIds:      effDistrictIds  || undefined,
+        policeStationIds: effPsIds        || undefined,
+        officeIds:        effOfficeIds    || undefined,
+        classOfIncident:  effClassOfInc   || undefined,
+        fromDate:         effFromDate     || undefined,
+        toDate:           effToDate       || undefined,
+        pendencyAge:      urlPendencyAge  || undefined,
+        disposalAge:      urlDisposalAge  || undefined,
+        unmappedPs:       urlUnmappedPs   || undefined,
+        psName:           urlPsName       || undefined,
       }),
     enabled: activeTab === 'synced',
     staleTime: 0,
@@ -603,8 +621,12 @@ export const CCTNSPage = () => {
 
   const resetFilters = () => {
     if (hasGlobalFilters) {
+      // If URL-based filters are active → navigate to clear them
+      // Also reset the FilterContext (GlobalFilterBar) selections
+      resetCtxFilters();
       navigate('/admin/cctns?tab=synced');
     } else {
+      // Only local filters active
       setSearchQuery('');
       setFilterDistrict('');
       setFilterStatus('');
@@ -954,6 +976,12 @@ export const CCTNSPage = () => {
                       urlStatusGroup && `Status: ${urlStatusGroup === 'pending' ? 'Pending' : urlStatusGroup === 'disposed' ? 'Disposed' : urlStatusGroup === 'unknown' ? 'Unknown' : urlStatusGroup === 'all' ? 'All' : urlStatusGroup}`,
                       urlDistrict       && `District: ${urlDistrict}`,
                       (urlPsIds || urlPsName) && `Police Station: ${urlPsName || `ID: ${urlPsIds}`}`,
+                      effDistrictIds    && !urlDistrict && `Districts (Filter): ${effDistrictIds}`,
+                      effPsIds          && !urlPsIds    && `Police Stations (Filter): ${effPsIds}`,
+                      effOfficeIds                     && `Offices (Filter): ${effOfficeIds}`,
+                      effClassOfInc                    && `Class: ${effClassOfInc}`,
+                      effFromDate                      && `From: ${effFromDate}`,
+                      effToDate                        && `To: ${effToDate}`,
                       urlPendencyAge && (urlPendencyAge === 'u7' ? 'Pendency: < 7 Days' :
                                          urlPendencyAge === 'u15' ? 'Pendency: 7 - 15 Days' :
                                          urlPendencyAge === 'u30' ? 'Pendency: 15 - 30 Days' :
