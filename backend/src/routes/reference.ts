@@ -1,6 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../config/database.js';
-import { sendSuccess, sendError } from '../utils/response.js';
+import { sendSuccess, sendError, sendCached } from '../utils/response.js';
 import { authenticate } from '../middleware/auth.js';
 import { syncDistricts, syncOffices, syncPoliceStationsByDistrict } from './government.js';
 import { runMasterSync } from '../services/masterSync.js';
@@ -42,13 +42,18 @@ const ensureMasterData = async () => {
 
 const getDistinctClassOfIncident = async () => {
   const complaints = await prisma.complaint.findMany({
-    where: { classOfIncident: { not: '' } },
+    where: {
+      classOfIncident: {
+        not: null,         // exclude NULL rows
+        notIn: ['', ' '], // exclude blank/whitespace-only
+      },
+    },
     select: { classOfIncident: true },
     distinct: ['classOfIncident'],
   });
   return complaints
     .map((row) => row.classOfIncident)
-    .filter((value): value is string => !!value)
+    .filter((value): value is string => typeof value === 'string' && value.trim().length > 0)
     .sort((a, b) => a.localeCompare(b));
 };
 
@@ -156,7 +161,8 @@ export const referenceRoutes = async (fastify: FastifyInstance) => {
   fastify.get('/reference/crime-category', {
     preHandler: [authenticate],
   }, async (_request, reply) => {
-    return sendSuccess(reply, await getDistinctClassOfIncident());
+    const data = await getDistinctClassOfIncident();
+    return sendCached(reply, data, 300); // 5-min edge cache — avoids full-table distinct scan on every hover
   });
 
   fastify.get('/reference/complaint-type', {

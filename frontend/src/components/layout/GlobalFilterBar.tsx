@@ -284,17 +284,17 @@ export const GlobalFilterBar = () => {
     queryFn: () => referenceApi.districts(),
     staleTime: 10 * 60 * 1000,
   });
-  const { data: policeStations, isFetching: psFetching } = useQuery({
+  const { data: policeStations, isLoading: psLoading } = useQuery({
     queryKey: ['filter-police-stations', filters.districtIds],
     queryFn: () => referenceApi.policeStations(filters.districtIds || undefined),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: offices, isFetching: officeFetching } = useQuery({
+  const { data: offices, isLoading: officeLoading } = useQuery({
     queryKey: ['filter-offices', filters.districtIds, filters.policeStationIds],
     queryFn: () => referenceApi.offices({ districtIds: filters.districtIds || undefined, policeStationIds: filters.policeStationIds || undefined }),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: classes } = useQuery({
+  const { data: classes, isLoading: classLoading } = useQuery({
     queryKey: ['filter-class-of-incident'],
     queryFn: () => referenceApi.crimeCategory(),
     staleTime: 10 * 60 * 1000,
@@ -307,7 +307,11 @@ export const GlobalFilterBar = () => {
   const officeOptions   = useMemo<Option[]>(() =>
     (offices?.data || []).map((o: any) => ({ id: String(o.id), label: String(o.name) })), [offices]);
   const classOptions    = useMemo<Option[]>(() =>
-    (classes?.data || []).filter(Boolean).map((v: string) => ({ id: v, label: v })), [classes]);
+    (classes?.data || [])
+      .filter((v: unknown): v is string => typeof v === 'string' && v.trim().length > 0)
+      .map((v: string) => ({ id: v, label: v })),
+    [classes]
+  );
 
   // Cascade prune
   useEffect(() => {
@@ -389,7 +393,7 @@ export const GlobalFilterBar = () => {
           label="Police Station" icon={<PSIcon />}
           isOpen={stationOpen} toggle={() => { closeAll(); setStationOpen(true); }}
           allLabel={selectedDistrictIds.length ? 'All in District' : 'All Stations'}
-          selectedIds={selectedStationIds} items={stationOptions} loading={psFetching}
+          selectedIds={selectedStationIds} items={stationOptions} loading={psLoading}
           onAllClick={() => { setFilter('policeStationIds',''); setFilter('officeIds',''); }}
           onToggleItem={id => setFilter('policeStationIds', toggleCsv(selectedStationIds, id).join(','))}
           onMouseEnter={() => setStationOpen(true)}
@@ -405,7 +409,7 @@ export const GlobalFilterBar = () => {
           label="Office" icon={<OfficeIcon />}
           isOpen={officeOpen} toggle={() => { closeAll(); setOfficeOpen(true); }}
           allLabel={selectedDistrictIds.length || selectedStationIds.length ? 'All in Selection' : 'All Offices'}
-          selectedIds={selectedOfficeIds} items={officeOptions} loading={officeFetching}
+          selectedIds={selectedOfficeIds} items={officeOptions} loading={officeLoading}
           onAllClick={() => setFilter('officeIds','')}
           onToggleItem={id => setFilter('officeIds', toggleCsv(selectedOfficeIds, id).join(','))}
           onMouseEnter={() => setOfficeOpen(true)}
@@ -421,6 +425,7 @@ export const GlobalFilterBar = () => {
           label="Class of Incident" icon={<ClassIcon />}
           isOpen={classOpen} toggle={() => { closeAll(); setClassOpen(true); }}
           allLabel="All Classes" selectedIds={selectedClassValues} items={classOptions}
+          loading={classLoading}
           onAllClick={() => setFilter('classOfIncident','')}
           onToggleItem={v => setFilter('classOfIncident', toggleCsv(selectedClassValues, v).join(','))}
           onMouseEnter={() => setClassOpen(true)}
