@@ -3,468 +3,458 @@ import { useFilters } from '../../contexts/FilterContext';
 import { useQuery } from '@tanstack/react-query';
 import { referenceApi } from '../../services/api';
 
-type Option = {
-  id: string;
-  label: string;
-};
+type Option = { id: string; label: string };
+const parseCsv = (v: string) => v.split(',').map(s => s.trim()).filter(Boolean);
 
-const parseCsv = (value: string) => value.split(',').map((item) => item.trim()).filter(Boolean);
+// ── Icons ─────────────────────────────────────────────────────────────────────
+const ChevronIcon = ({ open }: { open: boolean }) => (
+  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+    style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', flexShrink: 0 }}>
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+);
+const CheckIcon = () => (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>
+);
+const CalIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+    <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+    <line x1="3" y1="10" x2="21" y2="10"/>
+  </svg>
+);
 
+// ── MultiSelect dropdown ───────────────────────────────────────────────────────
 const MultiSelectDropdown = ({
-  isOpen,
-  toggle,
-  allLabel,
-  selectedIds,
-  items,
-  onAllClick,
-  onToggleItem,
-  disabled,
-  disabledHint,
-  onMouseEnter,
-  onMouseLeave,
+  label, icon, isOpen, toggle, allLabel, selectedIds, items,
+  onAllClick, onToggleItem, disabled, disabledHint, onMouseEnter, onMouseLeave, loading,
 }: {
-  isOpen: boolean;
-  toggle: () => void;
-  allLabel: string;
-  selectedIds: string[];
-  items: Option[];
-  onAllClick: () => void;
-  onToggleItem: (id: string) => void;
-  disabled?: boolean;
-  disabledHint?: string;
-  onMouseEnter?: () => void;
-  onMouseLeave?: () => void;
+  label: string; icon?: React.ReactNode; isOpen: boolean; toggle: () => void;
+  allLabel: string; selectedIds: string[]; items: Option[];
+  onAllClick: () => void; onToggleItem: (id: string) => void;
+  disabled?: boolean; disabledHint?: string;
+  onMouseEnter?: () => void; onMouseLeave?: () => void; loading?: boolean;
 }) => {
-  const [searchText, setSearchText] = useState('');
+  const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const count = selectedIds.length;
 
-  // Auto-focus search input when dropdown opens; reset search when it closes
   useEffect(() => {
-    if (isOpen) {
-      setSearchText('');
-      setTimeout(() => searchRef.current?.focus(), 50);
-    }
+    if (isOpen) { setSearch(''); setTimeout(() => searchRef.current?.focus(), 60); }
   }, [isOpen]);
 
-  const filteredItems = useMemo(() => {
-    const q = searchText.trim().toLowerCase();
-    return q ? items.filter(item => item.label.toLowerCase().includes(q)) : items;
-  }, [items, searchText]);
-
-  const selectedLabels = items
-    .filter((item) => selectedIds.includes(item.id))
-    .map((item) => item.label);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return q ? items.filter(i => i.label.toLowerCase().includes(q)) : items;
+  }, [items, search]);
 
   const displayText = disabled
     ? (disabledHint ?? allLabel)
-    : selectedIds.length === 0
-      ? allLabel
-      : selectedIds.length === 1
-        ? selectedLabels[0] || `${selectedIds.length} Selected`
-        : `${selectedIds.length} Selected`;
+    : count === 0 ? allLabel
+    : count === 1 ? (items.find(i => i.id === selectedIds[0])?.label ?? `1 selected`)
+    : `${count} selected`;
+
+  const hasValue = !disabled && count > 0;
 
   return (
     <>
-      <select
-        className="filter-input"
-        value="__custom__"
-        onClick={(e) => {
-          if (disabled) return;
-          e.preventDefault();
-          toggle();
-        }}
-        onMouseEnter={() => {
-          if (disabled) return;
-          toggle();
-        }}
-        onMouseLeave={() => {
-          // Delay hiding to allow moving to dropdown
-          setTimeout(() => {
-            // Only close if not hovering the dropdown
-          }, 200);
-        }}
-        onMouseDown={(e) => e.preventDefault()}
-        onChange={() => {}}
-        style={{
-          cursor: disabled ? 'not-allowed' : 'pointer',
-          minWidth: '100px',
-          opacity: disabled ? 0.5 : 1,
-        }}
+      {/* Trigger button */}
+      <button
+        onClick={() => { if (!disabled) toggle(); }}
+        disabled={disabled}
         title={disabled ? (disabledHint ?? '') : ''}
+        onMouseEnter={e => {
+          if (disabled) return;
+          const el = e.currentTarget;
+          if (!hasValue && !isOpen) {
+            el.style.background = 'rgba(99,102,241,0.1)';
+            el.style.borderColor = '#475569';
+            el.style.color = '#e2e8f0';
+          }
+        }}
+        onMouseLeave={e => {
+          if (disabled) return;
+          const el = e.currentTarget;
+          if (!hasValue && !isOpen) {
+            el.style.background = 'rgba(255,255,255,0.05)';
+            el.style.borderColor = '#2d3f55';
+            el.style.color = '#cbd5e1';
+          }
+        }}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '5px 11px', cursor: disabled ? 'not-allowed' : 'pointer',
+          background: hasValue
+            ? 'linear-gradient(135deg,rgba(99,102,241,0.22),rgba(139,92,246,0.16))'
+            : isOpen
+              ? 'rgba(99,102,241,0.1)'
+              : 'rgba(255,255,255,0.05)',
+          border: hasValue
+            ? '1px solid rgba(99,102,241,0.65)'
+            : isOpen
+              ? '1px solid #4f6272'
+              : '1px solid #2d3f55',
+          borderRadius: 8,
+          color: hasValue ? '#c4b5fd' : isOpen ? '#e2e8f0' : '#cbd5e1',
+          fontSize: 12, fontWeight: hasValue ? 600 : 500,
+          whiteSpace: 'nowrap', minWidth: 108, maxWidth: 185,
+          transition: 'all 0.18s', outline: 'none',
+          opacity: disabled ? 0.4 : 1,
+          boxShadow: hasValue
+            ? '0 0 0 1px rgba(99,102,241,0.25),0 2px 10px rgba(99,102,241,0.2)'
+            : isOpen
+              ? '0 0 0 1px rgba(99,102,241,0.15)'
+              : 'none',
+        }}
       >
-        <option value="__custom__">{displayText}</option>
-      </select>
+        <span style={{ color: hasValue ? '#a78bfa' : isOpen ? '#818cf8' : '#64748b', flexShrink: 0 }}>{icon}</span>
+        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>{displayText}</span>
+        {loading && (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+            style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0, color: '#94a3b8' }}>
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.3"/>
+            <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+          </svg>
+        )}
+        {count > 0 && !loading && (
+          <span style={{
+            background: 'linear-gradient(135deg,rgba(99,102,241,0.5),rgba(139,92,246,0.4))',
+            color: '#e0d9ff', borderRadius: 10, padding: '1px 6px',
+            fontSize: 10, fontWeight: 700, flexShrink: 0,
+            boxShadow: '0 1px 4px rgba(99,102,241,0.3)',
+          }}>{count}</span>
+        )}
+        <ChevronIcon open={isOpen} />
+      </button>
 
+      {/* Dropdown panel */}
       {isOpen && !disabled && (
         <div
-          onMouseEnter={onMouseEnter}
-          onMouseLeave={onMouseLeave}
+          onMouseEnter={onMouseEnter} onMouseLeave={onMouseLeave}
           style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            marginTop: '4px',
-            backgroundColor: '#0f172a',
-            border: '1px solid #334155',
-            borderRadius: '6px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-            zIndex: 9999,
-            minWidth: '240px',
+            position: 'absolute', top: 'calc(100% + 6px)', left: 0,
+            minWidth: 240, maxWidth: 320,
+            background: 'linear-gradient(180deg,#0f172a 0%,#0a0f1e 100%)',
+            border: '1px solid rgba(99,102,241,0.25)',
+            borderRadius: 10, zIndex: 9999,
+            boxShadow: '0 16px 40px rgba(0,0,0,0.6),0 0 0 1px rgba(99,102,241,0.1)',
+            overflow: 'hidden',
           }}
         >
-          {/* ── Sticky search box ── */}
-          <div style={{
-            padding: '6px 8px',
-            borderBottom: '1px solid #1e293b',
-            position: 'sticky',
-            top: 0,
-            backgroundColor: '#0f172a',
-            zIndex: 1,
-          }}>
-            <input
-              ref={searchRef}
-              type="text"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Search..."
-              onMouseDown={(e) => e.stopPropagation()}
-              style={{
-                width: '100%',
-                padding: '4px 8px',
-                fontSize: '12px',
-                backgroundColor: '#1e293b',
-                border: '1px solid #334155',
-                borderRadius: '4px',
-                color: '#e2e8f0',
-                outline: 'none',
-                boxSizing: 'border-box',
+          {/* Search */}
+          <div style={{ padding: '8px 8px 6px', borderBottom: '1px solid #1e293b', background: '#0f172a' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6,
+              background: '#1e293b', border: '1px solid #334155', borderRadius: 6, padding: '4px 8px' }}>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2.5">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+              </svg>
+              <input ref={searchRef} type="text" value={search} onChange={e => setSearch(e.target.value)}
+                placeholder={`Search ${label.toLowerCase()}…`}
+                onMouseDown={e => e.stopPropagation()}
+                style={{ flex: 1, background: 'none', border: 'none', outline: 'none',
+                  fontSize: 12, color: '#e2e8f0', minWidth: 0 }}
+              />
+            </div>
+          </div>
+
+          {/* List */}
+          <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+            {!search && (
+              <div onClick={onAllClick} style={{
+                display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
+                cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                color: count === 0 ? '#818cf8' : '#64748b',
+                borderBottom: '1px solid #1e293b',
+                background: count === 0 ? 'rgba(99,102,241,0.08)' : 'transparent',
+                transition: 'background 0.15s',
               }}
-            />
-          </div>
-
-          {/* ── Scrollable list ── */}
-          <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-            {/* "All" option — only visible when no search is active */}
-            {!searchText && (
-              <label
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  fontSize: '13px',
-                  color: '#e2e8f0',
-                  borderBottom: '1px solid #1e293b',
-                }}
-                onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
-                onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                onMouseEnter={e => { if (count !== 0) (e.currentTarget as HTMLElement).style.background = '#1e293b'; }}
+                onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = count === 0 ? 'rgba(99,102,241,0.08)' : 'transparent'; }}
               >
-                <input type="checkbox" checked={selectedIds.length === 0} onChange={onAllClick} style={{ accentColor: '#3b82f6' }} />
+                <span style={{
+                  width: 14, height: 14, borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: count === 0 ? '2px solid #6366f1' : '2px solid #334155',
+                  background: count === 0 ? '#6366f1' : 'transparent',
+                }}>{count === 0 && <CheckIcon />}</span>
                 {allLabel}
-              </label>
-            )}
-
-            {filteredItems.length === 0 ? (
-              <div style={{ padding: '10px', color: '#64748b', fontSize: '12px', textAlign: 'center' }}>
-                No results for &ldquo;{searchText}&rdquo;
               </div>
-            ) : (
-              filteredItems.map((item) => (
-                <label
-                  key={item.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '5px 10px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    color: '#e2e8f0',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#1e293b')}
-                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(item.id)}
-                    onChange={() => onToggleItem(item.id)}
-                    style={{ accentColor: '#3b82f6' }}
-                  />
-                  {item.label}
-                </label>
-              ))
             )}
+            {filtered.length === 0 ? (
+              <div style={{ padding: '12px 12px', color: '#475569', fontSize: 11, textAlign: 'center' }}>
+                No results for "{search}"
+              </div>
+            ) : filtered.map(item => {
+              const sel = selectedIds.includes(item.id);
+              return (
+                <div key={item.id} onClick={() => onToggleItem(item.id)} style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '6px 12px',
+                  cursor: 'pointer', fontSize: 12,
+                  color: sel ? '#c7d2fe' : '#cbd5e1',
+                  background: sel ? 'rgba(99,102,241,0.1)' : 'transparent',
+                  transition: 'background 0.12s',
+                }}
+                  onMouseEnter={e => { if (!sel) (e.currentTarget as HTMLElement).style.background = '#1e293b'; }}
+                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = sel ? 'rgba(99,102,241,0.1)' : 'transparent'; }}
+                >
+                  <span style={{
+                    width: 14, height: 14, borderRadius: 4, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    border: sel ? '2px solid #6366f1' : '2px solid #334155',
+                    background: sel ? '#6366f1' : 'transparent', transition: 'all 0.15s',
+                  }}>{sel && <CheckIcon />}</span>
+                  {item.label}
+                </div>
+              );
+            })}
           </div>
+
+          {count > 0 && (
+            <div style={{ borderTop: '1px solid #1e293b', padding: '5px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button onClick={onAllClick} style={{
+                background: 'none', border: 'none', color: '#ef4444', fontSize: 11,
+                cursor: 'pointer', padding: '2px 6px', borderRadius: 4,
+              }}>Clear {count} selected</button>
+            </div>
+          )}
         </div>
       )}
     </>
   );
 };
 
+
+// ── Icons for each filter ──────────────────────────────────────────────────────
+const DistrictIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+  </svg>
+);
+const PSIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+);
+const OfficeIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
+  </svg>
+);
+const ClassIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M4 6h16M4 12h16M4 18h7"/>
+  </svg>
+);
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 export const GlobalFilterBar = () => {
   const { filters, setFilter, resetFilters } = useFilters();
-  const [districtDropdownOpen, setDistrictDropdownOpen] = useState(false);
-  const [stationDropdownOpen,  setStationDropdownOpen]  = useState(false);
-  const [officeDropdownOpen,   setOfficeDropdownOpen]   = useState(false);
-  const [classDropdownOpen,    setClassDropdownOpen]    = useState(false);
+  const [districtOpen, setDistrictOpen] = useState(false);
+  const [stationOpen,  setStationOpen]  = useState(false);
+  const [officeOpen,   setOfficeOpen]   = useState(false);
+  const [classOpen,    setClassOpen]    = useState(false);
 
   const districtRef = useRef<HTMLDivElement>(null);
   const stationRef  = useRef<HTMLDivElement>(null);
   const officeRef   = useRef<HTMLDivElement>(null);
   const classRef    = useRef<HTMLDivElement>(null);
 
-  // Close all dropdowns on outside click
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (districtRef.current && !districtRef.current.contains(event.target as Node)) setDistrictDropdownOpen(false);
-      if (stationRef.current  && !stationRef.current.contains(event.target as Node))  setStationDropdownOpen(false);
-      if (officeRef.current   && !officeRef.current.contains(event.target as Node))   setOfficeDropdownOpen(false);
-      if (classRef.current    && !classRef.current.contains(event.target as Node))    setClassDropdownOpen(false);
+    const handler = (e: MouseEvent) => {
+      if (districtRef.current && !districtRef.current.contains(e.target as Node)) setDistrictOpen(false);
+      if (stationRef.current  && !stationRef.current.contains(e.target as Node))  setStationOpen(false);
+      if (officeRef.current   && !officeRef.current.contains(e.target as Node))   setOfficeOpen(false);
+      if (classRef.current    && !classRef.current.contains(e.target as Node))    setClassOpen(false);
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const selectedDistrictIds = parseCsv(filters.districtIds);
-  const selectedStationIds  = parseCsv(filters.policeStationIds);
-  const selectedOfficeIds   = parseCsv(filters.officeIds);
-  const selectedClassValues = parseCsv(filters.classOfIncident);
+  const selectedDistrictIds  = parseCsv(filters.districtIds);
+  const selectedStationIds   = parseCsv(filters.policeStationIds);
+  const selectedOfficeIds    = parseCsv(filters.officeIds);
+  const selectedClassValues  = parseCsv(filters.classOfIncident);
 
-  const toggleCsvValue = (selected: string[], value: string) =>
-    selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value];
+  const toggleCsv = (sel: string[], val: string) =>
+    sel.includes(val) ? sel.filter(v => v !== val) : [...sel, val];
 
-  // ── Reference data queries (hierarchically cascaded) ──────────────────────
-
+  // Reference data
   const { data: districts } = useQuery({
     queryKey: ['filter-districts'],
     queryFn: () => referenceApi.districts(),
     staleTime: 10 * 60 * 1000,
   });
-
-  // Police stations: only load PS from selected districts (if any)
   const { data: policeStations, isFetching: psFetching } = useQuery({
     queryKey: ['filter-police-stations', filters.districtIds],
     queryFn: () => referenceApi.policeStations(filters.districtIds || undefined),
     staleTime: 5 * 60 * 1000,
   });
-
-  // Offices: derive from complaint data scoped to selected district + PS
-  // Falls back to all offices when no district/PS is selected
   const { data: offices, isFetching: officeFetching } = useQuery({
     queryKey: ['filter-offices', filters.districtIds, filters.policeStationIds],
-    queryFn: () =>
-      referenceApi.offices({
-        districtIds:      filters.districtIds      || undefined,
-        policeStationIds: filters.policeStationIds || undefined,
-      }),
+    queryFn: () => referenceApi.offices({ districtIds: filters.districtIds || undefined, policeStationIds: filters.policeStationIds || undefined }),
     staleTime: 5 * 60 * 1000,
   });
-
   const { data: classes } = useQuery({
     queryKey: ['filter-class-of-incident'],
     queryFn: () => referenceApi.crimeCategory(),
     staleTime: 10 * 60 * 1000,
   });
 
-  // ── Option lists ───────────────────────────────────────────────────────────
+  const districtOptions = useMemo<Option[]>(() =>
+    (districts?.data || []).map((d: any) => ({ id: String(d.id), label: String(d.name) })), [districts]);
+  const stationOptions  = useMemo<Option[]>(() =>
+    (policeStations?.data || []).map((ps: any) => ({ id: String(ps.id), label: String(ps.name) })), [policeStations]);
+  const officeOptions   = useMemo<Option[]>(() =>
+    (offices?.data || []).map((o: any) => ({ id: String(o.id), label: String(o.name) })), [offices]);
+  const classOptions    = useMemo<Option[]>(() =>
+    (classes?.data || []).filter(Boolean).map((v: string) => ({ id: v, label: v })), [classes]);
 
-  const districtOptions = useMemo<Option[]>(
-    () => (districts?.data || []).map((d: any) => ({ id: String(d.id), label: String(d.name) })),
-    [districts]
-  );
-
-  const stationOptions = useMemo<Option[]>(
-    () => (policeStations?.data || []).map((ps: any) => ({ id: String(ps.id), label: String(ps.name) })),
-    [policeStations]
-  );
-
-  const officeOptions = useMemo<Option[]>(
-    () => (offices?.data || []).map((o: any) => ({ id: String(o.id), label: String(o.name) })),
-    [offices]
-  );
-
-  const classOptions = useMemo<Option[]>(
-    () => (classes?.data || []).filter(Boolean).map((value: string) => ({ id: value, label: value })),
-    [classes]
-  );
-
-  // ── Cascade cleanup: prune selections that are no longer valid ─────────────
-
-  // When district changes → prune any PS not in the new station list
+  // Cascade prune
   useEffect(() => {
-    if (selectedStationIds.length === 0) return;
-    const valid = new Set(stationOptions.map((item) => item.id));
-    const pruned = selectedStationIds.filter((id) => valid.has(id));
-    if (pruned.length !== selectedStationIds.length) {
-      setFilter('policeStationIds', pruned.join(','));
-    }
-  }, [filters.districtIds, stationOptions]);   // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selectedStationIds.length) return;
+    const valid = new Set(stationOptions.map(i => i.id));
+    const pruned = selectedStationIds.filter(id => valid.has(id));
+    if (pruned.length !== selectedStationIds.length) setFilter('policeStationIds', pruned.join(','));
+  }, [filters.districtIds, stationOptions]); // eslint-disable-line
 
-  // When district or PS changes → prune offices not in the new office list
   useEffect(() => {
-    if (selectedOfficeIds.length === 0) return;
-    const valid = new Set(officeOptions.map((item) => item.id));
-    const pruned = selectedOfficeIds.filter((id) => valid.has(id));
-    if (pruned.length !== selectedOfficeIds.length) {
-      setFilter('officeIds', pruned.join(','));
-    }
-  }, [filters.districtIds, filters.policeStationIds, officeOptions]);   // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selectedOfficeIds.length) return;
+    const valid = new Set(officeOptions.map(i => i.id));
+    const pruned = selectedOfficeIds.filter(id => valid.has(id));
+    if (pruned.length !== selectedOfficeIds.length) setFilter('officeIds', pruned.join(','));
+  }, [filters.districtIds, filters.policeStationIds, officeOptions]); // eslint-disable-line
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
-  const closeAll = () => {
-    setDistrictDropdownOpen(false);
-    setStationDropdownOpen(false);
-    setOfficeDropdownOpen(false);
-    setClassDropdownOpen(false);
-  };
+  const closeAll = () => { setDistrictOpen(false); setStationOpen(false); setOfficeOpen(false); setClassOpen(false); };
+
+  const hasAnyFilter = selectedDistrictIds.length > 0 || selectedStationIds.length > 0 ||
+    selectedOfficeIds.length > 0 || selectedClassValues.length > 0 ||
+    filters.fromDate || filters.toDate;
+
+  const totalActiveFilters = selectedDistrictIds.length + selectedStationIds.length +
+    selectedOfficeIds.length + selectedClassValues.length +
+    (filters.fromDate ? 1 : 0) + (filters.toDate ? 1 : 0);
 
   return (
     <div className="global-filter-bar">
 
-      {/* Date Range */}
-      <div className="filter-group">
-        <label>Date Range</label>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <input
-            type="date"
-            value={filters.fromDate}
-            onChange={(e) => setFilter('fromDate', e.target.value)}
-            onClick={(e) => 'showPicker' in HTMLInputElement.prototype && e.currentTarget.showPicker()}
-            onMouseEnter={(e) => {
-              if ('showPicker' in e.currentTarget) {
-                e.currentTarget.showPicker();
-              }
-            }}
+      {/* ── Date Range ─────────────────────────────────────────────────────── */}
+      <div className="filter-group" style={{ gap: 6 }}>
+        <span style={{ color: '#475569', flexShrink: 0 }}><CalIcon /></span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <input type="date" value={filters.fromDate}
+            onChange={e => setFilter('fromDate', e.target.value)}
+            onClick={e => 'showPicker' in HTMLInputElement.prototype && (e.currentTarget as any).showPicker()}
             className="filter-input date-input"
             style={{ cursor: 'pointer' }}
           />
-          <span style={{ color: '#94a3b8', alignSelf: 'center' }}>-</span>
-          <input
-            type="date"
-            value={filters.toDate}
-            onChange={(e) => setFilter('toDate', e.target.value)}
-            onClick={(e) => 'showPicker' in HTMLInputElement.prototype && e.currentTarget.showPicker()}
-            onMouseEnter={(e) => {
-              if ('showPicker' in e.currentTarget) {
-                e.currentTarget.showPicker();
-              }
-            }}
+          <span style={{ color: '#334155', fontSize: 12 }}>→</span>
+          <input type="date" value={filters.toDate}
+            onChange={e => setFilter('toDate', e.target.value)}
+            onClick={e => 'showPicker' in HTMLInputElement.prototype && (e.currentTarget as any).showPicker()}
             className="filter-input date-input"
             style={{ cursor: 'pointer' }}
           />
         </div>
+        {(filters.fromDate || filters.toDate) && (
+          <button onClick={() => { setFilter('fromDate',''); setFilter('toDate',''); }}
+            style={{ background:'none',border:'none',color:'#475569',cursor:'pointer',fontSize:14,padding:'0 2px',lineHeight:1 }}>
+            ×
+          </button>
+        )}
       </div>
 
-      {/* District (always fully loaded) */}
-      <div 
-        className="filter-group" 
-        ref={districtRef} 
-        style={{ position: 'relative' }}
-        onMouseEnter={() => { closeAll(); setDistrictDropdownOpen(true); }}
-        onMouseLeave={() => { /* Don't close on group leave, let dropdown handle it */ }}
-      >
-        <label>District</label>
+      {/* Separator */}
+      <div style={{ width: 1, height: 20, background: '#1e293b', flexShrink: 0 }} />
+
+      {/* ── District ───────────────────────────────────────────────────────── */}
+      <div ref={districtRef} className="filter-group" style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setDistrictOpen(true); }}>
+        <span className="filter-group-label">District</span>
         <MultiSelectDropdown
-          isOpen={districtDropdownOpen}
-          toggle={() => { closeAll(); setDistrictDropdownOpen(true); }}
-          allLabel="All Districts"
-          selectedIds={selectedDistrictIds}
-          items={districtOptions}
-          onAllClick={() => {
-            setFilter('districtIds', '');
-            setFilter('policeStationIds', '');
-            setFilter('officeIds', '');
+          label="District" icon={<DistrictIcon />}
+          isOpen={districtOpen} toggle={() => { closeAll(); setDistrictOpen(true); }}
+          allLabel="All Districts" selectedIds={selectedDistrictIds} items={districtOptions}
+          onAllClick={() => { setFilter('districtIds',''); setFilter('policeStationIds',''); setFilter('officeIds',''); }}
+          onToggleItem={id => setFilter('districtIds', toggleCsv(selectedDistrictIds, id).join(','))}
+          onMouseEnter={() => setDistrictOpen(true)}
+          onMouseLeave={() => setTimeout(() => setDistrictOpen(false), 400)}
+        />
+      </div>
+
+      {/* ── Police Station ─────────────────────────────────────────────────── */}
+      <div ref={stationRef} className="filter-group" style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setStationOpen(true); }}>
+        <span className="filter-group-label">PS</span>
+        <MultiSelectDropdown
+          label="Police Station" icon={<PSIcon />}
+          isOpen={stationOpen} toggle={() => { closeAll(); setStationOpen(true); }}
+          allLabel={selectedDistrictIds.length ? 'All in District' : 'All Stations'}
+          selectedIds={selectedStationIds} items={stationOptions} loading={psFetching}
+          onAllClick={() => { setFilter('policeStationIds',''); setFilter('officeIds',''); }}
+          onToggleItem={id => setFilter('policeStationIds', toggleCsv(selectedStationIds, id).join(','))}
+          onMouseEnter={() => setStationOpen(true)}
+          onMouseLeave={() => setTimeout(() => setStationOpen(false), 400)}
+        />
+      </div>
+
+      {/* ── Office ─────────────────────────────────────────────────────────── */}
+      <div ref={officeRef} className="filter-group" style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setOfficeOpen(true); }}>
+        <span className="filter-group-label">Office</span>
+        <MultiSelectDropdown
+          label="Office" icon={<OfficeIcon />}
+          isOpen={officeOpen} toggle={() => { closeAll(); setOfficeOpen(true); }}
+          allLabel={selectedDistrictIds.length || selectedStationIds.length ? 'All in Selection' : 'All Offices'}
+          selectedIds={selectedOfficeIds} items={officeOptions} loading={officeFetching}
+          onAllClick={() => setFilter('officeIds','')}
+          onToggleItem={id => setFilter('officeIds', toggleCsv(selectedOfficeIds, id).join(','))}
+          onMouseEnter={() => setOfficeOpen(true)}
+          onMouseLeave={() => setTimeout(() => setOfficeOpen(false), 400)}
+        />
+      </div>
+
+      {/* ── Class of Incident ──────────────────────────────────────────────── */}
+      <div ref={classRef} className="filter-group" style={{ position: 'relative' }}
+        onMouseEnter={() => { closeAll(); setClassOpen(true); }}>
+        <span className="filter-group-label">Class</span>
+        <MultiSelectDropdown
+          label="Class of Incident" icon={<ClassIcon />}
+          isOpen={classOpen} toggle={() => { closeAll(); setClassOpen(true); }}
+          allLabel="All Classes" selectedIds={selectedClassValues} items={classOptions}
+          onAllClick={() => setFilter('classOfIncident','')}
+          onToggleItem={v => setFilter('classOfIncident', toggleCsv(selectedClassValues, v).join(','))}
+          onMouseEnter={() => setClassOpen(true)}
+          onMouseLeave={() => setTimeout(() => setClassOpen(false), 400)}
+        />
+      </div>
+
+      {/* ── Total active count pill + Reset ────────────────────────────────── */}
+      {hasAnyFilter && (
+        <>
+          <div style={{ width: 1, height: 18, background: '#1e293b', flexShrink: 0 }} />
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: '#818cf8',
+            background: 'rgba(99,102,241,0.15)', border: '1px solid rgba(99,102,241,0.3)',
+            borderRadius: 20, padding: '2px 8px', whiteSpace: 'nowrap', flexShrink: 0,
+          }}>
+            {totalActiveFilters} active
+          </span>
+          <button onClick={resetFilters} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+            background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)',
+            color: '#f87171', fontSize: 11, fontWeight: 600, transition: 'all 0.2s',
           }}
-          onToggleItem={(id) => setFilter('districtIds', toggleCsvValue(selectedDistrictIds, id).join(','))}
-          onMouseEnter={() => setDistrictDropdownOpen(true)}
-          onMouseLeave={() => setTimeout(() => setDistrictDropdownOpen(false), 500)}
-        />
-      </div>
-
-      {/* Police Station (scoped to selected district) */}
-      <div 
-        className="filter-group" 
-        ref={stationRef} 
-        style={{ position: 'relative' }}
-        onMouseEnter={() => { closeAll(); setStationDropdownOpen(true); }}
-        onMouseLeave={() => { /* Don't close on group leave */ }}
-      >
-        <label>
-          Police Station
-          {psFetching && <span style={{ marginLeft: 4, color: '#64748b', fontSize: 10 }}>↻</span>}
-        </label>
-        <MultiSelectDropdown
-          isOpen={stationDropdownOpen}
-          toggle={() => { closeAll(); setStationDropdownOpen(true); }}
-          allLabel={selectedDistrictIds.length === 0 ? 'All Stations' : 'All Stations in District'}
-          selectedIds={selectedStationIds}
-          items={stationOptions}
-          onAllClick={() => {
-            setFilter('policeStationIds', '');
-            setFilter('officeIds', '');
-          }}
-          onToggleItem={(id) => setFilter('policeStationIds', toggleCsvValue(selectedStationIds, id).join(','))}
-          onMouseEnter={() => setStationDropdownOpen(true)}
-          onMouseLeave={() => setTimeout(() => setStationDropdownOpen(false), 500)}
-        />
-      </div>
-
-      {/* Office (scoped to selected district + PS, derived from complaint data) */}
-      <div 
-        className="filter-group" 
-        ref={officeRef} 
-        style={{ position: 'relative' }}
-        onMouseEnter={() => { closeAll(); setOfficeDropdownOpen(true); }}
-        onMouseLeave={() => { /* Don't close on group leave */ }}
-      >
-        <label>
-          Office
-          {officeFetching && <span style={{ marginLeft: 4, color: '#64748b', fontSize: 10 }}>↻</span>}
-        </label>
-        <MultiSelectDropdown
-          isOpen={officeDropdownOpen}
-          toggle={() => { closeAll(); setOfficeDropdownOpen(true); }}
-          allLabel={
-            selectedDistrictIds.length > 0 || selectedStationIds.length > 0
-              ? 'All Offices in Selection'
-              : 'All Offices'
-          }
-          selectedIds={selectedOfficeIds}
-          items={officeOptions}
-          onAllClick={() => setFilter('officeIds', '')}
-          onToggleItem={(id) => setFilter('officeIds', toggleCsvValue(selectedOfficeIds, id).join(','))}
-          onMouseEnter={() => setOfficeDropdownOpen(true)}
-          onMouseLeave={() => setTimeout(() => setOfficeDropdownOpen(false), 500)}
-        />
-      </div>
-
-      {/* Class of Incident */}
-      <div 
-        className="filter-group" 
-        ref={classRef} 
-        style={{ position: 'relative' }}
-        onMouseEnter={() => { closeAll(); setClassDropdownOpen(true); }}
-        onMouseLeave={() => { /* Don't close on group leave */ }}
-      >
-        <label>Class of Incident</label>
-        <MultiSelectDropdown
-          isOpen={classDropdownOpen}
-          toggle={() => { closeAll(); setClassDropdownOpen(true); }}
-          allLabel="All Classes"
-          selectedIds={selectedClassValues}
-          items={classOptions}
-          onAllClick={() => setFilter('classOfIncident', '')}
-          onToggleItem={(value) => setFilter('classOfIncident', toggleCsvValue(selectedClassValues, value).join(','))}
-          onMouseEnter={() => setClassDropdownOpen(true)}
-          onMouseLeave={() => setTimeout(() => setClassDropdownOpen(false), 500)}
-        />
-      </div>
-
-      <div className="filter-actions">
-        <button className="btn-reset" onClick={resetFilters}>Reset</button>
-      </div>
+            onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.18)'; }}
+            onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'rgba(239,68,68,0.08)'; }}
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+            Reset
+          </button>
+        </>
+      )}
     </div>
   );
 };

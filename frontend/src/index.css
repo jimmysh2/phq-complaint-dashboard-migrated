@@ -1323,10 +1323,10 @@ body {
 /* Tabs */
 .tab-list {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 4px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
-  padding: 4px;
+  padding: 3px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-md);
   border: 1px solid rgba(255, 255, 255, 0.05);
@@ -1336,9 +1336,9 @@ body {
 }
 
 .tab-item {
-  padding: 10px 20px;
+  padding: 5px 12px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: var(--transition);
@@ -1348,6 +1348,7 @@ body {
   text-decoration: none;
   white-space: nowrap;
   flex-shrink: 0;
+  line-height: 1.4;
 }
 
 .tab-item:hover {
@@ -1359,7 +1360,7 @@ body {
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
   color: white;
   border-color: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
 .hidden {
@@ -1958,68 +1959,104 @@ body {
   border-color: var(--primary-light);
   color: var(--primary-light);
 }
+/* ── Global Filter Bar ────────────────────────────────────────── */
 .global-filter-bar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  background: transparent;
-  padding: 8px 0;
+  gap: 6px;
   align-items: center;
   flex: 1;
+  padding: 6px 0;
 }
+
 .filter-group {
   display: flex;
-  flex-direction: row;
-  gap: 4px;
   align-items: center;
+  gap: 4px;
+  position: relative;
 }
-.filter-group label {
-  font-size: 0.7rem;
-  font-weight: 600;
+
+/* Small label tag above/beside each dropdown trigger */
+.filter-group-label {
+  font-size: 9px;
+  font-weight: 700;
   text-transform: uppercase;
-  color: #94a3b8;
+  letter-spacing: 0.07em;
+  color: #7c8fa8;
   white-space: nowrap;
+  user-select: none;
 }
+
+/* Date inputs — polished dark style */
 .filter-input {
-  background: #0f172a;
-  border: 1px solid #334155;
-  color: #f1f5f9;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid #2d3f55;
+  color: #b0bdcc;
   padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 0.75rem;
+  border-radius: 7px;
+  font-size: 11px;
   outline: none;
-  min-height: 26px;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  min-height: 28px;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  cursor: pointer;
 }
 
 .filter-input:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+  border-color: rgba(99,102,241,0.4);
+  background: rgba(99,102,241,0.06);
+  color: #cbd5e1;
 }
 
 .filter-input:focus {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+  color: #e2e8f0;
+  background: rgba(99,102,241,0.08);
 }
-.filter-input:focus {
-  border-color: #3b82f6;
+
+/* Date picker icon color */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.5) sepia(0.2) saturate(2) hue-rotate(200deg);
+  cursor: pointer;
+  opacity: 0.7;
 }
-.filter-actions {
-  margin-left: auto;
+input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
+
+/* Legacy reset / filter-actions kept for compatibility */
+.filter-actions { margin-left: auto; }
 .btn-reset {
   background: transparent;
   color: #ef4444;
-  border: 1px solid #ef4444;
-  padding: 3px 8px;
-  border-radius: 4px;
-  font-size: 0.7rem;
+  border: 1px solid rgba(239,68,68,0.4);
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
   cursor: pointer;
   transition: all 0.2s;
-  margin-left: 8px;
 }
-.btn-reset:hover {
-  background: rgba(239, 68, 68, 0.1);
+.btn-reset:hover { background: rgba(239,68,68,0.1); }
+
+/* Mobile: stack filters vertically */
+@media (max-width: 1024px) {
+  .global-filter-bar {
+    gap: 8px;
+  }
+}
+@media (max-width: 640px) {
+  .global-filter-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .filter-group {
+    width: 100%;
+  }
+  .filter-group button {
+    width: 100%;
+    max-width: unset !important;
+  }
 }
 
 @media print {

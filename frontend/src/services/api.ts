@@ -180,6 +180,11 @@ export const reportsApi = {
     const response = await api.get('/api/reports/oldest-pending', { params });
     return response.data;
   },
+
+  habitualComplainants: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/habitual-complainants', { params });
+    return response.data;
+  },
 };
 
 export const pendingApi = {
