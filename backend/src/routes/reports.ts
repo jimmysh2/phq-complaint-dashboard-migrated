@@ -259,7 +259,27 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
     const limitRaw  = Prisma.raw(String(pageSize));
     const offsetRaw = Prisma.raw(String(offset));
     const minRaw    = Prisma.raw(String(minComplaints));
+    const mobileFilter = String(query.mobileFilter || 'all').trim(); // 'all' | 'valid' | 'invalid'
 
+    // ── Indian mobile number validity expression ──────────────────────────────
+    // Valid: exactly 10 digits, starts with 6/7/8/9, NOT all-same-digit,
+    //        NOT 8+ consecutive zeros, NOT known fake sequential patterns.
+    const VALID_MOBILE_EXPR = Prisma.sql`(
+      mobile ~ '^[6-9][0-9]{9}$'
+      AND mobile !~ '^(.)\\1{9}$'
+      AND mobile !~ '0{8}'
+      AND mobile NOT IN ('1234567890','0987654321','9876543210','1111111111','2222222222',
+                         '3333333333','4444444444','5555555555','6666666666','7777777777',
+                         '8888888888','9999999999','0000000000')
+    )`;
+    const INVALID_MOBILE_EXPR = Prisma.sql`NOT (
+      mobile ~ '^[6-9][0-9]{9}$'
+      AND mobile !~ '^(.)\\1{9}$'
+      AND mobile !~ '0{8}'
+      AND mobile NOT IN ('1234567890','0987654321','9876543210','1111111111','2222222222',
+                         '3333333333','4444444444','5555555555','6666666666','7777777777',
+                         '8888888888','9999999999','0000000000')
+    )`;
     // Global date/district/PS/office/class filters from the global filter bar
     const globalWhere = buildRawWhereClause(query);
 
@@ -318,11 +338,15 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       } catch { /* ignore invalid JSON */ }
     }
 
+    // ── Mobile validity filter ────────────────────────────────────────────────
+    if (mobileFilter === 'valid')   outerParts.push(VALID_MOBILE_EXPR);
+    if (mobileFilter === 'invalid') outerParts.push(INVALID_MOBILE_EXPR);
+
     const outerWhere: Prisma.Sql = outerParts.length > 0
       ? Prisma.join(outerParts, ' AND ')
       : Prisma.sql`TRUE`;
 
-    const cacheKey = `report-habitual:${JSON.stringify({ page, pageSize, minComplaints, search: searchRaw, qf: qfRaw, ...query })}`;
+    const cacheKey = `report-habitual:${JSON.stringify({ page, pageSize, minComplaints, mobileFilter, search: searchRaw, qf: qfRaw, ...query })}`;
     const data = await cached(cacheKey, 5 * 60 * 1000, async () => {
 
       // Single CTE — no district branch; district comes from globalWhere (global filter bar)
@@ -470,5 +494,85 @@ export const reportRoutes = async (fastify: FastifyInstance) => {
       }
     });
     return sendCached(reply, data);
+  });
+
+  // ── By Hand + Bogus Mobile (Individual Complaints) ─────────────
+  fastify.get('/reports/byhand-bogus', {
+    preHandler: [authenticate],
+  }, async (request, reply) => {
+    const query = request.query as any;
+    const page = Math.max(1, parseInt(query.page || '1', 10));
+    const pageSize = Math.max(10, parseInt(query.pageSize || '50', 10));
+    const offset = (page - 1) * pageSize;
+    const searchRaw = String(query.search || '').trim();
+
+    const INVALID_MOBILE_EXPR = Prisma.sql`(
+      mobile IS NULL OR NOT (
+        mobile ~ '^[6-9][0-9]{9}$'
+        AND mobile !~ '^(.)\\1{9}$'
+        AND mobile !~ '0{8}'
+        AND mobile NOT IN ('1234567890','0987654321','9876543210','1111111111','2222222222',
+                           '3333333333','4444444444','5555555555','6666666666','7777777777',
+                           '8888888888','9999999999','0000000000')
+      )
+    )`;
+
+    const filterWhere = buildRawWhereClause(query);
+    const limitRaw = Prisma.raw(String(pageSize));
+    const offsetRaw = Prisma.raw(String(offset));
+
+    let searchWhere = Prisma.sql`TRUE`;
+    if (searchRaw) {
+      const pat = `%${searchRaw}%`;
+      searchWhere = Prisma.sql`(
+        COALESCE("firstName",'') || ' ' || COALESCE("lastName",'') ILIKE ${pat}
+        OR COALESCE(mobile,'') ILIKE ${pat}
+        OR COALESCE("complRegNum",'') ILIKE ${pat}
+      )`;
+    }
+
+    const whereClause = Prisma.sql`${filterWhere} 
+      AND "receptionMode" = 'In-Person/By Hand' 
+      AND ${INVALID_MOBILE_EXPR}
+      AND ${searchWhere}`;
+
+    const countRows = await prisma.$queryRaw<any[]>`
+      SELECT COUNT(*) AS total FROM "Complaint" WHERE ${whereClause}
+    `;
+
+    const rows = await prisma.$queryRaw<any[]>`
+      SELECT
+        "complRegNum" AS "complaintNumber", 
+        "complRegDt" AS "date", 
+        "firstName", "lastName", mobile, 
+        "districtName", "addressDistrict", 
+        "policeStationName", "addressPs",
+        "status"
+      FROM "Complaint"
+      WHERE ${whereClause}
+      ORDER BY "complRegDt" DESC NULLS LAST
+      LIMIT ${limitRaw} OFFSET ${offsetRaw}
+    `;
+
+    const items = rows.map(r => ({
+      complaintNumber: r.complaintNumber,
+      date: r.date ? String(r.date).split('T')[0] : null,
+      fullName: [r.firstName, r.lastName].filter(Boolean).join(' ') || 'N/A',
+      mobile: r.mobile,
+      district: r.districtName || r.addressDistrict || 'N/A',
+      ps: r.policeStationName || r.addressPs || 'N/A',
+      status: r.status,
+    }));
+
+    const total = Number(countRows[0]?.total || 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+    return sendSuccess(reply, {
+      data: items,
+      total,
+      page,
+      pageSize,
+      totalPages,
+    });
   });
 };

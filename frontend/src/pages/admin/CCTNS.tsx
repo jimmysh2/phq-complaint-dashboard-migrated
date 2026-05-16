@@ -119,7 +119,7 @@ export const CCTNSPage = () => {
 
   const isConfigured = statusQuery.data?.data?.configured;
 
-  // —— Fetch & Sync mutation ——
+  // ── Fetch & Sync mutation ──
   const fetchMutation = useMutation({
     mutationFn: (range: { from: string; to: string }) =>
       cctnsApi.fetchAndSync(range.from, range.to),
@@ -130,6 +130,25 @@ export const CCTNSPage = () => {
       }
     },
   });
+
+  // ── Quick Sync mutation (from last DB date → today) ──
+  const quickSyncMutation = useMutation({
+    mutationFn: () => cctnsApi.quickSync(),
+    onSuccess: (data) => {
+      if (data?.data?.jobId) {
+        setActiveJobId(data.data.jobId);
+        setJobStatus('pending');
+      }
+    },
+  });
+
+  // ── Last sync date (most recent complRegDt in DB) ──
+  const lastSyncDateQuery = useQuery({
+    queryKey: ['cctns-last-sync-date'],
+    queryFn: () => cctnsApi.lastSyncDate(),
+    staleTime: 60 * 1000, // refresh every minute
+  });
+  const lastSyncDateLabel: string = lastSyncDateQuery.data?.data?.apiDate || '—';
 
   // —— Poll job status ——
   const jobQuery = useQuery({
@@ -152,8 +171,10 @@ export const CCTNSPage = () => {
       const data = jobQuery.data.data;
       setJobStatus(data.status);
       if (data.status === 'success' || data.status === 'error') {
-        // Invalidate synced records to refresh
+        // Invalidate synced records AND sync history to refresh both
         queryClient.invalidateQueries({ queryKey: ['cctns-synced'] });
+        queryClient.invalidateQueries({ queryKey: ['cctns-history'] });
+        queryClient.invalidateQueries({ queryKey: ['cctns-last-sync-date'] });
         // Clear active job after a delay so user sees final state
         if (pollRef.current) clearTimeout(pollRef.current);
         pollRef.current = setTimeout(() => {
@@ -265,11 +286,13 @@ export const CCTNSPage = () => {
     staleTime: 5 * 60 * 1000, // Cache for 5 min
   });
 
-  // —— Sync run history ——
+  // ── Sync run history ──
   const historyQuery = useQuery({
     queryKey: ['cctns-history'],
     queryFn: () => cctnsApi.syncRuns(1, 50),
     enabled: activeTab === 'history',
+    staleTime: 0,              // always fetch fresh when re-enabled
+    refetchOnMount: 'always',  // force reload whenever the tab is switched to
   });
 
   // Handle response structure: response.data = { success, data: { data: [...], pagination: {...} }, message }
@@ -300,7 +323,7 @@ export const CCTNSPage = () => {
     });
   }, [activeTab, syncedQuery.isLoading, syncedQuery.isError, syncedQuery.data, liveQuery.isLoading, liveQuery.isError, liveQuery.data]);
 
-  const isFetching = fetchMutation.isPending || !!activeJobId;
+  const isFetching = fetchMutation.isPending || quickSyncMutation.isPending || !!activeJobId;
 
   // —— Export: fetch all records (no pagination limit) for Excel/PDF export ——
   const fetchAllCctnsForExport = useCallback(async () => {
@@ -829,9 +852,33 @@ export const CCTNSPage = () => {
                 </div>
               </div>
 
-              <Button variant="primary" disabled={!isConfigured || isFetching} onClick={handleFetch}>
-                {isFetching ? 'Syncing...' : 'Fetch & Sync to DB'}
-              </Button>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                <Button variant="primary" disabled={!isConfigured || isFetching} onClick={handleFetch}>
+                  {fetchMutation.isPending ? 'Starting...' : isFetching && !quickSyncMutation.isPending ? 'Syncing...' : 'Fetch & Sync'}
+                </Button>
+                {/* ── Quick Sync: auto-detects last DB date ── */}
+                <button
+                  disabled={!isConfigured || isFetching}
+                  onClick={() => { setFetchError(null); quickSyncMutation.mutate(); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    padding: '7px 14px', borderRadius: 7, fontSize: 13, fontWeight: 600, cursor: isFetching ? 'not-allowed' : 'pointer',
+                    background: isFetching ? 'rgba(52,211,153,0.05)' : 'rgba(52,211,153,0.15)',
+                    border: '1px solid rgba(52,211,153,0.4)', color: isFetching ? '#475569' : '#34d399',
+                    transition: 'all 0.15s',
+                  }}
+                  title={`Sync from ${lastSyncDateLabel} → Today (auto-detected from DB)`}
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                    style={quickSyncMutation.isPending ? { animation: 'spin 0.8s linear infinite' } : {}}>
+                    <path d="M1 4v6h6M23 20v-6h-6"/>
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/>
+                  </svg>
+                  {quickSyncMutation.isPending ? 'Starting...' : (
+                    <>Quick Sync{lastSyncDateLabel !== '—' && <span style={{ fontSize: 10, opacity: 0.75, marginLeft: 3 }}>from {lastSyncDateLabel}</span>}</>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* —— Error feedback —— */}

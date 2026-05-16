@@ -797,6 +797,103 @@ if (disposalAge) {
   });
 
 
+  // ── NEW: return the most recent complaint registration date in the DB ──
+  // Used by the frontend "Quick Sync" button to find the from-date automatically.
+  fastify.get('/cctns/last-sync-date', {
+    preHandler: [authenticate],
+  }, async (_request, reply) => {
+    try {
+      const result = await prisma.$queryRaw<{ last_date: Date | null }[]>`
+        SELECT MAX("complRegDt") AS last_date FROM "Complaint"
+      `;
+      const lastDate = result[0]?.last_date || null;
+      // Format as DD/MM/YYYY for the CCTNS API, and ISO for the frontend date picker
+      let apiDate: string | null = null;
+      let isoDate: string | null = null;
+      if (lastDate) {
+        const d = new Date(lastDate);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const yyyy = d.getFullYear();
+        apiDate = `${dd}/${mm}/${yyyy}`;
+        isoDate = `${yyyy}-${mm}-${dd}`;
+      }
+      return sendSuccess(reply, { lastDate: lastDate ? lastDate.toISOString() : null, apiDate, isoDate });
+    } catch (error: any) {
+      return sendError(reply, `Failed to get last sync date: ${error.message}`);
+    }
+  });
+
+  // ── NEW: Quick Sync — fetch from last DB date → today ──
+  fastify.post('/cctns/quick-sync', {
+    preHandler: [authenticate],
+  }, async (_request, reply) => {
+    try {
+      // Find the most recent complRegDt in DB
+      const result = await prisma.$queryRaw<{ last_date: Date | null }[]>`
+        SELECT MAX("complRegDt") AS last_date FROM "Complaint"
+      `;
+      const lastDate = result[0]?.last_date;
+
+      let fromDate: Date;
+      if (lastDate) {
+        // Start from the day AFTER the last recorded date to avoid re-fetching known data
+        fromDate = new Date(lastDate);
+        fromDate.setDate(fromDate.getDate() + 1);
+      } else {
+        // No data at all — default to 30 days ago
+        fromDate = new Date();
+        fromDate.setDate(fromDate.getDate() - 30);
+      }
+
+      const today = new Date();
+      // If from > today, nothing to do
+      if (fromDate > today) {
+        return sendSuccess(reply, {
+          skipped: true,
+          message: 'Database already up to date. No new dates to fetch.',
+          lastDate: lastDate ? lastDate.toISOString() : null,
+        });
+      }
+
+      const formatDDMMYYYY = (d: Date) => {
+        const dd = String(d.getDate()).padStart(2, '0');
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        return `${dd}/${mm}/${d.getFullYear()}`;
+      };
+
+      const timeFrom = formatDDMMYYYY(fromDate);
+      const timeTo   = formatDDMMYYYY(today);
+
+      const jobId = `quick-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const job: FetchJob = {
+        id: jobId,
+        status: 'pending',
+        timeFrom,
+        timeTo,
+        startedAt: new Date(),
+      };
+      fetchJobs.set(jobId, job);
+
+      // Fire async — do NOT await
+      runFetchJob(jobId, timeFrom, timeTo).catch((err) => {
+        console.error(`[QUICK-SYNC ${jobId}] Unhandled error:`, err);
+        const j = fetchJobs.get(jobId);
+        if (j) { j.status = 'error'; j.error = String(err); j.completedAt = new Date(); }
+      });
+
+      return sendSuccess(reply, {
+        jobId,
+        status: 'pending',
+        timeFrom,
+        timeTo,
+        message: `Quick sync started from ${timeFrom} to ${timeTo}. Poll /cctns/fetch-status/${jobId} for progress.`,
+      }, 'Quick sync started', 202);
+    } catch (error: any) {
+      return sendError(reply, `Quick sync failed to start: ${error.message}`);
+    }
+  });
+
   fastify.get('/cctns/:id', {
     preHandler: [authenticate],
   }, async (request, reply) => {

@@ -185,6 +185,10 @@ export const reportsApi = {
     const response = await api.get('/api/reports/habitual-complainants', { params });
     return response.data;
   },
+  byhandBogus: async (params?: Record<string, string>) => {
+    const response = await api.get('/api/reports/byhand-bogus', { params });
+    return response.data;
+  },
 };
 
 export const pendingApi = {
@@ -338,6 +342,19 @@ export const cctnsApi = {
   syncRuns: async (page = 1, limit = 20) => {
     const response = await api.get('/api/cctns/sync-runs', { params: { page, limit } });
     return response.data;
+  },
+  lastSyncDate: async () => {
+    const response = await api.get('/api/cctns/last-sync-date');
+    return response.data;
+  },
+  quickSync: async () => {
+    try {
+      const response = await api.post('/api/cctns/quick-sync');
+      return response.data;
+    } catch (error: any) {
+      console.error('❌ Quick sync failed:', error.response?.data || error.message);
+      throw error;
+    }
   },
 };
 

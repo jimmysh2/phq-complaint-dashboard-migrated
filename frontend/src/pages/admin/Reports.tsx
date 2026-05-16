@@ -19,6 +19,7 @@ const tabs = [
   { id: 'branch-wise', label: 'Branch' },
   { id: 'oldest-pending', label: 'Oldest Pending' },
   { id: 'habitual-complainants', label: 'Habitual Complainants' },
+  { id: 'byhand-bogus', label: 'By Hand + Bogus' },
 ];
 
 const apiFnMap: Record<string, (params?: Record<string, string>) => Promise<any>> = {
@@ -141,6 +142,7 @@ const HabitualComplainantsTab = ({ activeFilters, openDrawer }: {
   const [page,          setPage]          = useState(1);
   const [pageSize,      setPageSize]      = useState(50);
   const [gotoPage,      setGotoPage]      = useState('');
+  const [mobileFilter,  setMobileFilter]  = useState<'all'|'valid'|'invalid'>('all');
 
   // Query builder filters
   type QFField = 'name'|'mobile'|'district'|'ps'|'address'|'gender';
@@ -186,6 +188,7 @@ const HabitualComplainantsTab = ({ activeFilters, openDrawer }: {
     minComplaints: String(minComplaints),
   };
   if (debouncedSearch)        params.search       = debouncedSearch;
+  if (mobileFilter !== 'all') params.mobileFilter = mobileFilter;
   if (appliedFilters.length)  params.queryFilters = JSON.stringify(
     appliedFilters.map(({ field, op, value }) => ({ field, op, value }))
   );
@@ -232,6 +235,17 @@ const HabitualComplainantsTab = ({ activeFilters, openDrawer }: {
 
   const rankColor = (r: number) => r === 1 ? '#fbbf24' : r === 2 ? '#94a3b8' : r === 3 ? '#cd7f32' : '#1e293b';
 
+  // Client-side mobile validity (mirrors backend SQL rules)
+  const FAKE_MOBILES = new Set(['1234567890','0987654321','9876543210','1111111111','2222222222',
+    '3333333333','4444444444','5555555555','6666666666','7777777777','8888888888','9999999999','0000000000']);
+  const isValidIndianMobile = (m: string): boolean => {
+    if (!m || !/^[6-9][0-9]{9}$/.test(m)) return false;  // 10 digits, starts 6-9
+    if (/^(.)\1{9}$/.test(m)) return false;               // all-same-digit
+    if (/0{8}/.test(m)) return false;                     // 8+ consecutive zeros (e.g. 9900000000)
+    if (FAKE_MOBILES.has(m)) return false;                 // known fakes
+    return true;
+  };
+
   const navBtn = (disabled: boolean, onClick: () => void, label: string) => (
     <button disabled={disabled} onClick={onClick} style={{
       padding: '3px 8px', background: disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)',
@@ -276,6 +290,35 @@ const HabitualComplainantsTab = ({ activeFilters, openDrawer }: {
           <select value={minComplaints} onChange={e => { setMinComplaints(Number(e.target.value)); resetPage(); }} style={ctrlStyle}>
             {[2,3,5,10,20].map(n => <option key={n} value={n} style={{ background: '#1e293b' }}>{n}+</option>)}
           </select>
+        </div>
+
+        {/* Mobile Validity Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexShrink: 0, borderRadius: 7, overflow: 'hidden', border: '1px solid #334155' }}>
+          {([
+            { key: 'all',     label: 'All Mobiles',    icon: '📱' },
+            { key: 'valid',   label: 'Valid Mobile',   icon: '✓' },
+            { key: 'invalid', label: 'Invalid Mobile', icon: '✗' },
+          ] as const).map((opt, idx) => {
+            const isActive = mobileFilter === opt.key;
+            const activeColor =
+              opt.key === 'valid'   ? { bg: 'rgba(52,211,153,0.18)', border: 'rgba(52,211,153,0.5)', text: '#34d399' } :
+              opt.key === 'invalid' ? { bg: 'rgba(239,68,68,0.18)',  border: 'rgba(239,68,68,0.5)',  text: '#f87171' } :
+                                      { bg: 'rgba(99,102,241,0.18)', border: 'rgba(99,102,241,0.4)', text: '#818cf8' };
+            return (
+              <button key={opt.key} onClick={() => { setMobileFilter(opt.key); resetPage(); }} style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '5px 10px', fontSize: 11, fontWeight: isActive ? 600 : 400,
+                background:  isActive ? activeColor.bg  : 'rgba(255,255,255,0.04)',
+                color:       isActive ? activeColor.text : '#64748b',
+                border: 'none',
+                borderRight: idx < 2 ? '1px solid #334155' : 'none',
+                cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
+              }}>
+                <span style={{ fontSize: opt.key === 'all' ? 10 : 12, lineHeight: 1 }}>{opt.icon}</span>
+                {opt.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Add Filter button */}
@@ -419,7 +462,22 @@ const HabitualComplainantsTab = ({ activeFilters, openDrawer }: {
                         {r.gender  && <div style={{ fontSize: 10, color: '#64748b', marginTop: 1 }}>{r.gender}</div>}
                         {r.address && <div style={{ fontSize: 10, color: '#475569', marginTop: 1, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.address}</div>}
                       </td>
-                      <td style={{ padding: '8px 11px', fontFamily: 'monospace', color: '#60a5fa', whiteSpace: 'nowrap' }}>{r.mobile}</td>
+                      <td style={{ padding: '8px 11px', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <span style={{ fontFamily: 'monospace', color: '#60a5fa' }}>{r.mobile}</span>
+                          {isValidIndianMobile(r.mobile) ? (
+                            <span title="Valid Indian mobile number"
+                              style={{ fontSize: 9, color: '#34d399', fontWeight: 700, lineHeight: 1,
+                                border: '1px solid rgba(52,211,153,0.4)', borderRadius: 3,
+                                padding: '1px 3px', flexShrink: 0 }}>✓</span>
+                          ) : (
+                            <span title="Invalid / unverifiable mobile number"
+                              style={{ fontSize: 9, color: '#f87171', fontWeight: 700, lineHeight: 1,
+                                border: '1px solid rgba(248,113,113,0.4)', borderRadius: 3,
+                                padding: '1px 3px', flexShrink: 0 }}>✗</span>
+                          )}
+                        </div>
+                      </td>
                       <td style={{ padding: '8px 11px', color: '#94a3b8' }}>{r.districtName || '—'}</td>
                       <td style={{ padding: '8px 11px', color: '#94a3b8' }}>{r.psName || '—'}</td>
                       <td style={{ padding: '8px 11px' }}>
@@ -502,7 +560,165 @@ const HabitualComplainantsTab = ({ activeFilters, openDrawer }: {
 
 
 
+// ---------------------------------------------------------------------------
+// By Hand + Bogus Mobile Tab
+// ═══════════════════════════════════════════════════════════════════════════
+const ByHandBogusTab = ({ activeFilters, openDrawer }: {
+  activeFilters: Record<string, string>;
+  openDrawer: (title: string, filters: DrawerFilters) => void;
+}) => {
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(50);
+  const [searchText, setSearchText] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchText);
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchText]);
+
+  const params: Record<string, string> = { ...activeFilters, page: String(page), pageSize: String(pageSize) };
+  if (debouncedSearch) params.search = debouncedSearch;
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['byhand-bogus', params],
+    queryFn: () => reportsApi.byhandBogus(params),
+    staleTime: 5 * 60 * 1000,
+    placeholderData: (prev: any) => prev,
+  });
+
+  const apiData = (data as any)?.data || {};
+  const rows = apiData.data || [];
+  const total = apiData.total || 0;
+  const totalPages = apiData.totalPages || 1;
+
+  const navBtn = (disabled: boolean, onClick: () => void, label: string) => (
+    <button disabled={disabled} onClick={onClick} style={{
+      padding: '3px 8px', background: disabled ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)',
+      color: disabled ? '#475569' : '#e2e8f0', border: '1px solid #334155',
+      borderRadius: 4, cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 13,
+      transition: 'all 0.15s'
+    }}>
+      {label}
+    </button>
+  );
+
+  return (
+    <div style={{ background: '#0f172a', borderRadius: 12, border: '1px solid #1e293b', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Header controls */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: '#f1f5f9', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: '#fb923c' }}>⚠</span> By Hand Complaints with Bogus Mobile
+          </h3>
+          <p style={{ margin: '4px 0 0', fontSize: 12, color: '#94a3b8' }}>
+            Data entry mismatch: 'In-Person/By Hand' mode but containing invalid mobile numbers.
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input
+            type="text" placeholder="Search name, mobile, complaint..."
+            value={searchText} onChange={e => setSearchText(e.target.value)}
+            style={{
+              background: 'rgba(0,0,0,0.2)', border: '1px solid #334155', borderRadius: 6,
+              padding: '6px 12px', fontSize: 12, color: '#f1f5f9', width: 220, outline: 'none'
+            }}
+          />
+          {isFetching && !isLoading && (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              style={{ animation: 'spin 0.8s linear infinite', color: '#60a5fa' }}>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" opacity="0.2"/>
+              <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+            </svg>
+          )}
+        </div>
+      </div>
+
+      {/* Table */}
+      <div style={{ overflowX: 'auto', border: '1px solid #1e293b', borderRadius: 8, background: '#0b1120' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, textAlign: 'left' }}>
+          <thead>
+            <tr style={{ background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid #1e293b' }}>
+              <th style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 500, width: 40 }}>#</th>
+              <th style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 500 }}>Complaint No.</th>
+              <th style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 500 }}>Date</th>
+              <th style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 500 }}>Complainant Name</th>
+              <th style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 500 }}>Mobile</th>
+              <th style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 500 }}>District / PS</th>
+              <th style={{ padding: '10px 12px', color: '#94a3b8', fontWeight: 500 }}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {isLoading ? (
+              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>Loading...</td></tr>
+            ) : rows.length === 0 ? (
+              <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>No bogus by-hand records found.</td></tr>
+            ) : (
+              rows.map((r: any, i: number) => (
+                <tr key={r.complaintNumber || i} style={{ borderBottom: '1px solid #1e293b', transition: 'background 0.15s' }}>
+                  <td style={{ padding: '10px 12px', color: '#64748b' }}>{(page - 1) * pageSize + i + 1}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span 
+                      style={{ color: '#60a5fa', cursor: 'pointer', textDecoration: 'underline' }}
+                      onClick={() => openDrawer(`Complaint: ${r.complaintNumber}`, { search: r.complaintNumber } as any)}
+                    >
+                      {r.complaintNumber}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 12px', color: '#94a3b8' }}>{r.date || '-'}</td>
+                  <td style={{ padding: '10px 12px', color: '#e2e8f0', fontWeight: 500 }}>{r.fullName}</td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ color: '#f87171', fontFamily: 'monospace', padding: '2px 6px', background: 'rgba(239,68,68,0.1)', borderRadius: 4, fontSize: 11 }}>
+                      {r.mobile || 'NULL'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '10px 12px', color: '#cbd5e1' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <span>{r.district}</span>
+                      <span style={{ color: '#64748b', fontSize: 10 }}>{r.ps}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: '10px 12px' }}>
+                    <span style={{ 
+                      padding: '3px 8px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                      background: r.status === 'Disposed' ? 'rgba(52,211,153,0.1)' : 'rgba(250,204,21,0.1)',
+                      color: r.status === 'Disposed' ? '#34d399' : '#facc15'
+                    }}>
+                      {r.status || 'Pending'}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Footer */}
+      {!isLoading && total > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: '#64748b' }}>
+            Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of <strong style={{ color: '#e2e8f0' }}>{total.toLocaleString()}</strong> records
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11, color: '#64748b' }}>
+              Page <strong style={{ color: '#e2e8f0' }}>{page}</strong> of {totalPages}
+            </span>
+            <div style={{ display: 'flex', gap: 3 }}>
+              {navBtn(page <= 1, () => setPage(1), '«')}
+              {navBtn(page <= 1, () => setPage(p => p - 1), '‹')}
+              {navBtn(page >= totalPages, () => setPage(p => p + 1), '›')}
+              {navBtn(page >= totalPages, () => setPage(totalPages), '»')}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export const ReportsPage = () => {
   const [sp] = useSearchParams();
@@ -658,6 +874,11 @@ export const ReportsPage = () => {
 
         {isLoading ? (
           <div className="loading-spinner"><svg width="28" height="28" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg></div>
+        ) : type === 'byhand-bogus' ? (
+          <ByHandBogusTab
+            activeFilters={activeFilters}
+            openDrawer={openDrawer}
+          />
         ) : type === 'habitual-complainants' ? (
           <HabitualComplainantsTab
             activeFilters={activeFilters}
